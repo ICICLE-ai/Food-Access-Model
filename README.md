@@ -39,7 +39,7 @@
 
   <p align="center">
     project_description
-    *Use this guide to fill out this ReadMe (https://www.makeareadme.com/)*
+    Use this guide to fill out this ReadMe (https://www.makeareadme.com/)
     
     <br />
     <a href="https://github.com/github_username/repo_name"><strong>Explore the docs »</strong></a>
