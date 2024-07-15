@@ -1,0 +1,501 @@
+id,name,type,latitude,longitude
+0,Hills Market,CurbPickup,40.107112,-83.013977
+1,Midway Drive Thru,CurbPickup,39.932819,-83.047694
+2,Walmart Supercenter,CurbPickup,39.85464,-82.826026
+3,Walmart Supercenter,CurbPickup,39.92693,-83.120554
+4,Walmart Supercenter,CurbPickup,40.067172,-83.089916
+5,Walmart Supercenter,CurbPickup,40.060508,-82.91313
+6,Walmart Supercenter,CurbPickup,39.983176,-83.145067
+7,Walmart Supercenter,CurbPickup,40.074028,-83.137618
+8,Walmart Supercenter,CurbPickup,40.123491,-83.087117
+9,Walmart Supercenter,CurbPickup,39.875256,-83.042694
+10,Walmart Supercenter,CurbPickup,40.111316,-82.923926
+11,Walmart Supercenter,CurbPickup,39.954135,-82.900505
+12,Cam International Market,EthnicFoods,40.031528,-83.121688
+13,Hills Market,EthnicFoods,40.12504,-83.03657
+14,Hills Market Downtown,EthnicFoods,39.96537,-82.991853
+15,HTH Farm Market,EthnicFoods,40.090664,-83.052843
+16,Patel Brothers,EthnicFoods,40.103144,-83.089425
+17,Sunrise International Market,EthnicFoods,39.9556,-83.10869
+18,Tommy's Jerky Outlet,EthnicFoods,39.893505,-83.084533
+19,Trader Joe's,EthnicFoods,40.049344,-82.918221
+20,Trader Joe's,EthnicFoods,40.096375,-83.093199
+21,Vincenzo's Convenient Elegance,EthnicFoods,40.097156,-83.093437
+22,Yasmin International Market,EthnicFoods,40.080929,-82.95066
+23,23 Mart,GrocerRetail,39.831668,-83.000944
+24,3-C Food Mart,GrocerRetail,40.086175,-83.092972
+25,3c Plus Food Mart,GrocerRetail,40.061953,-82.971996
+26,Adult Supermart,GrocerRetail,39.951763,-83.145004
+27,Africa Supermarket,GrocerRetail,39.944899,-82.898689
+28,African Market Plus,GrocerRetail,39.920371,-82.878128
+29,Afrique Food Warehouse,GrocerRetail,40.056089,-82.975203
+30,Ai-Mustafa Market & Bakery,GrocerRetail,40.065951,-83.09426
+31,ALDI,GrocerRetail,39.856345,-82.825744
+32,ALDI,GrocerRetail,39.945478,-83.034099
+33,ALDI,GrocerRetail,40.061154,-82.959578
+34,ALDI,GrocerRetail,40.012699,-82.995449
+35,ALDI,GrocerRetail,39.887205,-82.996658
+36,ALDI,GrocerRetail,40.063232,-83.092289
+37,ALDI,GrocerRetail,40.074183,-83.019448
+38,ALDI,GrocerRetail,39.95023,-83.146223
+39,ALDI,GrocerRetail,40.069505,-82.864034
+40,ALDI,GrocerRetail,39.88057,-83.066622
+41,ALDI,GrocerRetail,39.89403,-82.88341
+42,ALDI,GrocerRetail,39.989406,-83.148821
+43,ALDI,GrocerRetail,40.103165,-82.82436
+44,ALDI,GrocerRetail,39.985413,-82.781228
+45,ALDI,GrocerRetail,40.023654,-83.057792
+46,ALDI,GrocerRetail,40.094984,-82.923793
+47,ALDI,GrocerRetail,39.955423,-82.896396
+48,Alex Market,GrocerRetail,39.943089,-83.07848
+49,Alma Food Inc,GrocerRetail,39.997203,-82.978363
+50,Ameristop Food Mart,GrocerRetail,40.058688,-82.96139
+51,Ameristop Food Mart,GrocerRetail,39.973071,-82.811002
+52,Apsara Markets,GrocerRetail,39.940699,-83.040505
+53,Archana Grocery LLC,GrocerRetail,40.061953,-82.971996
+54,Arena Produce Co,GrocerRetail,39.98027,-82.98067
+55,Arirang Oriental Market,GrocerRetail,40.065301,-83.059255
+56,Ashtown African Market LLC,GrocerRetail,40.098576,-82.949218
+57,Aswaq Baladna,GrocerRetail,40.083805,-82.953221
+58,Ayan Grocery Store,GrocerRetail,39.941857,-83.098141
+59,B G's Carry Out & Grocery,GrocerRetail,40.024,-82.987524
+60,Banadiry International,GrocerRetail,40.034087,-82.962543
+61,Baraka International Market,GrocerRetail,40.034087,-82.962543
+62,Bazyan Market & Bakery,GrocerRetail,40.0646,-83.060391
+63,Beer Frame Carry Out,GrocerRetail,39.917775,-82.896167
+64,Belvidere Food Mart,GrocerRetail,39.953137,-83.054824
+65,Bexley Natural Market,GrocerRetail,39.980951,-82.931698
+66,Big R Grocery,GrocerRetail,39.935962,-82.910479
+67,Bishops' Storehouse,GrocerRetail,39.883963,-82.88984
+68,Bob's Market,GrocerRetail,40.026612,-82.951669
+69,Bravo,GrocerRetail,39.967532,-82.981401
+70,Brilista Foods Inc,GrocerRetail,39.974774,-83.030184
+71,Brookshire Foodliner,GrocerRetail,39.938062,-83.072245
+72,Bulkmatic Transport Co,GrocerRetail,39.888434,-82.935268
+73,Bushman's Food Market,GrocerRetail,39.940177,-82.983686
+74,Butcher & Grocer,GrocerRetail,39.979563,-83.033633
+75,C-1 Convenient One,GrocerRetail,39.971608,-82.914262
+76,Cassady Market,GrocerRetail,40.021715,-82.928157
+77,Center Street Market,GrocerRetail,40.03443,-83.15984
+78,Chiquitas Imports LLC,GrocerRetail,39.945027,-83.066609
+79,Circle Mart,GrocerRetail,40.076425,-82.966957
+80,Clintonville Natural Foods,GrocerRetail,40.054659,-83.000058
+81,Columbus Asia Market Inc,GrocerRetail,40.031528,-83.121688
+82,Columbus Fish & Seafood WHLS,GrocerRetail,39.980926,-83.141175
+83,Columbus Preparatory Academy,GrocerRetail,39.933815,-83.055998
+84,Come & Go Ctr,GrocerRetail,40.032856,-82.991005
+85,Convenient Plus Food Mart,GrocerRetail,39.933749,-82.954604
+86,Convenient Plus Food Mart,GrocerRetail,39.963431,-83.076903
+87,Convenient Plus Food Mart,GrocerRetail,39.9427,-82.849725
+88,Cook's Oakland Park IGA,GrocerRetail,40.031843,-82.980772
+89,Costco Wholesale,GrocerRetail,40.053433,-82.904752
+90,Coughlin Express Mart,GrocerRetail,40.104845,-82.97635
+91,Country Food Store,GrocerRetail,39.941517,-83.101429
+92,Dairy Mart,GrocerRetail,39.925659,-82.882938
+93,Dairy Treats,GrocerRetail,39.986248,-82.987332
+94,De Store,GrocerRetail,39.875915,-82.826854
+95,Dire Dawa Grocery Store,GrocerRetail,39.955088,-82.877847
+96,Dirmarket,GrocerRetail,39.955088,-82.877847
+97,Discount Drug Mart,GrocerRetail,40.070694,-82.864118
+98,Discount Drug Mart,GrocerRetail,39.880291,-83.064343
+99,E & E Market,GrocerRetail,40.014877,-82.989705
+100,East Main Mart,GrocerRetail,39.955194,-82.881737
+101,East Pointe,GrocerRetail,39.961435,-82.88177
+102,El Girafol Grocery Store,GrocerRetail,39.933709,-82.964948
+103,Englefield Oil Co,GrocerRetail,39.987621,-83.026362
+104,Ernie's Carry Out,GrocerRetail,39.875977,-83.098525
+105,Eureka Market,GrocerRetail,39.951327,-83.064972
+106,Express Mart,GrocerRetail,39.986477,-82.980561
+107,Fast & Friendly,GrocerRetail,39.975182,-82.980165
+108,Fine Line Market,GrocerRetail,39.938455,-82.964417
+109,Flichia Wholesale Distributing,GrocerRetail,39.998285,-82.924735
+110,Food Mart,GrocerRetail,39.956035,-82.908827
+111,Food Mart,GrocerRetail,39.925844,-82.829278
+112,Food Works Inc,GrocerRetail,40.107112,-83.013977
+113,Foodmart Express,GrocerRetail,39.944283,-83.071122
+114,Four Seas Asian Food Svc,GrocerRetail,39.941955,-82.945175
+115,Frank's Fish & Seafood Market,GrocerRetail,39.935867,-83.138631
+116,Fresh Thyme Market,GrocerRetail,40.103144,-83.089425
+117,Fresh Thyme Market,GrocerRetail,40.048715,-82.865889
+118,Fresh Thyme Market,GrocerRetail,40.09383,-83.019013
+119,Getgo Gas Sta + Wetgo Carwash,GrocerRetail,40.065577,-83.09565
+120,Getgo Gas Sta + Wetgo Carwash,GrocerRetail,40.10261,-83.15886
+121,Getgo Gas Sta + Wetgo Carwash,GrocerRetail,40.060817,-83.181687
+122,Getgo Gas Station,GrocerRetail,39.877779,-83.061418
+123,Getgo Gas Station,GrocerRetail,40.025585,-83.057636
+124,Ghion Grocery,GrocerRetail,39.944146,-82.830295
+125,Giant Eagle,GrocerRetail,40.051163,-82.862686
+126,Giant Eagle,GrocerRetail,39.945442,-82.989338
+127,Giant Eagle,GrocerRetail,40.019056,-83.013386
+128,Giant Eagle,GrocerRetail,40.031832,-82.908197
+129,Giant Eagle,GrocerRetail,40.064107,-83.095824
+130,Giant Eagle,GrocerRetail,39.953692,-83.128633
+131,Giant Eagle,GrocerRetail,39.980714,-82.82047
+132,Giant Eagle,GrocerRetail,39.976866,-83.012451
+133,Giant Eagle,GrocerRetail,39.876728,-83.06175
+134,Giant Eagle,GrocerRetail,39.896657,-82.884602
+135,Giant Eagle,GrocerRetail,40.06126,-83.17988
+136,Giant Eagle,GrocerRetail,40.093208,-82.825646
+137,Giant Eagle Market District,GrocerRetail,40.102763,-83.155888
+138,Gifted African Market,GrocerRetail,39.927168,-82.880317
+139,Gleason Market,GrocerRetail,39.954515,-83.026526
+140,Glen Gary Carryout,GrocerRetail,40.093819,-82.923973
+141,Go-Ceries!,GrocerRetail,40.031907,-82.90548
+142,Good Deal Market,GrocerRetail,40.061154,-82.959578
+143,Gordon Food Svc Store,GrocerRetail,40.086904,-82.948696
+144,Gordon Food Svc Store,GrocerRetail,40.098263,-83.095645
+145,Gordon Food Svc Store,GrocerRetail,39.878336,-83.035888
+146,Gordon Food Svc Store,GrocerRetail,39.991087,-83.152619
+147,Gordon Food Svc Store,GrocerRetail,39.92657,-82.828327
+148,Graffiti Foods LTD,GrocerRetail,39.988152,-82.831402
+149,Great Miami Market,GrocerRetail,39.954464,-82.861164
+150,Grocery Gazelle,GrocerRetail,40.112208,-82.925919
+151,Hague Food Mart,GrocerRetail,39.971457,-83.081023
+152,Halal Mediterranean Food,GrocerRetail,40.026373,-83.159953
+153,Hall-Mart Food Store,GrocerRetail,39.942827,-82.896707
+154,Hamilton General Store,GrocerRetail,39.860815,-82.969904
+155,Hanmaoom,GrocerRetail,40.063953,-83.040227
+156,Heart Food Pantry,GrocerRetail,39.953425,-82.824421
+157,High Stop Food,GrocerRetail,39.93585,-82.995403
+158,Hilliard Farm Market,GrocerRetail,40.045439,-83.184101
+159,Hills Market,GrocerRetail,40.12504,-83.03657
+160,Hills Market Downtown,GrocerRetail,39.96537,-82.991853
+161,Home Market,GrocerRetail,39.914492,-82.981234
+162,Home Storage Ctr,GrocerRetail,39.883963,-82.88984
+163,Hometown Market,GrocerRetail,39.944625,-83.113249
+164,HRH Them To Grocers !!,GrocerRetail,40.056108,-83.080708
+165,HTH Farm Market,GrocerRetail,40.090664,-83.052843
+166,Hubert's Polish Kitchen,GrocerRetail,39.971885,-83.004326
+167,Hudson Express Carryout,GrocerRetail,40.013743,-82.960992
+168,Hudson Market,GrocerRetail,40.014593,-82.981073
+169,Image Grocery LLC,GrocerRetail,40.062135,-82.964167
+170,India Grocers Inc,GrocerRetail,40.086175,-83.092972
+171,Indreni Mart,GrocerRetail,40.085508,-82.97741
+172,Istanbul Market,GrocerRetail,40.0646,-83.060391
+173,It's All Natural! Temple Store,GrocerRetail,40.081476,-82.939615
+174,J & N Market,GrocerRetail,39.942839,-82.955139
+175,JF Baker's Sons Roofing Co,GrocerRetail,39.990203,-83.030047
+176,Jr J's Drive Thru,GrocerRetail,40.012564,-82.956912
+177,Jubilee Market & Cafe,GrocerRetail,39.959022,-83.031724
+178,Julian Foods,GrocerRetail,39.954012,-83.087819
+179,Julian Grocery Market,GrocerRetail,39.954012,-83.087819
+180,Kahiki Foods,GrocerRetail,39.972558,-82.911483
+181,Kal Kan Foods Inc,GrocerRetail,39.97268,-83.13599
+182,Kamana Grocery,GrocerRetail,39.91181,-82.81802
+183,Kamana Grocery LLC,GrocerRetail,39.954778,-82.806148
+184,Kaneshi Market,GrocerRetail,39.9125,-82.882506
+185,Kaneshil Market,GrocerRetail,39.922856,-82.882002
+186,Kelley's Market,GrocerRetail,39.891975,-82.987427
+187,Kenny Road Market,GrocerRetail,40.014286,-83.178441
+188,Kroger,GrocerRetail,39.908311,-82.82261
+189,Kroger,GrocerRetail,39.855587,-82.831888
+190,Kroger,GrocerRetail,39.989268,-83.005305
+191,Kroger,GrocerRetail,39.992591,-83.043627
+192,Kroger,GrocerRetail,39.934335,-82.985449
+193,Kroger,GrocerRetail,39.949653,-83.001958
+194,Kroger,GrocerRetail,39.919289,-83.120032
+195,Kroger,GrocerRetail,40.05879,-82.972682
+196,Kroger,GrocerRetail,40.065017,-83.025437
+197,Kroger,GrocerRetail,39.958258,-82.945049
+198,Kroger,GrocerRetail,40.065696,-83.073423
+199,Kroger,GrocerRetail,39.93163,-83.05098
+200,Kroger,GrocerRetail,40.032045,-83.01767
+201,Kroger,GrocerRetail,39.956866,-83.097053
+202,Kroger,GrocerRetail,39.887966,-83.001785
+203,Kroger,GrocerRetail,39.984391,-82.816465
+204,Kroger,GrocerRetail,40.097837,-83.122782
+205,Kroger,GrocerRetail,40.103368,-83.164322
+206,Kroger,GrocerRetail,40.121771,-83.092625
+207,Kroger,GrocerRetail,40.053965,-82.867466
+208,Kroger,GrocerRetail,40.011886,-82.864733
+209,Kroger,GrocerRetail,39.951872,-83.156323
+210,Kroger,GrocerRetail,39.882806,-83.068363
+211,Kroger,GrocerRetail,39.841416,-83.074845
+212,Kroger,GrocerRetail,39.853103,-82.899234
+213,Kroger,GrocerRetail,40.00258,-83.15615
+214,Kroger,GrocerRetail,40.033539,-83.140526
+215,Kroger,GrocerRetail,40.088812,-82.825811
+216,Kroger,GrocerRetail,39.956003,-82.82179
+217,Kroger,GrocerRetail,40.0547,-83.07273
+218,Kroger,GrocerRetail,40.10836,-82.928248
+219,Kroger,GrocerRetail,40.084004,-82.897263
+220,Kroger,GrocerRetail,39.972,-82.903117
+221,Kroger,GrocerRetail,39.958716,-82.875645
+222,Kroger,GrocerRetail,40.122852,-82.979757
+223,Kroger,GrocerRetail,40.109171,-83.01781
+224,Kroger New Albany Ctr,GrocerRetail,40.088812,-82.825811
+225,Kroger Pharmacy,GrocerRetail,39.951872,-83.156323
+226,Kumasi Kejtia African Market,GrocerRetail,40.077921,-82.951053
+227,LA Bodega,GrocerRetail,39.943705,-83.079339
+228,LA Costena Market,GrocerRetail,39.955936,-82.871593
+229,LA Michoacana,GrocerRetail,39.91252,-82.879643
+230,LA Michoacana,GrocerRetail,40.066106,-83.093976
+231,LA Michoacana,GrocerRetail,40.086668,-82.99421
+232,LA Michoacana Mexican Market,GrocerRetail,40.059272,-82.96141
+233,LA Michoacana Mexican Market,GrocerRetail,39.942019,-83.095775
+234,LA Michoacana Mexican Market,GrocerRetail,40.048279,-82.955518
+235,LA Michoacana Mexican Market,GrocerRetail,39.941044,-83.141648
+236,LA Michoacana Mexican Market,GrocerRetail,39.972393,-82.875062
+237,LA-Plaza-Tapatia,GrocerRetail,39.94762,-83.112219
+238,Lalibela Grocery,GrocerRetail,39.953506,-82.877834
+239,Lauren Stacy Berdy,GrocerRetail,39.943705,-82.987164
+240,Lenas Market,GrocerRetail,39.955277,-83.061689
+241,Linda's Market,GrocerRetail,39.927673,-82.899066
+242,Little's Village IGA,GrocerRetail,39.94944,-82.9825
+243,Livingston Market,GrocerRetail,39.948748,-82.954427
+244,M & J Carryout,GrocerRetail,39.948037,-83.050779
+245,M & M Food Mart,GrocerRetail,39.854126,-83.188156
+246,M Wangi Food,GrocerRetail,40.01476,-82.985316
+247,Madina Market Corp,GrocerRetail,40.039039,-82.950991
+248,Magnetic Springs Bottled Water,GrocerRetail,40.005206,-82.964827
+249,Makola-Market,GrocerRetail,40.061397,-82.98009
+250,Malik Inc,GrocerRetail,40.057463,-82.898216
+251,Maple Market,GrocerRetail,40.085308,-82.960951
+252,Marc's,GrocerRetail,40.056293,-83.069107
+253,Marc's,GrocerRetail,40.10296,-82.922514
+254,Market At Hilliard,GrocerRetail,39.989406,-83.148821
+255,Market District,GrocerRetail,40.031832,-82.908197
+256,Market District,GrocerRetail,40.020062,-83.058392
+257,Market District,GrocerRetail,39.985854,-83.027818
+258,Market District,GrocerRetail,40.102763,-83.155888
+259,Market District,GrocerRetail,40.034418,-83.133464
+260,Market District,GrocerRetail,40.093208,-82.825646
+261,Market District Express,GrocerRetail,39.957832,-82.939204
+262,Market District Pharmacy,GrocerRetail,39.985854,-83.027818
+263,Market District Supermarket,GrocerRetail,40.064107,-83.095824
+264,Marshall Shell Mini Mart,GrocerRetail,39.929753,-82.878654
+265,Mcguffey Market,GrocerRetail,40.014659,-82.981902
+266,Mecca Market,GrocerRetail,39.928514,-82.878695
+267,Medina Restaurant,GrocerRetail,39.91252,-82.879643
+268,Mediterranean Foods Imports,GrocerRetail,40.016219,-83.012138
+269,Mega Food Mart,GrocerRetail,40.066006,-82.952098
+270,Meijer,GrocerRetail,39.98125,-83.14802
+271,Meijer,GrocerRetail,40.06087,-82.860104
+272,Meijer,GrocerRetail,40.092602,-83.094177
+273,Meijer,GrocerRetail,39.83662,-83.080722
+274,Meijer,GrocerRetail,39.98826,-82.788156
+275,Meijer Bakery,GrocerRetail,39.935867,-83.138631
+276,Meijer Bakery,GrocerRetail,40.06087,-82.860104
+277,Meijer Bakery,GrocerRetail,40.092602,-83.094177
+278,Meijer Bakery,GrocerRetail,39.83662,-83.080722
+279,Meijer Bakery,GrocerRetail,39.98826,-82.788156
+280,Mi Pais Supper Market,GrocerRetail,39.953506,-82.877834
+281,Midwest Food & Grocers Inc,GrocerRetail,39.913275,-82.965781
+282,Mike's Carryout,GrocerRetail,39.945635,-82.877295
+283,Milhem Market,GrocerRetail,39.904902,-82.953437
+284,Minute Plus Carryout,GrocerRetail,39.943061,-83.093068
+285,N & N Supermarket,GrocerRetail,39.946647,-83.058862
+286,Najah Market,GrocerRetail,40.028013,-82.959006
+287,Noor Grocery Store,GrocerRetail,39.933937,-83.088972
+288,Norm's Market,GrocerRetail,39.853625,-82.893202
+289,North Africa Foods,GrocerRetail,39.956443,-82.895439
+290,North Campus Food Mart,GrocerRetail,40.011487,-83.010043
+291,North Market Cook Ware,GrocerRetail,39.971885,-83.004326
+292,Ohio Citrus Juice Co Inc,GrocerRetail,39.912738,-83.038886
+293,Ohio Grocers Assn,GrocerRetail,39.979896,-83.063056
+294,Olde Oak,GrocerRetail,39.962958,-82.981411
+295,Park To Stop,GrocerRetail,40.09238,-83.08957
+296,Parville Market,GrocerRetail,40.085352,-82.957487
+297,Pat's Hague Steel Market,GrocerRetail,39.958268,-83.074699
+298,Patel Brothers,GrocerRetail,40.103144,-83.089425
+299,Plaza Grocery & Meat,GrocerRetail,39.972554,-82.974318
+300,Plaza International Foods,GrocerRetail,40.024674,-83.025629
+301,Poindexter Village Market,GrocerRetail,39.968857,-82.968538
+302,Prasuesak Asian American Mkt,GrocerRetail,39.931774,-82.964993
+303,Quaker Foods,GrocerRetail,39.8878,-82.952648
+304,Quick & Easy Mart Inc,GrocerRetail,40.054759,-82.953878
+305,Quick Mart,GrocerRetail,40.056089,-82.975203
+306,Raisin Rack Natural Food Mkt,GrocerRetail,40.109666,-82.948015
+307,RJ Schinner,GrocerRetail,39.88186,-83.058143
+308,RMM Halal Meat,GrocerRetail,40.033027,-82.96338
+309,Rossco Market,GrocerRetail,39.945224,-83.065559
+310,Russian Home,GrocerRetail,39.952892,-82.835636
+311,S & G Mfg Group LLC,GrocerRetail,40.039318,-83.147414
+312,Sahara Halal Market,GrocerRetail,40.03614,-82.961584
+313,Sallys Market,GrocerRetail,39.95407,-83.019352
+314,Sam's Club,GrocerRetail,40.060458,-82.911364
+315,Sam's Club,GrocerRetail,40.086527,-83.088109
+316,Sam's Club,GrocerRetail,39.98694,-83.153824
+317,Santiago Supermarket,GrocerRetail,40.002462,-83.151694
+318,Saraga International Grocery,GrocerRetail,40.059817,-82.985325
+319,Save-A-Lot,GrocerRetail,40.061914,-82.985611
+320,Save-A-Lot,GrocerRetail,39.923214,-82.962858
+321,Save-A-Lot,GrocerRetail,40.012058,-82.949605
+322,Save-A-Lot,GrocerRetail,40.037971,-82.961791
+323,Save-A-Lot,GrocerRetail,39.952986,-83.132071
+324,Save-A-Lot,GrocerRetail,39.943698,-83.039413
+325,Save-A-Lot,GrocerRetail,40.103165,-82.82436
+326,Save-A-Lot,GrocerRetail,39.9435,-82.827194
+327,Save-A-Lot,GrocerRetail,39.962149,-82.886514
+328,Saveway Way Market,GrocerRetail,39.95095,-83.035893
+329,Schuman's Meats,GrocerRetail,39.928408,-83.053467
+330,Shop & Go,GrocerRetail,39.944933,-82.890136
+331,Smartway's Inc,GrocerRetail,40.041324,-82.977973
+332,Soussy Market,GrocerRetail,40.00302,-82.99814
+333,South Asian Bazaar,GrocerRetail,40.059475,-82.966427
+334,Speedway,GrocerRetail,39.954758,-82.877435
+335,Speedway,GrocerRetail,40.060973,-82.99375
+336,Speedway,GrocerRetail,39.93792,-82.996538
+337,Speedway,GrocerRetail,39.927224,-83.05694
+338,Speedway,GrocerRetail,40.054655,-83.067476
+339,Speedway,GrocerRetail,40.01367,-83.010533
+340,Speedway,GrocerRetail,39.956317,-82.919327
+341,Speedway,GrocerRetail,39.917194,-82.915009
+342,Speedway,GrocerRetail,40.027505,-83.090828
+343,Speedway,GrocerRetail,39.882531,-83.000076
+344,Speedway,GrocerRetail,40.050438,-82.953245
+345,Speedway,GrocerRetail,39.95489,-82.86659
+346,Speedway,GrocerRetail,40.085838,-82.960907
+347,Speedway,GrocerRetail,39.980338,-82.831291
+348,Speedway,GrocerRetail,40.118297,-82.99491
+349,Speedway,GrocerRetail,40.089028,-83.091252
+350,Speedway,GrocerRetail,40.003873,-83.139896
+351,Speedway,GrocerRetail,40.027596,-83.117322
+352,Speedway,GrocerRetail,39.923102,-82.830273
+353,Star Carryout,GrocerRetail,39.995158,-82.999318
+354,Starbucks,GrocerRetail,40.064107,-83.095824
+355,Stelzer Food Market,GrocerRetail,39.987886,-82.916167
+356,Stewart Market,GrocerRetail,39.94105,-82.977726
+357,Stop & Shop,GrocerRetail,39.927458,-82.964636
+358,Sunrise Asian Amer Supermarket,GrocerRetail,40.056293,-83.069107
+359,Sunrise International Market,GrocerRetail,39.9556,-83.10869
+360,Sunrise Market,GrocerRetail,39.967678,-82.8858
+361,Sunshine Grocery LLC,GrocerRetail,40.062135,-82.964167
+362,Sunshine International Market,GrocerRetail,40.085781,-82.992217
+363,Super Food Mart,GrocerRetail,40.026862,-83.014111
+364,Super Mercado Los Portales,GrocerRetail,39.941021,-82.828053
+365,Super Saver,GrocerRetail,39.964162,-82.87646
+366,Super Stores & Supermarkets,GrocerRetail,39.935962,-82.910479
+367,Tadi,GrocerRetail,40.085968,-82.96376
+368,Tamarack Sunoco,GrocerRetail,40.075693,-82.967245
+369,Tara International Mart LLC,GrocerRetail,40.061397,-82.98009
+370,Target,GrocerRetail,39.993842,-83.027498
+371,Target,GrocerRetail,40.056687,-82.921343
+372,Target,GrocerRetail,40.064957,-83.021259
+373,Target,GrocerRetail,40.089803,-83.089331
+374,Target,GrocerRetail,39.876879,-83.036694
+375,Target,GrocerRetail,39.991211,-83.148814
+376,Target,GrocerRetail,40.038381,-83.123949
+377,Target,GrocerRetail,39.988449,-82.784735
+378,Target,GrocerRetail,39.970864,-82.895252
+379,Tensuke Market,GrocerRetail,40.050546,-83.051115
+380,Thind Petroleum,GrocerRetail,40.060993,-82.977773
+381,Three C Food Mart,GrocerRetail,40.04273,-82.977715
+382,Trabue Food Mart,GrocerRetail,39.986951,-83.107733
+383,Trader Joe's,GrocerRetail,40.049344,-82.918221
+384,Trader Joe's,GrocerRetail,40.096375,-83.093199
+385,Tropical Nut & Fruit,GrocerRetail,39.903145,-83.080738
+386,Turkey Hill Minit Market,GrocerRetail,40.075638,-83.141703
+387,Turkey Hill Minit Market,GrocerRetail,40.09517,-83.15878
+388,United Dairy Farmers,GrocerRetail,39.957155,-83.02582
+389,United Dairy Farmers,GrocerRetail,39.977956,-83.101068
+390,United Dairy Farmers,GrocerRetail,39.996606,-83.007126
+391,United Dairy Farmers,GrocerRetail,40.014786,-83.001859
+392,United Dairy Farmers,GrocerRetail,40.042968,-82.977005
+393,United Dairy Farmers,GrocerRetail,40.057695,-82.923869
+394,United Dairy Farmers,GrocerRetail,40.072038,-83.018545
+395,United Dairy Farmers,GrocerRetail,39.99082,-83.03326
+396,United Dairy Farmers,GrocerRetail,39.891728,-83.086201
+397,United Dairy Farmers,GrocerRetail,39.926674,-82.825417
+398,United Dairy Farmers,GrocerRetail,39.975423,-82.885061
+399,United Food Mart,GrocerRetail,39.904112,-82.995883
+400,USA Grocery,GrocerRetail,39.945224,-83.065559
+401,Utz Quality Foods,GrocerRetail,40.009721,-83.136484
+402,Venky's Spice House,GrocerRetail,40.004535,-83.152081
+403,Vincenzo's Convenient Elegance,GrocerRetail,40.097156,-83.093437
+404,Vista Brothers Asian Grocery,GrocerRetail,40.059975,-82.987977
+405,Walmart Supercenter,GrocerRetail,39.85464,-82.826026
+406,Walmart Supercenter,GrocerRetail,39.92693,-83.120554
+407,Walmart Supercenter,GrocerRetail,40.067172,-83.089916
+408,Walmart Supercenter,GrocerRetail,40.060508,-82.91313
+409,Walmart Supercenter,GrocerRetail,39.983176,-83.145067
+410,Walmart Supercenter,GrocerRetail,40.074028,-83.137618
+411,Walmart Supercenter,GrocerRetail,40.123491,-83.087117
+412,Walmart Supercenter,GrocerRetail,39.875256,-83.042694
+413,Walmart Supercenter,GrocerRetail,40.111316,-82.923926
+414,Walmart Supercenter,GrocerRetail,39.954135,-82.900505
+415,Wayne Market,GrocerRetail,39.955141,-83.064556
+416,Weber Road Market,GrocerRetail,40.024126,-82.988012
+417,Weilands Fine Meats Inc,GrocerRetail,40.037253,-82.999219
+418,West Gate Intl Market,GrocerRetail,40.011578,-83.176462
+419,Wheatland Food Market,GrocerRetail,39.973895,-82.964151
+420,Whitehall Market LLC,GrocerRetail,39.905513,-82.965448
+421,Whole Foods Market,GrocerRetail,40.098525,-83.086439
+422,Whole Foods Market,GrocerRetail,40.057035,-82.90953
+423,Whole Foods Market,GrocerRetail,40.006556,-83.053044
+424,Wine & Brew Emporium,GrocerRetail,40.08463,-82.895268
+425,Yao Lee Oriental Supermarket,GrocerRetail,40.020403,-83.012359
+426,Ybb Market,GrocerRetail,40.026991,-82.959753
+427,Yummy Nummyz LLC,GrocerRetail,39.984391,-82.816465
+428,Fitness & Nutrition Ctr,HealthFoods,40.013071,-83.076895
+429,Hills Market Downtown,HealthFoods,39.96537,-82.991853
+430,Hsu & Co Health Foods,HealthFoods,40.055053,-82.884571
+431,Meijer Pharmacy,HealthFoods,39.935867,-83.138631
+432,Meijer Pharmacy,HealthFoods,40.06087,-82.860104
+433,Meijer Pharmacy,HealthFoods,40.092602,-83.094177
+434,Meijer Pharmacy,HealthFoods,39.83662,-83.080722
+435,Meijer Pharmacy,HealthFoods,39.98826,-82.788156
+436,Vitamin Shoppe,HealthFoods,39.982261,-83.151913
+437,Vitamin Shoppe,HealthFoods,39.991631,-83.025808
+438,Vitamin Shoppe,HealthFoods,40.053106,-82.920696
+439,A Passion For Shopping,ShoppingService,39.943004,-83.093848
+440,Afrique Food Warehouse,ShoppingService,40.056089,-82.975203
+441,Argo & Lehne Jewelers,ShoppingService,40.019655,-83.061698
+442,Arhaus,ShoppingService,40.054583,-82.910959
+443,Arhaus,ShoppingService,40.028145,-83.15941
+444,Child Development Council,ShoppingService,39.947683,-82.905209
+445,Clothes Mentor,ShoppingService,40.115514,-82.928174
+446,Crate & Barrel,ShoppingService,40.048723,-82.915979
+447,Ethan Allen,ShoppingService,40.102291,-83.018045
+448,Giant Eagle,ShoppingService,40.06126,-83.17988
+449,Green Bean Delivery,ShoppingService,39.993185,-82.926067
+450,Hall-Mart Food Store,ShoppingService,39.942827,-82.896707
+451,HALO Branded Solutions,ShoppingService,40.102917,-82.948033
+452,Hudson Market,ShoppingService,40.014593,-82.981073
+453,Kaneshi Market,ShoppingService,39.9125,-82.882506
+454,Kendra Scott,ShoppingService,40.053771,-82.915542
+455,Layers Deep Is Your Chaos,ShoppingService,40.02042,-83.01437
+456,Little's Village IGA,ShoppingService,39.94944,-82.9825
+457,Mecca Market,ShoppingService,39.928514,-82.878695
+458,Rossco Market,ShoppingService,39.945224,-83.065559
+459,Scotts Custom Jewelers,ShoppingService,40.104714,-83.162628
+460,Sterling Distribution,ShoppingService,39.927491,-82.948598
+461,United Food Mart,ShoppingService,39.904112,-82.995883
+462,USA Grocery,ShoppingService,39.945224,-83.065559
+463,Brownie Points Inc,SpecialtyFoods,39.985175,-82.848522
+464,Deliciously Brianna,SpecialtyFoods,40.091025,-82.896942
+465,El Campo Authentic Argentinean,SpecialtyFoods,40.12985,-83.048231
+466,Yasmin International Market,SpecialtyFoods,40.080929,-82.95066
+467,J Avenue,SpecialtyFoods,40.050546,-83.051115
+468,K A Menendian Oriental Rug,SpecialtyFoods,39.988613,-83.035189
+469,Naturally Farmed Foods Inc,SpecialtyFoods,40.114424,-83.087612
+470,Capital City Cakes,Wholesale,39.88258,-83.093849
+471,Flichia Wholesale Distributing,Wholesale,39.998285,-82.924735
+472,Gordon Food Svc Store,Wholesale,40.086904,-82.948696
+473,Gordon Food Svc Store,Wholesale,40.098263,-83.095645
+474,Gordon Food Svc Store,Wholesale,39.878336,-83.035888
+475,Gordon Food Svc Store,Wholesale,39.991087,-83.152619
+476,Gordon Food Svc Store,Wholesale,39.92657,-82.828327
+477,H T Hackney Co,Wholesale,39.994448,-82.839822
+478,Halal Mediterranean Food,Wholesale,40.026373,-83.159953
+479,Happy Chicken Farms,Wholesale,39.90036,-83.093503
+480,Irs Help Inc,Wholesale,40.119412,-83.010339
+481,Mclane Foodservice Dstrbtn,Wholesale,40.000303,-83.121076
+482,Mclane Foodservice Dstrbtn,Wholesale,39.844972,-82.950793
+483,Restaurant Depot,Wholesale,39.961526,-83.089185
+484,RJ Schinner,Wholesale,39.88186,-83.058143
+485,Sam's Club,Wholesale,40.060458,-82.911364
+486,Sam's Club,Wholesale,40.086527,-83.088109
+487,Sam's Club,Wholesale,39.98694,-83.153824
+488,Save-A-Lot,Wholesale,40.061914,-82.985611
+489,Save-A-Lot,Wholesale,39.923214,-82.962858
+490,Save-A-Lot,Wholesale,40.012058,-82.949605
+491,Save-A-Lot,Wholesale,40.037971,-82.961791
+492,Save-A-Lot,Wholesale,39.952986,-83.132071
+493,Save-A-Lot,Wholesale,39.943698,-83.039413
+494,Save-A-Lot,Wholesale,39.9435,-82.827194
+495,Save-A-Lot,Wholesale,39.962149,-82.886514
+496,SYGMA,Wholesale,39.99308,-83.121964
+497,SYGMA,Wholesale,40.10892,-83.12603
+498,SYGMA Network Inc,Wholesale,40.07824,-83.129929
+499,Sygma-Columbus,Wholesale,39.97094,-83.065871
