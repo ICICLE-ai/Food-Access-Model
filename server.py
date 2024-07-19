@@ -33,5 +33,5 @@ server = ModularServer(
     model_params, # Dictionary of parameters to pass to the model
 )
 
-print("running") 
+print("running")
 server.launch(8080) # Launch the server on port 8080
