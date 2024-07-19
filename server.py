@@ -7,13 +7,15 @@ import pandas as pd
 stores = pd.read_csv("data/stores.csv")
 households = pd.read_csv("data/households.csv")
 
+# Create a dictionary to hold model parameters
 model_params = {
-    "stores": stores,
-    "households": households,
+    "stores": stores,  # Pass the stores DataFrame to the model
+    "households": households,  # Pass the households DataFrame to the model
 }
 
-#Create Map visualization of Stores and households
+# Creates an instance of MapModule using agent_portrayal.
 map_vis = MapModule(agent_portrayal)
+
 
 """
 Create chart to track mfai score
@@ -23,12 +25,13 @@ chart = ChartModule(
 )
 """
 
-#Start server on port 8080
+# Set up and start the Mesa server for the simulation if the user wants to run the simulation
 server = ModularServer(
-    GeoModel,
-    [map_vis],
-    "Food Access Strategy Simulation",
-    model_params,
+    GeoModel, # The model class to run
+    [map_vis], # List of visualization modules to use
+    "Food Access Strategy Simulation",  # Title of the simulation
+    model_params, # Dictionary of parameters to pass to the model
 )
-print("running")
-server.launch(8080)
+
+print("running") 
+server.launch(8080) # Launch the server on port 8080
