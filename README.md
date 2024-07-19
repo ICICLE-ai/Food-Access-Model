@@ -38,7 +38,7 @@
 <h3 align="center">Food Access Model</h3>
 
   <p align="center">
-    This project, the ICICLE Food Access Model, is an Agent-Based model that simulates how households may access food in the real world. Use this guide to fill out this ReadMe (https://www.makeareadme.com/)
+    This project, the ICICLE Food Access Model, is an Agent-Based model that simulates how households may access food in the real world.
     <br />
     <a href="https://github.com/ICICLE-ai/Food-Access-Model"><strong>Explore the docs »</strong></a>
     <br />
@@ -86,7 +86,7 @@
 
 [![Product Name Screen Shot][product-screenshot]](https://example.com)
 
-Here's a blank template to get started: To avoid retyping too much info. Do a search and replace with your text editor for the following: `ICICLE-ai`, `Food-Access-Model`, `twitter_handle`, `linkedin_username`, `email_client`, `email`, `Food Access Model`, `This project, the ICICLE Food Access Model, is an Agent-Based model that simulates how households may access food in the real world.`
+This project, the ICICLE Food Access Model, is an Agent-Based model that simulates how households may access food in the real world.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -108,11 +108,7 @@ To get a local copy up and running follow these simple steps.
 
 ### Prerequisites
 
-You will need python3 to run this project.
-* Install requirements:
-  ```sh
-  
-  ```
+You will need python to run this project.
 
 ### Installation
 
@@ -139,24 +135,14 @@ You will need python3 to run this project.
 
 Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
 
+You can run this project on port 8080 with:
+'''sh
+python server.py
+'''
+
 _For more examples, please refer to the [Documentation](https://example.com)_
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- ROADMAP -->
-## Roadmap
-
-- [ ] Feature 1
-- [ ] Feature 2
-- [ ] Feature 3
-    - [ ] Nested Feature
-
-See the [open issues](https://github.com/ICICLE-ai/Food-Access-Model/issues) for a full list of proposed features (and known issues).
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 
 
 <!-- CONTRIBUTING -->
@@ -180,7 +166,7 @@ Don't forget to give the project a star! Thanks again!
 <!-- LICENSE -->
 ## License
 
-Distributed under the MIT License. See `LICENSE.txt` for more information.
+
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
