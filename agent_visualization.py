@@ -1,6 +1,7 @@
 from household import Household
 from store import Store
 
+
 def number_to_color_word(value):
     """
     helper function for agent_portrayal. Assigns a name to a value on a red-yellow-green scale.
@@ -33,6 +34,7 @@ def number_to_color_word(value):
     
     gray = 128
     desaturation_factor = .25
+
     red = int(red * (1 - desaturation_factor) + gray * desaturation_factor)
     green = int(green * (1 - desaturation_factor) + gray * desaturation_factor)
     blue = int(blue * (1 - desaturation_factor) + gray * desaturation_factor)
