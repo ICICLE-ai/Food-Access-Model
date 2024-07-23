@@ -131,12 +131,14 @@ class MapModule(VisualizationElement):
             self.js_code = self.js_code.replace(py_str, js_str)
 
     def render(self, model):
+        """Renders the model by creating a dictionary of layers and agents."""
         return {
             "layers": self._render_layers(model),
             "agents": self._render_agents(model),
         }
 
     def _render_layers(self, model):
+        """Renders the layers from the model's space."""
         layers = {"rasters": [], "vectors": [], "total_bounds": []}
         for layer in model.space.layers:
             if isinstance(layer, RasterBase):
@@ -153,7 +155,7 @@ class MapModule(VisualizationElement):
                 layers["vectors"].append(
                     layer.to_crs(self._crs)[["geometry"]].__geo_interface__
                 )
-        # longlat [min_x, min_y, max_x, max_y] to latlong [min_y, min_x, max_y, max_x]
+        # Convert longlat [min_x, min_y, max_x, max_y] to latlong [min_y, min_x, max_y, max_x]
         if model.space.total_bounds is not None:
             transformed_xx, transformed_yy = model.space.transformer.transform(
                 xx=[model.space.total_bounds[0], model.space.total_bounds[2]],
@@ -166,6 +168,7 @@ class MapModule(VisualizationElement):
         return layers
 
     def _render_agents(self, model):
+        """Renders the agents from the model's space."""
         feature_collection = {"type": "FeatureCollection", "features": []}
         for agent in model.space.agents:
             transformed_geometry = agent.get_transformed_geometry(

@@ -3,7 +3,7 @@ from store import Store
 
 def number_to_color_word(value):
     """
-    helper function for agent_portrayal. Assigns a name to a value on a red-yellow-green scale.
+    Helper function for agent_portrayal. Assigns a name to a value on a red-yellow-green scale.
 
     Args:
         - value: the value that is to be parsed into hex color.
@@ -52,8 +52,8 @@ def agent_portrayal(agent):
     portrayal = dict()
     if isinstance(agent,Household):
         portrayal["color"] = number_to_color_word(agent.income)
-
         portrayal["description"] = ["Household","income: " + "{:,}".format(agent.income) , "household size: " + str(agent.household_size) , "vehicles: " + str(agent.vehicles) , "number of workers: " + str(agent.number_of_workers)]
+        
     if isinstance(agent,Store):
         portrayal["color"] = "Blue"
         portrayal["description"] = ["Category: " + str(agent.type),"Name: " + str(agent.name)]

@@ -20,14 +20,20 @@ class Household(GeoAgent):
         Initialize the Household Agent.
 
         Args:
-            - model (GeoModel): model from mesa that places Households on a GeoSpace
-            - id: id number of agent
-            - location: shapely Point object that contains latitude and longitude
-            - search_radius: how far to search for stores (units unclear??)
-            - crs: geometry
+            - model (GeoModel): The model from mesa that places Households on a GeoSpace.
+            - id (int): Unique identifier for the agent.
+            - latitude (float): Latitude coordinate of the household.
+            - longitude (float): Longitude coordinate of the household.
+            - polygon (str): Well-known text (WKT) representation of the household's polygon.
+            - income (float): Income level of the household.
+            - household_size (int): Number of people in the household.
+            - vehicles (int): Number of vehicles owned by the household.
+            - number_of_workers (int): Number of workers in the household.
+            - search_radius (int): Initial radius to search for stores.
+            - crs (str): Coordinate reference system for the geometry.
         """
 
-        #Transform shapely coordinates to mercator projection coords
+        #Transform shapely coordinates to Mercator projection coords
         polygon = loads(polygon)
         
 
@@ -46,7 +52,7 @@ class Household(GeoAgent):
         by recursively increasing search radius until it finds a spm and a cspm. Ideally this function will not
         recurse except in edge cases. Ultimately, this method finds and chooses store to shop at.
 
-        TODO: statistical analysis should be used to find the most optimal search radius and increase to search radius
+        TODO: Statistical analysis should be used to find the most optimal search radius and increase to search radius
         for each step. This function is the main bottleneck for speed in this model and should be optimized perfectly.
 
         Args:
@@ -56,14 +62,15 @@ class Household(GeoAgent):
             - chosen_store: chosen store to shop at.
         """
 
-        #(1) find all agents within search radius
+        #(1) Find all agents within search radius
         closest_agents = self.model.space.get_neighbors_within_distance(self,search_radius)
 
-        #Find all Stores within search radius, and get closest store.
+        # Initialize variables to find the closest CSPM and SPM
         closest_cspm = None
         cspm_distance = search_radius
         closest_spm = None
         spm_distance = search_radius
+
         #Get closest cspm and closest spm
         for agent in closest_agents:
             if (isinstance(agent,Store)):

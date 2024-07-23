@@ -25,7 +25,7 @@ chart = ChartModule(
 )
 """
 
-# Set up and start the Mesa server for the simulation if the user wants to run the simulation
+# Set up and start the Mesa server for the simulation 
 server = ModularServer(
     GeoModel, # The model class to run
     [map_vis], # List of visualization modules to use

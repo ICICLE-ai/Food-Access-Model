@@ -1,6 +1,6 @@
-from mesa import Model, DataCollector # imports Model, the base class for Mesa models, and DataCollector, used for collecting data during model runs.
+from mesa import Model, DataCollector # imports Model - the base class for all Mesa models and DataCollector used for collecting data during model runs.
 from mesa.time import RandomActivation #Used to specify that agents are run randomly within each step
-from mesa_geo import GeoSpace #GeoSpace that houses agents
+from mesa_geo import GeoSpace #GeoSpace that holds houses agents
 import pandas as pd
 from store import Store # Store agent class
 from household import Household # Household agent class

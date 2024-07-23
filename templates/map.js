@@ -21,7 +21,7 @@ const MapModule = function (view, zoom, map_width, map_height, tiles, scale_opti
     }
     let agentLayer = L.geoJSON().addTo(Lmap)
 
-    // create tile layer
+    // Create tile layer
     if (tiles !== null) {
         if (tiles.kind === "raster_web_tile") {
             L.tileLayer(tiles.url, tiles.options).addTo(Lmap)
@@ -34,6 +34,8 @@ const MapModule = function (view, zoom, map_width, map_height, tiles, scale_opti
 
     let mapLayers = []
     let hasFitBounds = false
+
+    // Render the map layers
     this.renderLayers = function (layers) {
         mapLayers.forEach(layer => {layer.remove()})
         mapLayers = []
@@ -52,6 +54,7 @@ const MapModule = function (view, zoom, map_width, map_height, tiles, scale_opti
         }
     }
 
+    // Render the agents on the map
     this.renderAgents = function (agents) {
         agentLayer.remove()
         agentLayer = L.geoJSON(agents, {
@@ -65,18 +68,19 @@ const MapModule = function (view, zoom, map_width, map_height, tiles, scale_opti
         }).addTo(Lmap)
     }
 
+    // Render both layers and agents
     this.render = function (data) {
         this.renderLayers(data.layers)
         this.renderAgents(data.agents)
     }
 
+    // Reset the map by removing all layers
     this.reset = function () {
         agentLayer.remove()
         mapLayers.forEach(layer => {layer.remove()})
         mapLayers = []
     }
 }
-
 
 function PopUpProperties(feature, layer) {
     let popupContent = '<table>'

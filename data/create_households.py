@@ -11,7 +11,6 @@ import tempfile
 import os
 import pyproj
 
-
 FIBSCODE = "39049"
 YEAR = 2022
 from config import APIKEY
@@ -44,7 +43,7 @@ def get_random_point(tract_polygon,polygons):
             if not_touching:
                 return polygon
 
-#Dictionary to describe homedata Variables
+#Dictionary to describe homedata variables
 households_variables_dict = {
     "B19001_001E": "total households in tract",
     "B19001_002E": "under 10k",
