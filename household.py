@@ -15,22 +15,28 @@ class Household(GeoAgent):
     defines the behavior of a single household on each step through the model.
     """
 
-    def __init__(self, model, id: int, latitude, longitude, polygon, income, household_size,vehicles,number_of_workers, search_radius: int, crs: str):
+    def __init__(self, model, id: int, latitude, longitude, polygon, income, household_size,vehicles,number_of_workers, search_radius: int, crs: int):
         """
         Initialize the Household Agent.
 
         Args:
             - model (GeoModel): model from mesa that places Households on a GeoSpace
             - id: id number of agent
-            - location: shapely Point object that contains latitude and longitude
-            - search_radius: how far to search for stores (units unclear??)
-            - crs: geometry
+            - latitude (float): latitude of the household
+            - longitude (float): longitude of the household
+            - polygon (Polygon): a shapely polygon that represents a houshold on the map
+            - income (int): total income of the household
+            - household_size (int): total members in the household
+            - vehicles (int): total vechiles in the household
+            - number_of_workers (int): total working members (having job) in the household
+            - search_radius (int): how far to search for stores
+            - crs (string): constant value (i.e.3857),used to map households on a flat earth display 
         """
 
         #Transform shapely coordinates to mercator projection coords
         polygon = loads(polygon)
         
-
+        # Setting argument values to the passed parameteric values.
         super().__init__(id,model,polygon,crs)
         self.income = income
         self.search_radius = search_radius
@@ -43,7 +49,7 @@ class Household(GeoAgent):
     def choose_store(self, search_radius):
         """
         Helper method for step function. This method optimizes time complexity of the step function
-        by recursively increasing search radius until it finds a spm and a cspm. Ideally this function will not
+        by recursively increasing search radius until it finds a store. Ideally this function will not 
         recurse except in edge cases. Ultimately, this method finds and chooses store to shop at.
 
         TODO: statistical analysis should be used to find the most optimal search radius and increase to search radius
