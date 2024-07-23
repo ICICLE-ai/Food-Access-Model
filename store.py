@@ -16,10 +16,10 @@ class Store(GeoAgent):
         Args:
             - id (int): store's unique id
             - model (GeoModel): model from mesa that places stores on a GeoSpace
-            - type(String) : can be either [CurbPickup, EthnicFoods, GroceRetail,HealthFoods, ShoppingService, SpecialtyFoods, WholeSale] 
+            - type (String): can be either [CurbPickup, EthnicFoods, GroceRetail,HealthFoods, ShoppingService, SpecialtyFoods, WholeSale] 
             - lat (float): latitude of agent
             - lon (float): longitude of agent
-            - crs (int) : constant value (i.e.3857) used to map stores on a flat earth display 
+            - crs (string): constant value (i.e.3857),used to map stores on a flat earth display 
         """
 
         #Transform shapely coordinates to mercator projection coords
