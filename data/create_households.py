@@ -28,7 +28,6 @@ def get_random_point(tract_polygon,polygons):
         location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
         
         # Check if the point is inside the polygon
-        
         if tract_polygon.contains(location):
             count += 1
             if count == 1000:
@@ -359,7 +358,6 @@ for count in range(int(len(households_key_list)/50)+1):
         county_data = pd.merge(pd.DataFrame(response.json()[1:], columns=response.json()[0]), county_data, on='NAME', how='inner')
     else:
         county_data = pd.DataFrame(response.json()[1:], columns=response.json()[0])
-
 
 
 # Load in tract data

@@ -19,6 +19,7 @@ def number_to_color_word(value):
         red = top_range
         green = 0
         blue = 0
+
     # Calculate the red, green, and blue components
     elif normalized < 0.5:
         # Interpolate between red (255, 0, 0) and yellow (255, 255, 0)
@@ -44,17 +45,29 @@ def number_to_color_word(value):
 
 def agent_portrayal(agent):
     """
-    Defines attributes for agent visualization. If agent is a houshold, it is colored blue, if it is a store then red.
+    Defines attributes for agent visualization. If agent is a houshold, it is colored blue, if it is a store then it's red.
 
     Args:
-        - agent: household or store to be colored red or blue.
+        - agent: An instance of either household or store which are to be colored red or blue.
     """
     portrayal = dict()
     if isinstance(agent,Household):
+        # Set color based on income and define description attributes for a Household
         portrayal["color"] = number_to_color_word(agent.income)
-        portrayal["description"] = ["Household","income: " + "{:,}".format(agent.income) , "household size: " + str(agent.household_size) , "vehicles: " + str(agent.vehicles) , "number of workers: " + str(agent.number_of_workers)]
+        portrayal["description"] = [
+            "Household",
+            "income: " + "{:,}".format(agent.income),
+            "household size: " + str(agent.household_size),
+            "vehicles: " + str(agent.vehicles),
+            "number of workers: " + str(agent.number_of_workers)
+        ]
         
     if isinstance(agent,Store):
+        # Set color and define description attributes for a Store
         portrayal["color"] = "Blue"
-        portrayal["description"] = ["Category: " + str(agent.type),"Name: " + str(agent.name)]
+        portrayal["description"] = [
+            "Category: " + str(agent.type),
+            "Name: " + str(agent.name)
+        ]
+
     return portrayal
