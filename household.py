@@ -15,22 +15,28 @@ class Household(GeoAgent):
     defines the behavior of a single household on each step through the model.
     """
 
-    def __init__(self, model, id: int, latitude, longitude, polygon, income, household_size,vehicles,number_of_workers, search_radius: int, crs: str):
+    def __init__(self, model, id: int, latitude, longitude, polygon, income, household_size,vehicles,number_of_workers, search_radius: int, crs: int):
         """
         Initialize the Household Agent.
 
         Args:
             - model (GeoModel): model from mesa that places Households on a GeoSpace
             - id: id number of agent
-            - location: shapely Point object that contains latitude and longitude
-            - search_radius: how far to search for stores (units unclear??)
-            - crs: geometry
+            - latitude (float): latitude of the household
+            - longitude (float): longitude of the household
+            - polygon (Polygon): a shapely polygon that represents a houshold on the map
+            - income (int): total income of the household
+            - household_size (int): total members in the household
+            - vehicles (int): total vechiles in the household
+            - number_of_workers (int): total working members (having job) in the household
+            - search_radius (int): how far to search for stores
+            - crs (string): constant value (i.e.3857),used to map households on a flat earth display 
         """
 
         #Transform shapely coordinates to mercator projection coords
         polygon = loads(polygon)
         
-
+        # Setting argument values to the passed parameteric values.
         super().__init__(id,model,polygon,crs)
         self.income = income
         self.search_radius = search_radius
@@ -40,10 +46,11 @@ class Household(GeoAgent):
         self.vehicles = vehicles
         self.number_of_workers = number_of_workers
 
+
     def choose_store(self, search_radius):
         """
         Helper method for step function. This method optimizes time complexity of the step function
-        by recursively increasing search radius until it finds a spm and a cspm. Ideally this function will not
+        by recursively increasing search radius until it finds a store. Ideally this function will not 
         recurse except in edge cases. Ultimately, this method finds and chooses store to shop at.
 
         TODO: statistical analysis should be used to find the most optimal search radius and increase to search radius
@@ -59,7 +66,8 @@ class Household(GeoAgent):
         #(1) find all agents within search radius
         closest_agents = self.model.space.get_neighbors_within_distance(self,search_radius)
 
-        #Find all Stores within search radius, and get closest store.
+        #Codes from now on are based on old algorithm for determining the closest store to a household. Previously,the stores were divided into two categories: SPM and CSPM. 
+        # Current version makes a list of store types [CurbPickup, EthnicFoods, GroceRetail,HealthFoods, ShoppingService, SpecialtyFoods, WholeSale] and follow an updated algorithm to decide the nearest one.
         closest_cspm = None
         cspm_distance = search_radius
         closest_spm = None
@@ -114,4 +122,4 @@ class Household(GeoAgent):
         # AT END OF MONTH
         # mfai = ((Sum of Food per month) / (Maximum MFAI)) * 100
         #food_on_this_visit = ((chosen_store.fsa*self.max_carry_percent) / self.mfai_max) * 100
-        #self.mfai = (self.mfai - self.mfai/self.trips_per_month) + food_on_this_visit
+        #self.mfai = (self.mfai - self.mfai/self.trips_per_month) + food_on_this_visit 
