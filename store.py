@@ -6,7 +6,8 @@ import pyproj
 
 class Store(GeoAgent):
     """
-    Represents a Store. Extends the mesa_geo GeoAgent class.
+    Represents a Store. Extends the mesa_geo GeoAgent class. A store can either
+    be a "CSPM" (convenience store) or a "SPM" (supermarket).
     """
 
     def __init__(self,  model, id: int, name, type, lat: float, lon: float, crs) -> None:
@@ -14,12 +15,12 @@ class Store(GeoAgent):
         Initialize the Household Agent.
 
         Args:
-            - id (int): store's unique id
+            - store_id (int): unique id
             - model (GeoModel): model from mesa that places stores on a GeoSpace
-            - type (String): can be either [CurbPickup, EthnicFoods, GroceRetail,HealthFoods, ShoppingService, SpecialtyFoods, WholeSale] 
+            - category (string): SPM or CSPM
             - lat (float): latitude of agent
             - lon (float): longitude of agent
-            - crs (string): constant value (i.e.3857),used to map stores on a flat earth display 
+            - fsa (int): Food Store Audit (index indicating the percentage of 87 USDA TFP items available at the store)
         """
 
         #Transform shapely coordinates to mercator projection coords
