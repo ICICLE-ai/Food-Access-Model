@@ -1,6 +1,7 @@
 from household import Household
 from store import Store
 
+
 def number_to_color_word(value):
     """
     helper function for agent_portrayal. Assigns a name to a value on a red-yellow-green scale.
@@ -31,8 +32,11 @@ def number_to_color_word(value):
         green = top_range
         blue = 0
     
+    
     gray = 128
     desaturation_factor = .25
+
+    # Desaturating respective colors (RED,GREEN,BLUE)
     red = int(red * (1 - desaturation_factor) + gray * desaturation_factor)
     green = int(green * (1 - desaturation_factor) + gray * desaturation_factor)
     blue = int(blue * (1 - desaturation_factor) + gray * desaturation_factor)
@@ -44,17 +48,23 @@ def number_to_color_word(value):
 
 def agent_portrayal(agent):
     """
-    Defines attributes for agent visualization. If agent is a houshold, it is colored blue, if it is a store then red.
+    Defines attributes for agent visualization. If agent is a houshold, it is colored on a red-green color scale, if it is a store then blue.
 
     Args:
-        - agent: household or store to be colored red or blue.
+        - agent: household or store to be colored red-green or blue.
     """
     portrayal = dict()
-    if isinstance(agent,Household):
-        portrayal["color"] = number_to_color_word(agent.income)
 
+    # Adding attributes to define a Household. 
+    if isinstance(agent,Household):
+        # Sets the house color based on its income 
+        portrayal["color"] = number_to_color_word(agent.income)
+        # Overall Description of the house
         portrayal["description"] = ["Household","income: " + "{:,}".format(agent.income) , "household size: " + str(agent.household_size) , "vehicles: " + str(agent.vehicles) , "number of workers: " + str(agent.number_of_workers)]
+
+    # Adding attributes to define a Store like its color and overall description. 
     if isinstance(agent,Store):
-        portrayal["color"] = "Blue"
+        portrayal["color"] = "Blue" 
         portrayal["description"] = ["Category: " + str(agent.type),"Name: " + str(agent.name)]
+
     return portrayal
