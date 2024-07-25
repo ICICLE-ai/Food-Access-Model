@@ -46,6 +46,7 @@ class Household(GeoAgent):
         self.vehicles = vehicles
         self.number_of_workers = number_of_workers
 
+
     def choose_store(self, search_radius):
         """
         Helper method for step function. This method optimizes time complexity of the step function
@@ -65,7 +66,8 @@ class Household(GeoAgent):
         #(1) find all agents within search radius
         closest_agents = self.model.space.get_neighbors_within_distance(self,search_radius)
 
-        #Find all Stores within search radius, and get closest store.
+        #Codes from now on are based on old algorithm for determining the closest store to a household. Previously,the stores were divided into two categories: SPM and CSPM. 
+        # Current version makes a list of store types [CurbPickup, EthnicFoods, GroceRetail,HealthFoods, ShoppingService, SpecialtyFoods, WholeSale] and follow an updated algorithm to decide the nearest one.
         closest_cspm = None
         cspm_distance = search_radius
         closest_spm = None
@@ -120,4 +122,4 @@ class Household(GeoAgent):
         # AT END OF MONTH
         # mfai = ((Sum of Food per month) / (Maximum MFAI)) * 100
         #food_on_this_visit = ((chosen_store.fsa*self.max_carry_percent) / self.mfai_max) * 100
-        #self.mfai = (self.mfai - self.mfai/self.trips_per_month) + food_on_this_visit
+        #self.mfai = (self.mfai - self.mfai/self.trips_per_month) + food_on_this_visit 
