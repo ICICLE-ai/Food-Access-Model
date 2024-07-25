@@ -64,7 +64,7 @@ def agent_portrayal(agent):
 
     # Adding attributes to define a Store like its color and overall description. 
     if isinstance(agent,Store):
-        portrayal["color"] = "Blue"
+        portrayal["color"] = "Blue" 
         portrayal["description"] = ["Category: " + str(agent.type),"Name: " + str(agent.name)]
 
     return portrayal
