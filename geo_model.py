@@ -41,7 +41,7 @@ class GeoModel(Model):
                 row["latitude"],
                 row["longitude"],
                 CRS)
-            self.space.add_agents(agent) 
+            self.space.add_agents(agent)
 
         # Initialize all household agents and add them to the scheduler and the Geospace
         for index,row in households.iterrows():
