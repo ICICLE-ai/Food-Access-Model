@@ -94,8 +94,8 @@ This project, the ICICLE Food Access Model, is an Agent-Based model that simulat
 
 ### Built With
 
-* [![Python][Python3]][Python-url]
-* [![React][React.js]][React-url]
+* Python
+* React.js
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -136,9 +136,9 @@ You will need python to run this project.
 Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
 
 You can run this project on port 8080 with:
-'''sh
-python server.py
-'''
+```sh
+   python server.py
+```
 
 _For more examples, please refer to the [Documentation](https://example.com)_
 
@@ -169,30 +169,6 @@ Don't forget to give the project a star! Thanks again!
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- CONTACT -->
-## Contact
-
-Your Name - [@twitter_handle](https://twitter.com/twitter_handle) - email@email_client.com
-
-Project Link: [https://github.com/ICICLE-ai/Food-Access-Model](https://github.com/ICICLE-ai/Food-Access-Model)
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- ACKNOWLEDGMENTS -->
-## Acknowledgments
-
-* []()
-* []()
-* []()
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->

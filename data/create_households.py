@@ -24,7 +24,6 @@ def get_random_point(tract_polygon,polygons):
     min_x, min_y, max_x, max_y = tract_polygon.bounds
     count = 0
     while True:
-        print(count)
         # Generate a random point
         location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
         
@@ -34,7 +33,18 @@ def get_random_point(tract_polygon,polygons):
             count += 1
             if count == 1000:
                 raise Exception()
-            polygon =Polygon(((location.x+20, location.y+20),(location.x-20, location.y+20),(location.x-20, location.y-20),(location.x+20, location.y-20)))
+            polygon =Polygon(((location.x+20, location.y+20),
+                              (location.x, location.y+40),
+                              (location.x-20, location.y+20),
+                              (location.x+20, location.y+20),
+                              (location.x-20, location.y+20),
+                              (location.x-20, location.y-10),
+                              (location.x-5, location.y-10),
+                              (location.x-5, location.y+5),
+                              (location.x+5, location.y+5),
+                              (location.x+5, location.y-10),
+                              (location.x-5, location.y-10),
+                              (location.x+20, location.y-10)))
             not_touching = True
             for polygon_2 in polygons:
                 touches = polygon.intersects(polygon_2)
@@ -342,9 +352,12 @@ income_ranges = [
 ]
 
 #Read csvs into pandas dataframes
+#For loop runs a census API pull for each loop iteration
+#this is neccessary because we can only pull 50 variables at a time and we have >50
 county_data = pd.DataFrame()
 for count in range(int(len(households_key_list)/50)+1):
     variables = ""
+    #put variables from above into census readable lists
     if ((count+1)*50) > len(households_key_list):
         variables = ",".join(households_key_list[(50*count):])
     elif count == 0:
@@ -354,6 +367,7 @@ for count in range(int(len(households_key_list)/50)+1):
             variables = ",".join(households_key_list[:(50*(count+1)-1)])
     else:
         variables = ",".join(households_key_list[(50*count):(50*(count+1)-1)])
+    #Pull data and add to dataframe
     url = f"https://api.census.gov/data/{YEAR}/acs/acs5?get=NAME,{variables}&for=tract:*&in=state:{state_code}&in=county:{county_code}&key={APIKEY}"
     response = requests.request("GET", url)
     if len(county_data != 0):
@@ -363,7 +377,7 @@ for count in range(int(len(households_key_list)/50)+1):
 
 
 
-# Load in tract data
+# Load in geographical tract data
 tract_url = f"https://www2.census.gov/geo/tiger/TIGER{YEAR}/TRACT/tl_{YEAR}_{state_code}_tract.zip"
 response = requests.request("GET", tract_url)
 # Use BytesIO to handle the zip file in memory
@@ -391,9 +405,11 @@ data = pd.merge(county_geodata, county_data, on = "tract_y", how="inner")
 data.rename(columns=households_variables_dict, inplace = True)
 households = pd.DataFrame(columns = ["id","latitude","longitude","polygon","income","household_size","vehicles","number_of_workers"])
 
+#helper method to switch x and y in a shapely Point
 def swap_xy(x, y):
     return y, x
 
+# Create a list of all store polygons so that we can test if households overlap with them
 store_polygons = []
 stores = pd.read_csv("data/stores.csv")
 for index,row in stores.iterrows():
@@ -408,10 +424,11 @@ for index,row in stores.iterrows():
     store_polygons.append(polygon)  # apply projection
 
 
-#Iterate through each tract
+#Iterate through each tract and create households
 total_count = 0
 for index,row in data.iterrows():
     if ((row['tract_y']>5000)&(row['tract_y']<6000)):
+        #Create household polygon
         tract_polygon = Polygon(row["geometry"])
         tract_polygon = transform(swap_xy, tract_polygon)
         project = pyproj.Transformer.from_proj(
@@ -419,18 +436,20 @@ for index,row in data.iterrows():
             pyproj.Proj('epsg:3857')) # destination coordinate system
         tract_polygon = transform(project.transform, tract_polygon)  # apply
 
-        weights = np.array(row["10k to 15k":"200k+"]).astype(int)
-        if sum(weights)==0:
+        #Get amount of people in each tract at each income level
+        income_weights = np.array(row["10k to 15k":"150k to 200k"]).astype(int)
+        if sum(income_weights)==0:
             continue
 
+        # Make a list of incomes to distribute to households
         total_households = int(row["total households in tract"])
         distributed_incomes = []
-        for i in range(15):
+        for i in range(14):
             uniform_list = []
             if i != 14:
-                uniform_list = np.random.uniform(income_ranges[i][0],income_ranges[i][1],weights[i])
+                uniform_list = np.random.uniform(income_ranges[i][0],income_ranges[i][1],income_weights[i])
             else:
-                uniform_list = np.random.uniform(200000,200000,weights[i])
+                uniform_list = np.random.uniform(200000,200000,income_weights[i])
             distributed_incomes.extend(uniform_list.astype(int))
 
         vehicle_weights = [
@@ -518,7 +537,7 @@ for index,row in data.iterrows():
         household_size_weights = [0 if item == -666666666 else item for item in household_size_weights]
 
         polygons = store_polygons
-        for household_num in range(int(tract_polygon.area/7000)):
+        for household_num in range(int(tract_polygon.area/20000)):
 
 
             location = Point()
@@ -530,7 +549,9 @@ for index,row in data.iterrows():
                 polygon = Polygon(((location.x+20, location.y+20),(location.x-20, location.y+20),(location.x-20, location.y-20),(location.x+20, location.y-20)))
             location = polygon.centroid
 
-            income = distributed_incomes[random.randint(0,len(distributed_incomes)-1)]
+
+            income_range = random.choices(income_ranges,weights = income_weights)
+            income = random.randint(income_range[0][0]/1000,income_range[0][1]/1000)*1000
 
             #This is stupid - literally just hardcoded
             household_size = random.choices([1,2,3,4,5,6,7],weights=[1,1,1,1,0,0,0])[0]
@@ -551,8 +572,6 @@ for index,row in data.iterrows():
             else:
                 size_indexes = size_index_dict[4]
             workers_indexes = workers_index_dict[num_workers]
-            print(size_indexes)
-            print(workers_indexes)
             vehicle_combined_weights = None
             if num_workers != 3:
                 vehicle_combined_weights = np.array(vehicle_weights[(size_indexes[0]):(size_indexes[1])])+np.array(vehicle_weights[(workers_indexes[0]):(workers_indexes[1])])
