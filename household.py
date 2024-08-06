@@ -55,7 +55,7 @@ class Household(GeoAgent):
             
         for store in self.stores_list: 
          distance = self.model.space.distance(self,store)
-        if distance <= 1:
+        if distance <= 1609.34:
          self.num_store_within_mile += 1 
         return self.num_store_within_mile
 
