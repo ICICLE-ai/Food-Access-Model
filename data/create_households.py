@@ -33,7 +33,18 @@ def get_random_point(tract_polygon,polygons):
             count += 1
             if count == 1000:
                 raise Exception()
-            polygon =Polygon(((location.x+20, location.y+20),(location.x-20, location.y+20),(location.x-20, location.y-20),(location.x+20, location.y-20)))
+            polygon =Polygon(((location.x+20, location.y+20),
+                              (location.x, location.y+40),
+                              (location.x-20, location.y+20),
+                              (location.x+20, location.y+20),
+                              (location.x-20, location.y+20),
+                              (location.x-20, location.y-10),
+                              (location.x-5, location.y-10),
+                              (location.x-5, location.y+5),
+                              (location.x+5, location.y+5),
+                              (location.x+5, location.y-10),
+                              (location.x-5, location.y-10),
+                              (location.x+20, location.y-10)))
             not_touching = True
             for polygon_2 in polygons:
                 touches = polygon.intersects(polygon_2)
@@ -526,7 +537,7 @@ for index,row in data.iterrows():
         household_size_weights = [0 if item == -666666666 else item for item in household_size_weights]
 
         polygons = store_polygons
-        for household_num in range(int(tract_polygon.area/10000)):
+        for household_num in range(int(tract_polygon.area/20000)):
 
 
             location = Point()
