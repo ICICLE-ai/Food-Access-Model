@@ -60,11 +60,20 @@ def agent_portrayal(agent):
         # Sets the house color based on its income 
         portrayal["color"] = number_to_color_word(agent.income)
         # Overall Description of the house
-        portrayal["description"] = ["Household","income: " + "{:,}".format(agent.income) , "household size: " + str(agent.household_size) , "vehicles: " + str(agent.vehicles) , "number of workers: " + str(agent.number_of_workers)]
+        portrayal["description"] = [
+            "Household",
+            "Income: " + "{:,}".format(agent.income) , 
+            "Household Size: " + str(agent.household_size) , 
+            "Vehicles: " + str(agent.vehicles) , 
+            "Number of Workers: " + str(agent.number_of_workers),
+            "Stores within 1 Mile: " + str(agent.num_store_within_mile) 
+            ]
 
     # Adding attributes to define a Store like its color and overall description. 
     if isinstance(agent,Store):
         portrayal["color"] = "Blue" 
-        portrayal["description"] = ["Category: " + str(agent.type),"Name: " + str(agent.name)]
+        portrayal["description"] = [
+            "Category: " + str(agent.type),
+            "Name: " + str(agent.name)]
 
     return portrayal
