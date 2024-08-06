@@ -48,17 +48,20 @@ class Household(GeoAgent):
         self.number_of_workers = number_of_workers
         self.stores_list = stores_list
 
-        # Variable to store number of stores within 1 mile of a Household
-        self.num_store_within_mile = 0 
+# Variable to store number of stores within 1 mile of a Household
+        self.num_store_within_mile = self.stores_with_1_miles() 
+        print(self.stores_with_1_miles())
+        
+        
 
     def stores_with_1_miles (self):
-            
+        total = 0 
         for store in self.stores_list: 
          distance = self.model.space.distance(self,store)
-        if distance <= 1609.34:
-         self.num_store_within_mile += 1 
-        return self.num_store_within_mile
-
+        #  print("distance")
+         if distance <= 1609.34:
+          total += 1 
+        return total 
 
 
     def choose_store(self, search_radius):
