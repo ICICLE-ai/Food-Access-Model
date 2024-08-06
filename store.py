@@ -14,8 +14,9 @@ class Store(GeoAgent):
         Initialize the Household Agent.
 
         Args:
-            - id (int): store's unique id
             - model (GeoModel): model from mesa that places stores on a GeoSpace
+            - id (int): store's unique id
+            - name (String): Name of grocery store
             - type (String): can be either [CurbPickup, EthnicFoods, GroceRetail,HealthFoods, ShoppingService, SpecialtyFoods, WholeSale] 
             - lat (float): latitude of agent
             - lon (float): longitude of agent
