@@ -15,7 +15,7 @@ class Household(GeoAgent):
     defines the behavior of a single household on each step through the model.
     """
 
-    def __init__(self, model, id: int, latitude, longitude, polygon, income, household_size,vehicles,number_of_workers, search_radius: int, crs: int):
+    def __init__(self, model, id: int, latitude, longitude, polygon, income, household_size,vehicles,number_of_workers, stores_list,search_radius: int, crs: int):
         """
         Initialize the Household Agent.
 
@@ -29,6 +29,7 @@ class Household(GeoAgent):
             - household_size (int): total members in the household
             - vehicles (int): total vechiles in the household
             - number_of_workers (int): total working members (having job) in the household
+            - stores_list : List containing all the stores with their attributes
             - search_radius (int): how far to search for stores
             - crs (string): constant value (i.e.3857),used to map households on a flat earth display 
         """
@@ -45,6 +46,22 @@ class Household(GeoAgent):
         self.household_size = household_size
         self.vehicles = vehicles
         self.number_of_workers = number_of_workers
+        self.stores_list = stores_list
+
+# Variable to store number of stores within 1 mile of a Household
+        self.num_store_within_mile = self.stores_with_1_miles() 
+        print(self.stores_with_1_miles())
+        
+        
+
+    def stores_with_1_miles (self):
+        total = 0 
+        for store in self.stores_list: 
+         distance = self.model.space.distance(self,store)
+        #  print("distance")
+         if distance <= 1609.34:
+          total += 1 
+        return total 
 
 
     def choose_store(self, search_radius):
