@@ -30,6 +30,8 @@ class GeoModel(Model):
         self.space = GeoSpace(warn_crs_conversion=False) 
         # Specify that agents should be activated randomly during each step
         self.schedule = RandomActivation(self) 
+        # Initializing empty list to collect all the store objects
+        stores_list = []
         
         # Initialize all store agents and add them to the GeoSpace
         for index,row in stores.iterrows():
@@ -41,7 +43,9 @@ class GeoModel(Model):
                 row["latitude"],
                 row["longitude"],
                 CRS)
-            self.space.add_agents(agent)
+            self.space.add_agents(agent) 
+            # Initializing empty list to collect all the store objects
+            stores_list.append(agent)
 
         # Initialize all household agents and add them to the scheduler and the Geospace
         for index,row in households.iterrows():
@@ -55,6 +59,7 @@ class GeoModel(Model):
                 row["household_size"],
                 row["vehicles"],
                 row["number_of_workers"],
+                stores_list,
                 SEARCHRADIUS,
                 CRS)
             self.schedule.add(agent)
