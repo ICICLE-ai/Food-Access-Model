@@ -1,4 +1,5 @@
-#Radius that households look for stores on first search iteration. Units unclear ^^
+#Radius that households look for stores on first search iteration. 
+# Units => Meters^^
 SEARCHRADIUS = 500
 
 #crs geometry for map (this is web mercator)
