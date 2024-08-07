@@ -26,7 +26,7 @@ def get_random_point(tract_polygon,polygons):
     while True:
         # Generate a random point
         location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
-        
+        print(location)
         # Check if the point is inside the polygon
         
         if tract_polygon.contains(location):
@@ -52,6 +52,7 @@ def get_random_point(tract_polygon,polygons):
                     not_touching = False
                     break
             if not_touching:
+                print(polygon)
                 return polygon
 
 #Dictionary to describe homedata Variables
@@ -403,7 +404,7 @@ county_geodata["tract_y"] = county_geodata["tract_y"].astype(int)
 county_data["tract_y"] = county_data["tract_y"].astype(int)
 data = pd.merge(county_geodata, county_data, on = "tract_y", how="inner")
 data.rename(columns=households_variables_dict, inplace = True)
-households = pd.DataFrame(columns = ["id","latitude","longitude","polygon","income","household_size","vehicles","number_of_workers"])
+households = pd.DataFrame(columns = ["id","polygon","income","household_size","vehicles","number_of_workers"])
 
 #helper method to switch x and y in a shapely Point
 def swap_xy(x, y):
@@ -542,13 +543,7 @@ for index,row in data.iterrows():
 
             location = Point()
             polygon = Polygon()
-            if (len(polygons) != 0):
-                polygon = get_random_point(tract_polygon,polygons)
-            else:
-                location = tract_polygon.centroid
-                polygon = Polygon(((location.x+20, location.y+20),(location.x-20, location.y+20),(location.x-20, location.y-20),(location.x+20, location.y-20)))
-            location = polygon.centroid
-
+            polygon = get_random_point(tract_polygon,polygons)
 
             income_range = random.choices(income_ranges,weights = income_weights)
             income = random.randint(income_range[0][0]/1000,income_range[0][1]/1000)*1000
@@ -581,8 +576,6 @@ for index,row in data.iterrows():
 
             households.loc[total_count] = {
                 "id":total_count,
-                "latitude":location.y,
-                "longitude":location.x,
                 "polygon":polygon,
                 "income":income,
                 "vehicles":vehicles,
