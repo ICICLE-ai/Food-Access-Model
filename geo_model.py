@@ -51,9 +51,7 @@ class GeoModel(Model):
         for index,row in households.iterrows():
             agent = Household(
                 self, 
-                row["id"], 
-                float(row["latitude"]), 
-                float(row["longitude"]), 
+                row["id"],
                 row["polygon"], 
                 row["income"],
                 row["household_size"],

@@ -15,15 +15,13 @@ class Household(GeoAgent):
     defines the behavior of a single household on each step through the model.
     """
 
-    def __init__(self, model, id: int, latitude, longitude, polygon, income, household_size,vehicles,number_of_workers, stores_list,search_radius: int, crs: int):
+    def __init__(self, model, id: int, polygon, income, household_size,vehicles,number_of_workers, stores_list,search_radius: int, crs: int):
         """
         Initialize the Household Agent.
 
         Args:
             - model (GeoModel): model from mesa that places Households on a GeoSpace
             - id: id number of agent
-            - latitude (float): latitude of the household
-            - longitude (float): longitude of the household
             - polygon (Polygon): a shapely polygon that represents a houshold on the map
             - income (int): total income of the household
             - household_size (int): total members in the household
@@ -41,8 +39,6 @@ class Household(GeoAgent):
         super().__init__(id,model,polygon,crs)
         self.income = income
         self.search_radius = search_radius
-        self.latitude = latitude
-        self.longitude = longitude
         self.household_size = household_size
         self.vehicles = vehicles
         self.number_of_workers = number_of_workers
