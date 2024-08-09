@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import geopandas
 from shapely.geometry import Polygon, Point
-from shapely.ops import transform
+import shapely
 import random
 import requests
 from io import BytesIO
@@ -10,7 +10,10 @@ from zipfile import ZipFile
 import tempfile
 import os
 import pyproj
-
+import rasterio
+from rasterio.transform import from_origin
+from pyproj import Proj
+from pyproj import transform
 
 FIBSCODE = "39049"
 YEAR = 2022
@@ -18,6 +21,18 @@ from config import APIKEY
 
 county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
+
+
+
+# Open the raster file and read the first band
+with rasterio.open('data/county_raster.tif') as src:
+    band1 = src.read(1)  # Read the first band
+    raster_crs = src.crs  # Get the CRS of the raster
+    transform_affline = src.transform # Get the affine transform of the raster
+
+# Define the EPSG:3857 and the raster CRS
+epsg3857 = Proj('EPSG:3857')
+raster_proj = Proj(raster_crs)
 
 # Function to generate a random point within a polygon
 def get_random_point(tract_polygon,polygons):
@@ -31,7 +46,7 @@ def get_random_point(tract_polygon,polygons):
         
         if tract_polygon.contains(location):
             count += 1
-            if count == 1000:
+            if count == 10000:
                 raise Exception()
             polygon =Polygon(((location.x+20, location.y+20),
                               (location.x, location.y+40),
@@ -47,11 +62,24 @@ def get_random_point(tract_polygon,polygons):
                               (location.x+20, location.y-10)))
             not_touching = True
             for polygon_2 in polygons:
+                
                 touches = polygon.intersects(polygon_2)
                 if touches:
                     not_touching = False
                     break
-            if not_touching:
+            # Transform the point from EPSG:3857 to the raster's CRS
+            x_raster, y_raster = transform(epsg3857, raster_proj, location.x, location.y)
+
+            # Convert the transformed coordinates to row and column indices
+            row, col = ~transform_affline * (x_raster, y_raster)
+
+            # Convert to integers (row and column indices must be integers)
+            row = int(row)
+            col = int(col)
+
+            # Extract the value from the NumPy array at the calculated indices
+            value = band1[col, row]
+            if not_touching and ((value == 23) or (value == 24)):
                 return polygon
 
 #Dictionary to describe homedata Variables
@@ -419,7 +447,7 @@ for index,row in stores.iterrows():
     project = pyproj.Transformer.from_proj(
         pyproj.Proj('epsg:4326'), # source coordinate system
         pyproj.Proj('epsg:3857')) # destination coordinate system
-    point = transform(project.transform, point)  # apply projection
+    point = shapely.ops.transform(project.transform, point)  # apply projection
     polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
     store_polygons.append(polygon)  # apply projection
 
@@ -430,11 +458,11 @@ for index,row in data.iterrows():
     if ((row['tract_y']>5000)&(row['tract_y']<6000)):
         #Create household polygon
         tract_polygon = Polygon(row["geometry"])
-        tract_polygon = transform(swap_xy, tract_polygon)
+        tract_polygon = shapely.ops.transform(swap_xy, tract_polygon)
         project = pyproj.Transformer.from_proj(
             pyproj.Proj('epsg:4326'), # source coordinate system
             pyproj.Proj('epsg:3857')) # destination coordinate system
-        tract_polygon = transform(project.transform, tract_polygon)  # apply
+        tract_polygon = shapely.ops.transform(project.transform, tract_polygon)  # apply
 
         #Get amount of people in each tract at each income level
         income_weights = np.array(row["10k to 15k":"150k to 200k"]).astype(int)
@@ -537,7 +565,7 @@ for index,row in data.iterrows():
         household_size_weights = [0 if item == -666666666 else item for item in household_size_weights]
 
         polygons = store_polygons
-        for household_num in range(int(tract_polygon.area/20000)):
+        for household_num in range(int(tract_polygon.area/9000)):
 
 
             location = Point()
@@ -551,7 +579,7 @@ for index,row in data.iterrows():
 
 
             income_range = random.choices(income_ranges,weights = income_weights)
-            income = random.randint(income_range[0][0]/1000,income_range[0][1]/1000)*1000
+            income = random.randint(int(income_range[0][0]/1000),int(income_range[0][1]/1000))*1000
 
             #This is stupid - literally just hardcoded
             household_size = random.choices([1,2,3,4,5,6,7],weights=[1,1,1,1,0,0,0])[0]
