@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import geopandas
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon, Point, mapping
 import shapely
 import random
 import requests
@@ -11,8 +11,8 @@ import tempfile
 import os
 import pyproj
 import rasterio
-from pyproj import Proj
-from pyproj import transform
+import pyproj
+from rasterio.mask import mask
 from household_constants import(
     households_variables_dict,
     household_values_list,
@@ -33,11 +33,7 @@ state_code = FIBSCODE[:2]
 with rasterio.open('data/household_creation/county_raster.tif') as src:
     band1 = src.read(1)  # Read the first band
     raster_crs = src.crs  # Get the CRS of the raster
-    transform_affline = src.transform # Get the affine transform of the raster
-
-# Define the EPSG:3857 and the raster CRS
-epsg3857 = Proj('EPSG:3857')
-raster_proj = Proj(raster_crs)
+    transform_affline = src.transform # Get the affine transformation of the raster
 
 # Function to generate a random point within a polygon
 def place_household(tract_polygon,polygons):
@@ -73,19 +69,38 @@ def place_household(tract_polygon,polygons):
                     break
 
             nlcd_transformer = pyproj.Transformer.from_crs(raster_crs, 'EPSG:3857')
-            # Transform the point from EPSG:3857 to the raster's CRS
-            x_raster, y_raster = nlcd_transformer.transform(location.x, location.y)
 
-            # Convert the transformed coordinates to row and column indices
-            row, col = ~transform_affline * (x_raster, y_raster)
+            in_housing_area = True
+            points = [
+                (location.x+20, location.y+20),
+                (location.x, location.y+40),
+                (location.x-20, location.y+20),
+                (location.x+20, location.y+20),
+                (location.x-20, location.y+20),
+                (location.x-20, location.y-10),
+                (location.x-5, location.y-10),
+                (location.x-5, location.y+5),
+                (location.x+5, location.y+5),
+                (location.x+5, location.y-10),
+                (location.x-5, location.y-10),
+                (location.x+20, location.y-10)
+            ]
+            for i in range(len(points)):
+                # Transform the point from EPSG:3857 to the raster's CRS
+                x_raster, y_raster = nlcd_transformer.transform(points[i][0], points[i][1])
 
-            # Convert to integers (row and column indices must be integers)
-            row = int(row)
-            col = int(col)
+                # Convert the transformed coordinates to row and column indices
+                row, col = ~transform_affline * (x_raster, y_raster)
 
-            # Extract the value from the NumPy array at the calculated indices
-            value = band1[col, row]
-            if not_touching and ((value == 23) or (value == 24)):
+                # Convert to integers (row and column indices must be integers)
+                row = int(row)
+                col = int(col)
+
+                # Extract the value from the NumPy array at the calculated indices
+                value = band1[col, row]
+                if ((value != 24) and (value != 23) and (value != 25)):
+                    in_housing_area = False
+            if not_touching and in_housing_area:
                 return polygon
 
 
@@ -262,8 +277,22 @@ for index,row in data.iterrows():
         household_size_weights = [0 if item == -666666666 else item for item in household_size_weights]
 
         polygons = store_polygons
-        for household_num in range(int(tract_polygon.area/20000)):
+        geojson_polygon = [mapping(tract_polygon)]
+        with rasterio.open('data/household_creation/county_raster.tif') as src:
+            band1 = src.read(1)  # Read the first band
+            raster_crs = src.crs  # Get the CRS of the raster
+            transform_affline = src.transform # Get the affine transformation of the raster
+            out_image, out_transform = mask(src, shapes=geojson_polygon, crop=True)
 
+        total_area = 0
+        total_avail_area = 0
+        for num in np.nditer(out_image):
+            total_area += 1
+            if ((num != 24) and (num != 23) and (num != 25)):
+                total_avail_area += 1
+        num_houses = int((total_avail_area/total_area) *200)
+
+        for household_num in range(num_houses):
 
             location = Point()
             polygon = Polygon()
