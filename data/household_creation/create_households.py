@@ -29,10 +29,8 @@ from config import APIKEY
 county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
 
-
-
 # Open the raster file and read the first band
-with rasterio.open('data/county_raster.tif') as src:
+with rasterio.open('data/household_creation/county_raster.tif') as src:
     band1 = src.read(1)  # Read the first band
     raster_crs = src.crs  # Get the CRS of the raster
     transform_affline = src.transform # Get the affine transform of the raster
@@ -48,7 +46,6 @@ def place_household(tract_polygon,polygons):
     while True:
         # Generate a random point
         location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
-        print(location)
         # Check if the point is inside the polygon
         
         if tract_polygon.contains(location):
@@ -74,8 +71,10 @@ def place_household(tract_polygon,polygons):
                 if touches:
                     not_touching = False
                     break
+
+            nlcd_transformer = pyproj.Transformer.from_crs(raster_crs, 'EPSG:3857')
             # Transform the point from EPSG:3857 to the raster's CRS
-            x_raster, y_raster = transform(epsg3857, raster_proj, location.x, location.y)
+            x_raster, y_raster = nlcd_transformer.transform(location.x, location.y)
 
             # Convert the transformed coordinates to row and column indices
             row, col = ~transform_affline * (x_raster, y_raster)
@@ -113,7 +112,6 @@ for count in range(int(len(households_key_list)/50)+1):
         county_data = pd.merge(pd.DataFrame(response.json()[1:], columns=response.json()[0]), county_data, on='NAME', how='inner')
     else:
         county_data = pd.DataFrame(response.json()[1:], columns=response.json()[0])
-
 
 
 # Load in geographical tract data
@@ -264,7 +262,7 @@ for index,row in data.iterrows():
         household_size_weights = [0 if item == -666666666 else item for item in household_size_weights]
 
         polygons = store_polygons
-        for household_num in range(int(tract_polygon.area/9000)):
+        for household_num in range(int(tract_polygon.area/20000)):
 
 
             location = Point()
