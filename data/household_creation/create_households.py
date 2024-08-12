@@ -284,13 +284,12 @@ for index,row in data.iterrows():
             transform_affline = src.transform # Get the affine transformation of the raster
             out_image, out_transform = mask(src, shapes=geojson_polygon, crop=True)
 
-        total_area = 0
         total_avail_area = 0
         for num in np.nditer(out_image):
-            total_area += 1
-            if ((num != 24) and (num != 23) and (num != 25)):
+            if ((num == 24) or (num == 23) or (num == 25)):
                 total_avail_area += 1
-        num_houses = int((total_avail_area/total_area) *200)
+        num_houses = int(total_avail_area/5)
+        print(num_houses)
 
         for household_num in range(num_houses):
 
