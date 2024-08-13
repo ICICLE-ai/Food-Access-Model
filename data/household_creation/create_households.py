@@ -73,16 +73,8 @@ def place_household(tract_polygon,polygons):
             in_housing_area = True
             points = [
                 (location.x+20, location.y+20),
-                (location.x, location.y+40),
-                (location.x-20, location.y+20),
-                (location.x+20, location.y+20),
                 (location.x-20, location.y+20),
                 (location.x-20, location.y-10),
-                (location.x-5, location.y-10),
-                (location.x-5, location.y+5),
-                (location.x+5, location.y+5),
-                (location.x+5, location.y-10),
-                (location.x-5, location.y-10),
                 (location.x+20, location.y-10)
             ]
             for i in range(len(points)):
