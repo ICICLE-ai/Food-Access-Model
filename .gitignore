@@ -1,6 +1,9 @@
 # Config File
 config.py
 
+#useless json
+*.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -11,6 +14,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.pbf
 build/
 develop-eggs/
 dist/

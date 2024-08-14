@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import geopandas
-from shapely.geometry import Polygon, Point, mapping
+from shapely.geometry import Polygon, Point, LineString, mapping
 import shapely
 import random
 import requests
@@ -9,10 +9,12 @@ from io import BytesIO
 from zipfile import ZipFile
 import tempfile
 import os
+import osmnx as ox
 import pyproj
 import rasterio
 import pyproj
 from rasterio.mask import mask
+import csv
 from household_constants import(
     households_variables_dict,
     household_values_list,
@@ -29,72 +31,22 @@ from config import APIKEY
 county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
 
+roads = []
+
+with open('data/household_creation/roads.csv', newline='') as file:
+    reader = csv.reader(file)
+    for row in reader:
+        roads.append(shapely.wkt.loads(row)[0].buffer(1))
+
+#helper method to switch x and y in a shapely Point
+def swap_xy(x, y):
+    return y, x
+
 # Open the raster file and read the first band
 with rasterio.open('data/household_creation/county_raster.tif') as src:
     band1 = src.read(1)  # Read the first band
     raster_crs = src.crs  # Get the CRS of the raster
     transform_affline = src.transform # Get the affine transformation of the raster
-
-# Function to generate a random point within a polygon
-def place_household(tract_polygon,polygons):
-    min_x, min_y, max_x, max_y = tract_polygon.bounds
-    count = 0
-    while True:
-        # Generate a random point
-        location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
-        # Check if the point is inside the polygon
-        
-        if tract_polygon.contains(location):
-            count += 1
-            if count == 10000:
-                raise Exception()
-            polygon =Polygon(((location.x+20, location.y+20),
-                              (location.x, location.y+40),
-                              (location.x-20, location.y+20),
-                              (location.x+20, location.y+20),
-                              (location.x-20, location.y+20),
-                              (location.x-20, location.y-10),
-                              (location.x-5, location.y-10),
-                              (location.x-5, location.y+5),
-                              (location.x+5, location.y+5),
-                              (location.x+5, location.y-10),
-                              (location.x-5, location.y-10),
-                              (location.x+20, location.y-10)))
-            not_touching = True
-            for polygon_2 in polygons:
-                
-                touches = polygon.intersects(polygon_2)
-                if touches:
-                    not_touching = False
-                    break
-
-            nlcd_transformer = pyproj.Transformer.from_crs(raster_crs, 'EPSG:3857')
-
-            in_housing_area = True
-            points = [
-                (location.x+20, location.y+20),
-                (location.x-20, location.y+20),
-                (location.x-20, location.y-10),
-                (location.x+20, location.y-10)
-            ]
-            for i in range(len(points)):
-                # Transform the point from EPSG:3857 to the raster's CRS
-                x_raster, y_raster = nlcd_transformer.transform(points[i][0], points[i][1])
-
-                # Convert the transformed coordinates to row and column indices
-                row, col = ~transform_affline * (x_raster, y_raster)
-
-                # Convert to integers (row and column indices must be integers)
-                row = int(row)
-                col = int(col)
-
-                # Extract the value from the NumPy array at the calculated indices
-                value = band1[col, row]
-                if ((value != 24) and (value != 23) and (value != 25)):
-                    in_housing_area = False
-            if not_touching and in_housing_area:
-                return polygon
-
 
 #Read csvs into pandas dataframes
 #For loop runs a census API pull for each loop iteration
@@ -149,12 +101,9 @@ data = pd.merge(county_geodata, county_data, on = "tract_y", how="inner")
 data.rename(columns=households_variables_dict, inplace = True)
 households = pd.DataFrame(columns = ["id","polygon","income","household_size","vehicles","number_of_workers"])
 
-#helper method to switch x and y in a shapely Point
-def swap_xy(x, y):
-    return y, x
 
-# Create a list of all store polygons so that we can test if households overlap with them
-store_polygons = []
+# Create a list of all store map_elements so that we can test if households overlap with them
+map_elements = roads
 stores = pd.read_csv("data/stores.csv")
 for index,row in stores.iterrows():
     lat = row["latitude"]
@@ -165,12 +114,73 @@ for index,row in stores.iterrows():
         pyproj.Proj('epsg:3857')) # destination coordinate system
     point = shapely.ops.transform(project.transform, point)  # apply projection
     polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
-    store_polygons.append(polygon)  # apply projection
+    map_elements.append(polygon)  # apply projection
 
+# Function to generate a random point within a polygon
+def place_household(tract_polygon,tract_elements):
+    min_x, min_y, max_x, max_y = tract_polygon.bounds
+    count = 0
+    while True:
+        # Generate a random point
+        location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
+        # Check if the point is inside the polygon
+        
+        if tract_polygon.contains(location):
+            count += 1
+            if count == 10000:
+                raise Exception()
+            polygon =Polygon(((location.x+20, location.y+20),
+                              (location.x, location.y+40),
+                              (location.x-20, location.y+20),
+                              (location.x+20, location.y+20),
+                              (location.x-20, location.y+20),
+                              (location.x-20, location.y-10),
+                              (location.x-5, location.y-10),
+                              (location.x-5, location.y+5),
+                              (location.x+5, location.y+5),
+                              (location.x+5, location.y-10),
+                              (location.x-5, location.y-10),
+                              (location.x+20, location.y-10)))
+            not_touching = True
+            for polygon_2 in tract_elements:
+                
+                touches = polygon.intersects(polygon_2)
+                if touches:
+                    not_touching = False
+                    break
+
+            nlcd_transformer = pyproj.Transformer.from_crs(raster_crs, 'EPSG:3857')
+
+            in_housing_area = True
+            points = [
+                (location.x+20, location.y+20),
+                (location.x-20, location.y+20),
+                (location.x-20, location.y-10),
+                (location.x+20, location.y-10)
+            ]
+            for i in range(len(points)):
+                # Transform the point from EPSG:3857 to the raster's CRS
+                x_raster, y_raster = nlcd_transformer.transform(points[i][0], points[i][1])
+
+                # Convert the transformed coordinates to row and column indices
+                row, col = ~transform_affline * (x_raster, y_raster)
+
+                # Convert to integers (row and column indices must be integers)
+                row = int(row)
+                col = int(col)
+
+                # Extract the value from the NumPy array at the calculated indices
+                value = band1[col, row]
+                if ((value != 24) and (value != 23) and (value != 25)):
+                    in_housing_area = False
+            if not_touching and in_housing_area:
+                return polygon
+            
 
 #Iterate through each tract and create households
 total_count = 0
 for index,row in data.iterrows():
+    tract_elements = list()
     if ((row['tract_y']>5000)&(row['tract_y']<6000)):
         #Create household polygon
         tract_polygon = Polygon(row["geometry"])
@@ -268,7 +278,10 @@ for index,row in data.iterrows():
                         ]
         household_size_weights = [0 if item == -666666666 else item for item in household_size_weights]
 
-        polygons = store_polygons
+        for polygon in map_elements:
+            if polygon.intersects(tract_polygon):
+                tract_elements.append(polygon)
+
         geojson_polygon = [mapping(tract_polygon)]
         with rasterio.open('data/household_creation/county_raster.tif') as src:
             band1 = src.read(1)  # Read the first band
@@ -280,14 +293,14 @@ for index,row in data.iterrows():
         for num in np.nditer(out_image):
             if ((num == 24) or (num == 23) or (num == 25)):
                 total_avail_area += 1
-        num_houses = int(total_avail_area/5)
+        num_houses = int(total_avail_area/15)
         print(num_houses)
 
         for household_num in range(num_houses):
 
             location = Point()
             polygon = Polygon()
-            polygon = place_household(tract_polygon,polygons)
+            polygon = place_household(tract_polygon,tract_elements)
 
             income_range = random.choices(income_ranges,weights = income_weights)
             income = random.randint(int(income_range[0][0]/1000),int(income_range[0][1]/1000))*1000
@@ -327,7 +340,10 @@ for index,row in data.iterrows():
                 "number_of_workers":num_workers
                 }
             total_count+=1
-            polygons.append(polygon)
+            tract_elements.append(polygon)
+        map_elements.extend(tract_elements)
+
+
 
 households.to_csv('data/households.csv', index=False)
 print(households)
