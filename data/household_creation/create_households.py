@@ -31,6 +31,7 @@ from config import APIKEY
 county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
 
+
 roads = []
 
 with open('data/household_creation/roads.csv', newline='') as file:

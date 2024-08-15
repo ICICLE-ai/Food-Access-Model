@@ -1,3 +1,6 @@
+FIBSCODE = "39049"
+YEAR = 2022
+
 #Dictionary to describe homedata Variables
 households_variables_dict = {
     "B19001_001E": "total households in tract",

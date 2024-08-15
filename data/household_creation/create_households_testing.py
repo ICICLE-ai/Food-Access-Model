@@ -1,105 +1,19 @@
 import numpy as np
 import pandas as pd
-import geopandas
-from shapely.geometry import Polygon, Point, LineString, mapping
+from shapely.geometry import Polygon, Point
 import shapely
 import random
-import requests
-from io import BytesIO
-from zipfile import ZipFile
-import tempfile
-import os
-import osmnx as ox
 import pyproj
-import rasterio
-import pyproj
-from rasterio.mask import mask
 import csv
 from household_constants import(
-    households_variables_dict,
-    household_values_list,
-    households_key_list,
     income_ranges,
     size_index_dict,
     workers_index_dict
 )
 
-FIBSCODE = "39049"
-YEAR = 2022
-from config import APIKEY
+from get_census_data import data
 
-county_code = FIBSCODE[2:]
-state_code = FIBSCODE[:2]
-
-roads = []
-
-with open('data/household_creation/roads.csv', newline='') as file:
-    reader = csv.reader(file)
-    for row in reader:
-        if row[0] == "geometry":
-            continue
-        if (row[1] == "residential"):
-            roads.append(shapely.wkt.loads(row[0]).buffer(50))
-
-#helper method to switch x and y in a shapely Point
-def swap_xy(x, y):
-    return y, x
-
-#Read csvs into pandas dataframes
-#For loop runs a census API pull for each loop iteration
-#this is neccessary because we can only pull 50 variables at a time and we have >50
-county_data = pd.DataFrame()
-for count in range(int(len(households_key_list)/50)+1):
-    variables = ""
-    #put variables from above into census readable lists
-    if ((count+1)*50) > len(households_key_list):
-        variables = ",".join(households_key_list[(50*count):])
-    elif count == 0:
-        if (int(len(households_key_list)/50)+1) == 1:
-            variables = ",".join(households_key_list[:])
-        else:
-            variables = ",".join(households_key_list[:(50*(count+1)-1)])
-    else:
-        variables = ",".join(households_key_list[(50*count):(50*(count+1)-1)])
-    #Pull data and add to dataframe
-    url = f"https://api.census.gov/data/{YEAR}/acs/acs5?get=NAME,{variables}&for=tract:*&in=state:{state_code}&in=county:{county_code}&key={APIKEY}"
-    response = requests.request("GET", url)
-    if len(county_data != 0):
-        county_data = pd.merge(pd.DataFrame(response.json()[1:], columns=response.json()[0]), county_data, on='NAME', how='inner')
-    else:
-        county_data = pd.DataFrame(response.json()[1:], columns=response.json()[0])
-
-
-# Load in geographical tract data
-tract_url = f"https://www2.census.gov/geo/tiger/TIGER{YEAR}/TRACT/tl_{YEAR}_{state_code}_tract.zip"
-response = requests.request("GET", tract_url)
-# Use BytesIO to handle the zip file in memory
-with ZipFile(BytesIO(response.content)) as zip_ref:
-    # Create a temporary directory to extract the zip file
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        zip_ref.extractall(tmpdirname)
-        
-        # Find the shapefile or GeoJSON file in the extracted contents
-        for root, dirs, files in os.walk(tmpdirname):
-            for file in files:
-                if file.endswith(".shp") or file.endswith(".geojson"):
-                    file_path = os.path.join(root, file)
-                    # Load the file into a GeoDataFrame
-                    geodata = geopandas.read_file(file_path)
-
-
-#Merge geographical dataframe (containing shapely ploygons) with census data
-geodata.crs = 'EPSG:3857'
-county_geodata = geodata[geodata['COUNTYFP'] == county_code]
-county_geodata = county_geodata.rename(columns={"TRACTCE":"tract_y"})
-county_geodata["tract_y"] = county_geodata["tract_y"].astype(int)
-county_data["tract_y"] = county_data["tract_y"].astype(int)
-data = pd.merge(county_geodata, county_data, on = "tract_y", how="inner")
-data.rename(columns=households_variables_dict, inplace = True)
-households = pd.DataFrame(columns = ["id","polygon","income","household_size","vehicles","number_of_workers"])
-
-
-# Create a list of all store map_elements so that we can test if households overlap with them
+# Create a list of all stores so that we can test if households overlap with them
 map_elements = list()
 stores = pd.read_csv("data/stores.csv")
 for index,row in stores.iterrows():
@@ -111,51 +25,73 @@ for index,row in stores.iterrows():
         pyproj.Proj('epsg:3857')) # destination coordinate system
     point = shapely.ops.transform(project.transform, point)  # apply projection
     polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
-    map_elements.append(polygon)  # apply projection
+    map_elements.append(polygon.buffer(20))  # apply projection
+
+roads = []
+with open('data/household_creation/roads.csv', newline='') as file:
+    reader = csv.reader(file)
+    for row in reader:
+        if row[0] == "geometry":
+            continue
+        if (row[1] == "residential"):
+            roads.append(shapely.wkt.loads(row[0]).buffer(40))
+        else:
+            map_elements.append(shapely.wkt.loads(row[0]))
+
+#helper method to switch x and y in a shapely Point
+def swap_xy(x, y):
+    return y, x
+
+households = pd.DataFrame(columns = ["id","polygon","income","household_size","vehicles","number_of_workers"])
+
+
 
 # Function to generate a random point within a polygon
-def place_household(tract_polygon,tract_elements,tract_roads):
-    min_x, min_y, max_x, max_y = tract_polygon.bounds
-    count = 0
-    while True:
-        # Generate a random point
+def get_house_polygons(tract_polygon,tract_elements,housing_areas):
+    housing_area = 0
+    for area in housing_areas:
+        housing_area+=area.area
+
+    num_houses = int(housing_area/5000)
+    houses = list()
+    for i in range(num_houses):
+        min_x, min_y, max_x, max_y = tract_polygon.bounds
+        min_x += 10
+        min_y += 10
+        max_x = max_x-10
+        max_y = max_y-10
         location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
-        # Check if the point is inside the polygon
-        
-        if tract_polygon.contains(location):
-            count += 1
-            if count == 10000:
-                raise Exception()
-            polygon =Polygon(((location.x+20, location.y+20),
-                              (location.x, location.y+40),
-                              (location.x-20, location.y+20),
-                              (location.x+20, location.y+20),
-                              (location.x-20, location.y+20),
-                              (location.x-20, location.y-10),
-                              (location.x-5, location.y-10),
-                              (location.x-5, location.y+5),
-                              (location.x+5, location.y+5),
-                              (location.x+5, location.y-10),
-                              (location.x-5, location.y-10),
-                              (location.x+20, location.y-10)))
+        if housing_area.contains(location):
+            house = Polygon(((location.x+20, location.y+20),
+                            (location.x, location.y+40),
+                            (location.x-20, location.y+20),
+                            (location.x+20, location.y+20),
+                            (location.x-20, location.y+20),
+                            (location.x-20, location.y-10),
+                            (location.x-5, location.y-10),
+                            (location.x-5, location.y+5),
+                            (location.x+5, location.y+5),
+                            (location.x+5, location.y-10),
+                            (location.x-5, location.y-10),
+                            (location.x+20, location.y-10)))
+            
             not_touching = True
-            for polygon_2 in tract_elements:
-                
-                touches = polygon.intersects(polygon_2)
+            for element in tract_elements:
+                touches = house.intersects(element)
                 if touches:
                     not_touching = False
                     break
 
-            touching_road = False
-            for road in tract_roads:
-                
-                touches = polygon.intersects(road)
+            for element in houses:
+                touches = house.intersects(element)
                 if touches:
-                    touching_road = True
+                    not_touching = False
                     break
 
-            if not_touching and touching_road:
-                return polygon
+            if not_touching:
+                houses.append(house)
+                break
+    return houses
             
 
 #Iterate through each tract and create households
@@ -263,21 +199,21 @@ for index,row in data.iterrows():
             if polygon.intersects(tract_polygon):
                 tract_elements.append(polygon)
 
-        tract_roads = []
+        housing_areas = []
         residential_area = 0
         for polygon in roads:
             if polygon.intersects(tract_polygon):
                 residential_area+=polygon.area
-                tract_roads.append(polygon)
+                housing_areas.append(polygon)
 
-        num_houses = int(residential_area/30000)
-        print(num_houses)
+        house_polygons = get_house_polygons(tract_polygon,tract_elements,housing_areas)
+        map_elements.extend(house_polygons)
 
-        for household_num in range(num_houses):
+        for household_num in range(len(house_polygons)):
 
             location = Point()
             polygon = Polygon()
-            polygon = place_household(tract_polygon,tract_elements,tract_roads)
+            polygon = house_polygons[household_num]
 
             income_range = random.choices(income_ranges,weights = income_weights)
             income = random.randint(int(income_range[0][0]/1000),int(income_range[0][1]/1000))*1000
