@@ -2,7 +2,6 @@ from shapely.geometry import LineString
 import osmnx as ox
 import shapely
 import pyproj
-import csv
 import pandas as pd
 
 place_name = "Franklin County, Ohio, USA"
