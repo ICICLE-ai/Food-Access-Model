@@ -37,19 +37,19 @@ with open('data/household_creation/roads.csv', newline='') as file:
         if row[0] == "geometry":
             continue
         if (row[1] == "residential"):
-            housing_areas.append(shapely.wkt.loads(row[0]).buffer(100))
+            housing_areas.append(shapely.wkt.loads(row[0]).buffer(200))
             map_elements.append(shapely.wkt.loads(row[0]))
-        elif (row[1] == "motorway") or (row[1] == "motorway_link"):
-            map_elements.append(shapely.wkt.loads(row[0]).buffer(100))
+        elif (row[1] == "motorway"):
+           map_elements.append(shapely.wkt.loads(row[0]))
         elif (row[1] == "primary"):
-            map_elements.append(shapely.wkt.loads(row[0]).buffer(10))
+            map_elements.append(shapely.wkt.loads(row[0]))
         else:
-            map_elements.append(shapely.wkt.loads(row[0]).buffer(1))
+            map_elements.append(shapely.wkt.loads(row[0]))
 map_elements_index = STRtree(map_elements)
 
 
 housing_areas_index = STRtree(housing_areas)
-temp_indexes = housing_areas_index.query(Polygon(((-9231087.591381988,4855583.605717118),(-9230359.092447992,4859016.425386268),(-9231386.539835587,4861464.9938469855),(-9237985.24736839,4863046.919173137))))
+temp_indexes = housing_areas_index.query(Polygon(((-9241087.591381988,4855583.605717118),(-9240359.092447992,4859016.425386268),(-9241386.539835587,4861464.9938469855),(-9247985.24736839,4863046.919173137))))
 housing_areas = [housing_areas[i] for i in temp_indexes]
 # Open the raster file and read the first band
 #with rasterio.open('data/household_creation/county_raster.tif') as src:
@@ -68,24 +68,24 @@ total_count = 0
 housing_areas_count = 0
 for housing_area in housing_areas:
     housing_areas_count+=1
-    print(housing_areas_count/len(housing_areas))
+    print(str(round(housing_areas_count/len(housing_areas)*100)) + "%")
     count = 0
-    while count<10:
+    while count<(((housing_area.area)/400)/8):
         min_x, min_y, max_x, max_y = housing_area.bounds
         location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
         if housing_area.contains(location):
-            house = Polygon(((location.x+20, location.y+20),
-                            (location.x, location.y+40),
-                            (location.x-20, location.y+20),
-                            (location.x+20, location.y+20),
-                            (location.x-20, location.y+20),
-                            (location.x-20, location.y-10),
-                            (location.x-5, location.y-10),
-                            (location.x-5, location.y+5),
-                            (location.x+5, location.y+5),
-                            (location.x+5, location.y-10),
-                            (location.x-5, location.y-10),
-                            (location.x+20, location.y-10)))
+            house = Polygon(((location.x+10, location.y+10),
+                            (location.x, location.y+20),
+                            (location.x-10, location.y+10),
+                            (location.x+10, location.y+10),
+                            (location.x-10, location.y+10),
+                            (location.x-10, location.y-5),
+                            (location.x-3, location.y-5),
+                            (location.x-3, location.y+3),
+                            (location.x+3, location.y+3),
+                            (location.x+3, location.y-5),
+                            (location.x-3, location.y-5),
+                            (location.x+10, location.y-5)))
             
             intersecting_map_elements_indexes = map_elements_index.query(house)
             if len(intersecting_map_elements_indexes) != 0:
