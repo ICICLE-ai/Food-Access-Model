@@ -49,7 +49,7 @@ map_elements_index = STRtree(map_elements)
 
 
 housing_areas_index = STRtree(housing_areas)
-temp_indexes = housing_areas_index.query(Polygon(((-9261087.591381988,4865583.605717118),(-9260359.092447992,4869016.425386268),(-9261386.539835587,4871464.9938469855),(-9267985.24736839,4873046.919173137))))
+temp_indexes = housing_areas_index.query(Polygon(((-9231087.591381988,4855583.605717118),(-9230359.092447992,4859016.425386268),(-9231386.539835587,4861464.9938469855),(-9237985.24736839,4863046.919173137))))
 housing_areas = [housing_areas[i] for i in temp_indexes]
 # Open the raster file and read the first band
 #with rasterio.open('data/household_creation/county_raster.tif') as src:
