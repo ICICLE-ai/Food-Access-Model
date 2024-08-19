@@ -5,6 +5,9 @@ import shapely
 import random
 import pyproj
 import csv
+import time
+from shapely.strtree import STRtree
+import rasterio
 from household_constants import(
     income_ranges,
     size_index_dict,
@@ -34,9 +37,20 @@ with open('data/household_creation/roads.csv', newline='') as file:
         if row[0] == "geometry":
             continue
         if (row[1] == "residential"):
-            roads.append(shapely.wkt.loads(row[0]).buffer(40))
-        else:
+            roads.append(shapely.wkt.loads(row[0]).buffer(100))
             map_elements.append(shapely.wkt.loads(row[0]))
+        elif (row[1] == "motorway") or (row[1] == "motorway_link"):
+            map_elements.append(shapely.wkt.loads(row[0]).buffer(100))
+        elif (row[1] == "primary"):
+            map_elements.append(shapely.wkt.loads(row[0]).buffer(10))
+        else:
+            map_elements.append(shapely.wkt.loads(row[0]).buffer(1))
+            
+# Open the raster file and read the first band
+with rasterio.open('data/household_creation/county_raster.tif') as src:
+    band1 = src.read(1)  # Read the first band
+    raster_crs = src.crs  # Get the CRS of the raster
+    transform_affline = src.transform # Get the affine transformation of the raster
 
 #helper method to switch x and y in a shapely Point
 def swap_xy(x, y):
@@ -45,14 +59,15 @@ def swap_xy(x, y):
 households = pd.DataFrame(columns = ["id","polygon","income","household_size","vehicles","number_of_workers"])
 
 
-
+"""
 # Function to generate a random point within a polygon
 def get_house_polygons(tract_polygon,tract_elements,housing_areas):
     housing_area = 0
     for area in housing_areas:
         housing_area+=area.area
 
-    num_houses = int(housing_area/5000)
+    num_houses = int(housing_area/30000)
+    print(num_houses)
     houses = list()
     for i in range(num_houses):
         min_x, min_y, max_x, max_y = tract_polygon.bounds
@@ -60,45 +75,163 @@ def get_house_polygons(tract_polygon,tract_elements,housing_areas):
         min_y += 10
         max_x = max_x-10
         max_y = max_y-10
-        location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
-        if housing_area.contains(location):
-            house = Polygon(((location.x+20, location.y+20),
-                            (location.x, location.y+40),
-                            (location.x-20, location.y+20),
-                            (location.x+20, location.y+20),
-                            (location.x-20, location.y+20),
-                            (location.x-20, location.y-10),
-                            (location.x-5, location.y-10),
-                            (location.x-5, location.y+5),
-                            (location.x+5, location.y+5),
-                            (location.x+5, location.y-10),
-                            (location.x-5, location.y-10),
-                            (location.x+20, location.y-10)))
-            
-            not_touching = True
-            for element in tract_elements:
-                touches = house.intersects(element)
-                if touches:
-                    not_touching = False
-                    break
+        count = 0
+        while True:
+            if count==500:
+                break
+            location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
+            if tract_polygon.contains(location):
+                house = Polygon(((location.x+20, location.y+20),
+                                (location.x, location.y+40),
+                                (location.x-20, location.y+20),
+                                (location.x+20, location.y+20),
+                                (location.x-20, location.y+20),
+                                (location.x-20, location.y-10),
+                                (location.x-5, location.y-10),
+                                (location.x-5, location.y+5),
+                                (location.x+5, location.y+5),
+                                (location.x+5, location.y-10),
+                                (location.x-5, location.y-10),
+                                (location.x+20, location.y-10)))
+                count+=1
+                in_housing_area = False
+                for housing_area in housing_areas:
+                    touches = housing_area.contains(location)
+                    if touches:
+                        in_housing_area = True
+                        break
+                if  not in_housing_area:
+                    continue
+                
+                not_touching_other_element = True
+                for element in tract_elements:
+                    touches = house.intersects(element)
+                    if touches:
+                        not_touching_other_element = False
+                        break
+                if not not_touching_other_element:
+                    continue
 
-            for element in houses:
-                touches = house.intersects(element)
-                if touches:
-                    not_touching = False
-                    break
+                for element in houses:
+                    touches = house.intersects(element)
+                    if touches:
+                        not_touching_other_element = False
+                        break
 
-            if not_touching:
+                if not not_touching_other_element:
+                    continue
+
                 houses.append(house)
                 break
+        print(count)
     return houses
-            
+"""   
+""" 
+# Function to generate a random point within a polygon
+def get_house_polygons(tract_polygon):
+    housing_areas = []
+    roads_count = 0
+    for i in range(len(roads)):
+        if roads[roads_count].intersects(tract_polygon):
+            housing_areas.append(roads.pop(roads_count))
+        else:
+            roads_count+=1
+    housing_area_elements = list()
+    buffered_tract_polygon = tract_polygon.buffer(200)
+    for polygon in map_elements:
+        if buffered_tract_polygon.intersects(polygon):
+            housing_area_elements.append(polygon)
+    houses = list()
+    housing_areas_count = 0
+    while housing_areas_count < len(housing_areas):
+        housing_area = housing_areas[housing_areas_count]
+        min_x, min_y, max_x, max_y = housing_area.bounds
+        min_x += 0
+        min_y += 0
+        max_x = max_x-0
+        max_y = max_y-0
+        count = 0
+        while count<500:
+            location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
+            if housing_area.contains(location):
+                house = Polygon(((location.x+20, location.y+20),
+                                (location.x, location.y+40),
+                                (location.x-20, location.y+20),
+                                (location.x+20, location.y+20),
+                                (location.x-20, location.y+20),
+                                (location.x-20, location.y-10),
+                                (location.x-5, location.y-10),
+                                (location.x-5, location.y+5),
+                                (location.x+5, location.y+5),
+                                (location.x+5, location.y-10),
+                                (location.x-5, location.y-10),
+                                (location.x+20, location.y-10)))
+                count+=1
+                not_touching_other_element = True
+                for element in housing_area_elements:
+                    touches = house.intersects(element)
+                    if touches:
+                        not_touching_other_element = False
+                        break
+                if not not_touching_other_element:
+                    continue
 
-#Iterate through each tract and create households
+                for element in houses:
+                    touches = house.intersects(element)
+                    if touches:
+                        not_touching_other_element = False
+                        break
+                if not not_touching_other_element:
+                    continue
+
+                nlcd_transformer = pyproj.Transformer.from_crs(raster_crs, 'EPSG:3857')
+
+                in_housing_area = True
+                points = [
+                    (location.x+20, location.y+20),
+                    (location.x-20, location.y+20),
+                    (location.x-20, location.y-10),
+                    (location.x+20, location.y-10)
+                ]
+                for i in range(len(points)):
+                    # Transform the point from EPSG:3857 to the raster's CRS
+                    x_raster, y_raster = nlcd_transformer.transform(points[i][0], points[i][1])
+
+                    # Convert the transformed coordinates to row and column indices
+                    row, col = ~transform_affline * (x_raster, y_raster)
+
+                    # Convert to integers (row and column indices must be integers)
+                    row = int(row)
+                    col = int(col)
+
+                    # Extract the value from the NumPy array at the calculated indices
+                    value = band1[col, row]
+                    if value <= 22:
+                        in_housing_area = False
+                if not in_housing_area:
+                    continue
+                houses.append(house)
+                map_elements.append(house)
+                housing_area_elements.append(house)
+                break
+        housing_areas_count+=1
+    return houses
+"""
+# Function to generate a random point within a polygon
+def get_house_polygons(tract_polygon):
+    houses = list()
+
+    return houses
+
 total_count = 0
+count = 0
+start = time.time()
 for index,row in data.iterrows():
-    tract_elements = list()
-    if ((row['tract_y']>5000)&(row['tract_y']<6000)):
+    if ((row['tract_y']>4000)&(row['tract_y']<6000)):
+        start = time.time()
+        
+        count+=1
+        print(count)
         #Create household polygon
         tract_polygon = Polygon(row["geometry"])
         tract_polygon = shapely.ops.transform(swap_xy, tract_polygon)
@@ -107,7 +240,8 @@ for index,row in data.iterrows():
             pyproj.Proj('epsg:3857')) # destination coordinate system
         tract_polygon = shapely.ops.transform(project.transform, tract_polygon)  # apply
 
-        #Get amount of people in each tract at each income level
+        #Iterate through each tract and create households
+        #Get amount of people in each tract at each income levela
         income_weights = np.array(row["10k to 15k":"150k to 200k"]).astype(int)
         if sum(income_weights)==0:
             continue
@@ -194,21 +328,8 @@ for index,row in data.iterrows():
                             int(row["Median Income for 7+ Person(s)"])
                         ]
         household_size_weights = [0 if item == -666666666 else item for item in household_size_weights]
-
-        for polygon in map_elements:
-            if polygon.intersects(tract_polygon):
-                tract_elements.append(polygon)
-
-        housing_areas = []
-        residential_area = 0
-        for polygon in roads:
-            if polygon.intersects(tract_polygon):
-                residential_area+=polygon.area
-                housing_areas.append(polygon)
-
-        house_polygons = get_house_polygons(tract_polygon,tract_elements,housing_areas)
-        map_elements.extend(house_polygons)
-
+        
+        house_polygons = get_house_polygons(tract_polygon)
         for household_num in range(len(house_polygons)):
 
             location = Point()
@@ -223,12 +344,20 @@ for index,row in data.iterrows():
 
             num_workers = 0
             if household_size == 1:
+                if sum(worker_weights[:2])==0:
+                    num_workers = 0
                 num_workers = random.choices([0,1], weights=worker_weights[:2], k=1)[0]
             if household_size == 2:
+                if sum(worker_weights[2:5])==0:
+                    num_workers = 0
                 num_workers = random.choices([0,1,2], weights=worker_weights[2:5], k=1)[0]
             if household_size == 3:
+                if sum(worker_weights[5:9])==0:
+                    num_workers = 0
                 num_workers = random.choices([0,1,2,3], weights=worker_weights[5:9], k=1)[0]
             if household_size >= 4:
+                if sum(worker_weights[9:])==0:
+                    num_workers = 0
                 num_workers = random.choices([0,1,2,3], weights=worker_weights[9:], k=1)[0]
             
             size_indexes = None
@@ -253,9 +382,7 @@ for index,row in data.iterrows():
                 "number_of_workers":num_workers
                 }
             total_count+=1
-            tract_elements.append(polygon)
-        map_elements.extend(tract_elements)
-
+        print("Time: "+str(time.time()-start))
 
 
 households.to_csv('data/households.csv', index=False)

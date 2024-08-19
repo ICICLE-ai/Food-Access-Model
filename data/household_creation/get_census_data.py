@@ -68,3 +68,4 @@ county_geodata["tract_y"] = county_geodata["tract_y"].astype(int)
 county_data["tract_y"] = county_data["tract_y"].astype(int)
 data = pd.merge(county_geodata, county_data, on = "tract_y", how="inner")
 data.rename(columns=households_variables_dict, inplace = True)
+data = data[(data['tract_y'] > 4000) & (data['tract_y'] < 6000)]
