@@ -40,9 +40,8 @@ class GeoModel(Model):
                 index+len(households), 
                 row["name"],
                 row["type"], 
-                row["latitude"],
-                row["longitude"],
-                CRS)
+                row["geometry"]
+                )
             self.space.add_agents(agent) 
             # Initializing empty list to collect all the store objects
             stores_list.append(agent)

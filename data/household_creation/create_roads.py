@@ -12,7 +12,9 @@ def swap_xy(x, y):
 
 G = ox.graph_from_place(place_name, network_type='all')
 gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
-roads = [["geometry","type"]]
+print(gdf_edges)
+print(gdf_nodes)
+roads = [["geometry","highway","service","landuse"]]
 for index,row in gdf_edges.iterrows():
     road = LineString(row["geometry"])
     road = shapely.ops.transform(swap_xy, road)
@@ -20,7 +22,7 @@ for index,row in gdf_edges.iterrows():
         pyproj.Proj('epsg:4326'), # source coordinate system
         pyproj.Proj('epsg:3857')) # destination coordinate system
     road = shapely.ops.transform(project.transform, road)
-    roads.append([road,row["highway"]])
+    roads.append([road,row["highway"],row["service"],row["landuse"]])
 
 # Convert the 2D list to a DataFrame
 df = pd.DataFrame(roads[1:], columns=roads[0])

@@ -61,7 +61,7 @@ class MapModule(VisualizationElement):
         zoom=None,
         map_width=500,
         map_height=500,
-        tiles=ctx.providers.CartoDB.Voyager,
+        tiles=ctx.providers.OpenStreetMap.Mapnik,
         scale_options=None,
     ):
         """
