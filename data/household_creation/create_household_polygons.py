@@ -5,6 +5,7 @@ import shapely
 import random
 import pyproj
 import csv
+import rtree
 import time
 from shapely.strtree import STRtree
 import rasterio
@@ -30,7 +31,7 @@ with open('data/household_creation/roads.csv', newline='') as file:
     for row in reader:
         if row[0] == "geometry":
             continue
-        if (row[1] == "residential") or (row[1] == "living_street"):
+        if (row[1] == "residential") or (row[1] == "living_street") or (row[3] == "residential"):
             housing_areas.append(shapely.wkt.loads(row[0]).buffer(30))
             map_elements.append(shapely.wkt.loads(row[0]))
         elif (row[1] == "motorway"):
@@ -58,7 +59,7 @@ def swap_xy(x, y):
     return y, x
 
 houses = list()
-houses_index = STRtree(houses)
+houses_index = rtree.index.Index()
 households = pd.DataFrame(columns = ["id","polygon","income","household_size","vehicles","number_of_workers"])
 total_count = 0
 housing_areas_count = 0
@@ -66,7 +67,7 @@ for housing_area in housing_areas:
     housing_areas_count+=1
     print(str(round(housing_areas_count/len(housing_areas)*100)) + "%")
     count = 0
-    while count<(((housing_area.area)/400)*10):
+    while count<(((housing_area.area)/400)*5):
         min_x, min_y, max_x, max_y = housing_area.bounds
         location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
         if housing_area.contains(location):
@@ -89,8 +90,8 @@ for housing_area in housing_areas:
                 count+=1
                 continue
             
-            intersecting_houses_indexes = houses_index.query(house)
-            if len(intersecting_houses_indexes) != 0:
+            intersecting_houses_indexes = houses_index.intersection(house.bounds)
+            if len(list(intersecting_houses_indexes)) != 0:
                 count+=1
                 continue
 
@@ -118,7 +119,7 @@ for housing_area in housing_areas:
                 continue
 
             houses.append(house)
-            houses_index = STRtree(houses)
+            houses_index.add(total_count,house.bounds)
             households.loc[total_count] = {
                 "id":total_count,
                 "polygon":house,
