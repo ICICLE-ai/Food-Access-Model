@@ -3,6 +3,7 @@ import pandas as pd
 import pyproj
 from shapely.geometry import Point
 import shapely
+from database_connection import engine
 
 
 place_name = "Franklin County, Ohio, USA"
@@ -23,4 +24,4 @@ for index,row in features.iterrows():
     features.loc[index,"geometry"] = feature_geo
 
 # Save the DataFrame to a CSV file
-features.to_csv('data/household_creation/features.csv', index=False)
+features.to_sql('stores', engine, if_exists='replace', index=False)
