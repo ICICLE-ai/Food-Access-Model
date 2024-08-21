@@ -59,8 +59,8 @@ class MapModule(VisualizationElement):
         portrayal_method=None,
         view=None,
         zoom=None,
-        map_width=500,
-        map_height=500,
+        map_width=700,
+        map_height=600,
         tiles=ctx.providers.Esri.WorldStreetMap,
         scale_options=None,
     ):

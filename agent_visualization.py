@@ -66,7 +66,7 @@ def agent_portrayal(agent):
             "Household Size: " + str(agent.household_size) , 
             "Vehicles: " + str(agent.vehicles) , 
             "Number of Workers: " + str(agent.number_of_workers),
-            "Stores within 1 Mile: " + str(agent.num_store_within_mile) 
+            "Stores within 1 Mile: " + "A"
             ]
 
     # Adding attributes to define a Store like its color and overall description. 
