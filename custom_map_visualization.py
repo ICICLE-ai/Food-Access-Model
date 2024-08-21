@@ -61,7 +61,7 @@ class MapModule(VisualizationElement):
         zoom=None,
         map_width=500,
         map_height=500,
-        tiles=ctx.providers.OpenStreetMap.Mapnik,
+        tiles=ctx.providers.Esri.WorldStreetMap,
         scale_options=None,
     ):
         """
