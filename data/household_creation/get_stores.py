@@ -1,7 +1,7 @@
 import osmnx as ox
 import pandas as pd
 import pyproj
-from shapely.geometry import Point
+from shapely.geometry import Point,Polygon
 import shapely
 from database_connection import engine
 
@@ -14,6 +14,9 @@ def swap_xy(x, y):
 
 features = ox.features.features_from_place(place_name,tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']})
 
+for index,row in features.iterrows():
+    if not isinstance(row["geometry"],Point):
+        features.loc[index, "geometry"] = row["geometry"].centroid
 features = features.to_crs("epsg:3857")
 print(features)
 

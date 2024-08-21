@@ -26,28 +26,27 @@ for index,row in stores.iterrows():
     map_elements.append(polygon.buffer(20))
 
 housing_areas = []
-with open('data/household_creation/roads.csv', newline='') as file:
-    reader = csv.reader(file)
-    for row in reader:
-        if row[0] == "geometry":
-            continue
-        if (row[1] == "residential") or (row[1] == "living_street") or (row[3] == "residential"):
-            housing_areas.append(shapely.wkt.loads(row[0]).buffer(30))
-            map_elements.append(shapely.wkt.loads(row[0]))
-        elif (row[1] == "motorway"):
-           map_elements.append(shapely.wkt.loads(row[0]).buffer(75))
-        elif (row[1] == "trunk"):
-            map_elements.append(shapely.wkt.loads(row[0]).buffer(50))
-        elif (row[1] == "primary"):
-            map_elements.append(shapely.wkt.loads(row[0]).buffer(5))
-        else:
-            map_elements.append(shapely.wkt.loads(row[0]))
+roads_df = pd.read_csv("data/household_creation/roads.csv")
+for index,row in roads_df.iterrows():
+    if (row["highway"] == "residential") or (row["highway"] == "living_street") or (row["landuse"] == "residential"):
+        if str(row["name"]).startswith("Hilltonia"):
+            print(row)
+        housing_areas.append(shapely.wkt.loads(row["geometry"]).buffer(30))
+        map_elements.append(shapely.wkt.loads(row["geometry"]))
+    elif (row["highway"] == "motorway"):
+        map_elements.append(shapely.wkt.loads(row["geometry"]).buffer(75))
+    elif (row["highway"] == "trunk"):
+        map_elements.append(shapely.wkt.loads(row["geometry"]).buffer(50))
+    elif (row["highway"] == "primary"):
+        map_elements.append(shapely.wkt.loads(row["geometry"]).buffer(5))
+    else:
+        map_elements.append(shapely.wkt.loads(row["geometry"]))
 map_elements_index = STRtree(map_elements)
 
 
-housing_areas_index = STRtree(housing_areas)
-temp_indexes = housing_areas_index.query(Polygon(((-9241087.591381988,4855583.605717118),(-9240359.092447992,4859016.425386268),(-9241386.539835587,4861464.9938469855),(-9247985.24736839,4863046.919173137))))
-housing_areas = [housing_areas[i] for i in temp_indexes]
+#housing_areas_index = STRtree(housing_areas)
+#temp_indexes = housing_areas_index.query(Polygon(((-9241087.591381988,4855583.605717118),(-9240359.092447992,4859016.425386268),(-9241386.539835587,4861464.9938469855),(-9247985.24736839,4863046.919173137))))
+#housing_areas = [housing_areas[i] for i in temp_indexes]
 # Open the raster file and read the first band
 with rasterio.open('data/household_creation/county_raster.tif') as src:
     band1 = src.read(1)  # Read the first band
@@ -67,7 +66,7 @@ for housing_area in housing_areas:
     housing_areas_count+=1
     print(str(round(housing_areas_count/len(housing_areas)*100)) + "%")
     count = 0
-    while count<(((housing_area.area)/400)*5):
+    while count<(((housing_area.area)/400)/20):
         min_x, min_y, max_x, max_y = housing_area.bounds
         location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
         if housing_area.contains(location):
@@ -102,6 +101,7 @@ for housing_area in housing_areas:
                 (location.x-10, location.y-5),
                 (location.x+10, location.y-5)
             ]
+            """
             for i in range(len(points)):
 
                 # Convert the transformed coordinates to row and column indices
@@ -117,6 +117,7 @@ for housing_area in housing_areas:
                     in_housing_area = False
             if not in_housing_area:
                 continue
+            """
 
             houses.append(house)
             houses_index.add(total_count,house.bounds)
