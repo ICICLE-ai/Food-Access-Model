@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon, Point, LineString
 import shapely
 import random
 import pyproj
 import csv
 import rtree
 import time
+import math
 from shapely.strtree import STRtree
 import rasterio
 from household_constants import(
@@ -26,28 +27,23 @@ for index,row in stores.iterrows():
     map_elements.append(polygon.buffer(20))
 
 housing_areas = []
-roads_df = pd.read_csv("data/household_creation/roads.csv")
+roads_df = pd.read_csv("data/household_creation/roads.csv", low_memory=False)
 for index,row in roads_df.iterrows():
-    if (row["highway"] == "residential") or (row["highway"] == "living_street") or (row["landuse"] == "residential"):
-        if str(row["name"]).startswith("Hilltonia"):
-            print(row)
+    if (row["highway"] == "residential") or (row["highway"] == "living_street") or (row["service"] == "alley"):
         housing_areas.append(shapely.wkt.loads(row["geometry"]).buffer(30))
-        map_elements.append(shapely.wkt.loads(row["geometry"]))
+        map_elements.append(shapely.wkt.loads(row["geometry"]).buffer(2))
     elif (row["highway"] == "motorway"):
         map_elements.append(shapely.wkt.loads(row["geometry"]).buffer(75))
     elif (row["highway"] == "trunk"):
         map_elements.append(shapely.wkt.loads(row["geometry"]).buffer(50))
     elif (row["highway"] == "primary"):
-        map_elements.append(shapely.wkt.loads(row["geometry"]).buffer(5))
-    else:
+        map_elements.append(shapely.wkt.loads(row["geometry"]).buffer(10))
+    elif (row["highway"] == "secondary"):
+        map_elements.append(shapely.wkt.loads(row["geometry"]).buffer(10))
+    elif isinstance(shapely.wkt.loads(row["geometry"]), LineString):
         map_elements.append(shapely.wkt.loads(row["geometry"]))
 map_elements_index = STRtree(map_elements)
 
-
-#housing_areas_index = STRtree(housing_areas)
-#temp_indexes = housing_areas_index.query(Polygon(((-9241087.591381988,4855583.605717118),(-9240359.092447992,4859016.425386268),(-9241386.539835587,4861464.9938469855),(-9247985.24736839,4863046.919173137))))
-#housing_areas = [housing_areas[i] for i in temp_indexes]
-# Open the raster file and read the first band
 with rasterio.open('data/household_creation/county_raster.tif') as src:
     band1 = src.read(1)  # Read the first band
     raster_crs = src.crs  # Get the CRS of the raster
@@ -66,10 +62,25 @@ for housing_area in housing_areas:
     housing_areas_count+=1
     print(str(round(housing_areas_count/len(housing_areas)*100)) + "%")
     count = 0
-    while count<(((housing_area.area)/400)/20):
-        min_x, min_y, max_x, max_y = housing_area.bounds
-        location = Point(random.uniform(min_x, max_x), random.uniform(min_y, max_y))
-        if housing_area.contains(location):
+    # Get the exterior coordinates of the polygon
+    exterior_coords = list(housing_area.exterior.coords)
+    # Create LineStrings for each edge
+    edges = [LineString([exterior_coords[i], exterior_coords[i+1]]) 
+            for i in range(len(exterior_coords) - 1)]
+        
+    for edge in edges:
+        length = edge.length
+        coord1 = edge.coords[0]
+        coord2 = edge.coords[1]
+        vector_direction = (coord2[0] - coord1[0], coord2[1] - coord1[1])
+        temp = (vector_direction[0])*(vector_direction[0]) + (vector_direction[1])*(vector_direction[1])
+        vector_magnitude = math.sqrt(temp)
+        normalized_vector = (0,0)
+        if vector_magnitude != 0:
+            normalized_vector = (vector_direction[0]/vector_magnitude,vector_direction[1]/vector_magnitude)
+        for i in range(int(vector_magnitude/20)+1):
+            location = Point(coord1[0]+normalized_vector[0]*i*30,coord1[1]+normalized_vector[1]*i*30)
+
             house = Polygon(((location.x+10, location.y+10),
                             (location.x, location.y+20),
                             (location.x-10, location.y+10),
@@ -84,40 +95,20 @@ for housing_area in housing_areas:
                             (location.x+10, location.y-5)))
             
             
+            valid = True
             intersecting_map_elements_indexes = map_elements_index.query(house)
             if len(intersecting_map_elements_indexes) != 0:
-                count+=1
+                for index in intersecting_map_elements_indexes:
+                    if map_elements[index].intersects(house):
+                        valid=False
+                        continue
+            if not valid:
                 continue
+
             
             intersecting_houses_indexes = houses_index.intersection(house.bounds)
             if len(list(intersecting_houses_indexes)) != 0:
-                count+=1
                 continue
-
-            in_housing_area = True
-            points = [
-                (location.x+10, location.y+10),
-                (location.x-10, location.y+10),
-                (location.x-10, location.y-5),
-                (location.x+10, location.y-5)
-            ]
-            """
-            for i in range(len(points)):
-
-                # Convert the transformed coordinates to row and column indices
-                row, col = ~transform_affline * (points[i][0], points[i][1])
-
-                # Convert to integers (row and column indices must be integers)
-                row = int(row)
-                col = int(col)
-
-                # Extract the value from the NumPy array at the calculated indices
-                value = band1[col, row]
-                if (value <= 22) or (value>28):
-                    in_housing_area = False
-            if not in_housing_area:
-                continue
-            """
 
             houses.append(house)
             houses_index.add(total_count,house.bounds)
