@@ -39,7 +39,7 @@ class GeoModel(Model):
                 self, 
                 index+len(households), 
                 row["name"],
-                row["type"], 
+                row["shop"], 
                 row["geometry"]
                 )
             self.space.add_agents(agent) 
