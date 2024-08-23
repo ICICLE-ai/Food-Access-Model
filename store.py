@@ -8,7 +8,7 @@ class Store(GeoAgent):
     Represents a Store. Extends the mesa_geo GeoAgent class.
     """
 
-    def __init__(self,  model, id: int, name, type, geometry) -> None:
+    def __init__(self, model, id: int, name, type, geometry) -> None:
         """
         Initialize the Household Agent.
 

@@ -12,13 +12,11 @@ place_name = "Franklin County, Ohio, USA"
 def swap_xy(x, y):
     return y, x
 
-features = ox.features.features_from_point((39.959813,-83.00514),tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']},dist=3000)
-
+features = ox.features.features_from_point((39.959813,-83.00514),tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']},dist=5000)
 for index,row in features.iterrows():
     if not isinstance(row["geometry"],Point):
         features.loc[index, "geometry"] = row["geometry"].centroid
 features = features.to_crs("epsg:3857")
-print(features.columns)
 
 # Save the DataFrame to a CSV file
 #features.to_sql('stores', engine, if_exists='replace', index=False)
