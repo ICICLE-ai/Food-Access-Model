@@ -1,11 +1,5 @@
 from mesa_geo import GeoAgent
-from shapely.geometry import Polygon,Point
-from shapely.ops import transform
-from shapely.wkt import loads
-import pyproj
-from store import Store
-import random
-random.seed(1)
+import shapely
 
 
 class Household(GeoAgent):
@@ -31,10 +25,7 @@ class Household(GeoAgent):
             - search_radius (int): how far to search for stores
             - crs (string): constant value (i.e.3857),used to map households on a flat earth display
         """
-
-        #Transform shapely coordinates to mercator projection coords
-        polygon = loads(polygon)
-        
+        polygon = shapely.wkb.loads(polygon)
         # Setting argument values to the passed parameteric values.
         super().__init__(id,model,polygon,crs)
         self.income = income

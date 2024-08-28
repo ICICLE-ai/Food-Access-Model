@@ -1,7 +1,5 @@
 import osmnx as ox
 import psycopg2
-from config import USER, PASS
-import shapely
 from shapely.geometry import Point, Polygon, LineString
 from shapely.strtree import STRtree
 import rtree
@@ -14,7 +12,7 @@ import tempfile
 import os
 import geopandas
 from io import BytesIO
-from data.household_constants import(
+from household_constants import(
     households_variables_dict,
     households_key_list,
     FIBSCODE,
@@ -27,7 +25,7 @@ place_name = "Franklin County, Ohio, USA"
 county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
 
-from config import APIKEY
+from config import APIKEY, USER, PASS
 
 #Read csvs into pandas dataframes
 #For loop runs a census API pull for each loop iteration
@@ -95,8 +93,8 @@ create_roads_query = '''
 CREATE TABLE roads (
     name TEXT,
     highway VARCHAR(30),
-    length VARCHAR(20),
-    geometry TEXT,
+    length NUMERIC,
+    geometry GEOMETRY,
     service VARCHAR(30)
 );
 '''
@@ -105,7 +103,7 @@ CREATE TABLE roads (
 create_food_stores_query = '''
 CREATE TABLE food_stores (
     shop VARCHAR(15),
-    geometry VARCHAR(50),
+    geometry GEOMETRY,
     amenity VARCHAR(20),
     name VARCHAR(50)
 );
@@ -151,7 +149,7 @@ for index,row in gdf_edges.iterrows():
         map_elements.append((row["geometry"]).buffer(10))
     elif isinstance((row["geometry"]), LineString):
         map_elements.append((row["geometry"]))
-    cursor.execute(roads_query, (row["name"],row["highway"],str(row["length"]),str(row["geometry"]),row["service"]))
+    cursor.execute(roads_query, (row["name"],row["highway"],int(row["length"]),str(row["geometry"]),row["service"]))
 
 #Get food stores
 features = ox.features.features_from_point((39.959813,-83.00514),dist=5000,tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']})
@@ -178,12 +176,12 @@ map_elements_index = STRtree(map_elements)
 # SQL query to create the 'households' table
 create_households_query = '''
 CREATE TABLE households (
-    id VARCHAR(7),
-    polygon TEXT,
-    income VARCHAR(6),
-    household_size VARCHAR(1),
-    vehicles VARCHAR(1),
-    number_of_workers VARCHAR(1)
+    id NUMERIC,
+    polygon GEOMETRY,
+    income NUMERIC,
+    household_size NUMERIC,
+    vehicles NUMERIC,
+    number_of_workers NUMERIC
 
 );
 '''
@@ -259,6 +257,8 @@ for housing_area in housing_areas:
             
             cursor.execute(household_query, (total_count,str(house),0,0,0,0))
             total_count+=1
+
+
 
 # Close the cursor and connection
 connection.commit()
