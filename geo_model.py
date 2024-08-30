@@ -33,7 +33,7 @@ class GeoModel(Model):
         # Specify that agents should be activated randomly during each step
         self.schedule = RandomActivation(self) 
         # Initializing empty list to collect all the store objects
-        stores_list = []
+        self.stores_list = []
 
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(
@@ -72,7 +72,7 @@ class GeoModel(Model):
             index_count+=1
             self.space.add_agents(agent) 
             # Initializing empty list to collect all the store objects
-            stores_list.append(agent)
+            self.stores_list.append(agent)
 
         # Initialize all household agents and add them to the scheduler and the Geospace
         for house in households:
@@ -84,7 +84,6 @@ class GeoModel(Model):
                 house[3],
                 house[4],
                 house[5],
-                stores_list,
                 SEARCHRADIUS,
                 CRS)
             self.schedule.add(agent)
