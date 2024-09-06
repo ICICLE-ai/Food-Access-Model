@@ -121,7 +121,7 @@ You will need python and postgreSQL to run this project. Download postgreSQL if 
    pip install -r requirements.txt
    ```
 3. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html)
-4. Enter your API in `config.py`
+4. create a file `config.py` in the main folder and enter your API in `config.py`
    ```py
    API_KEY = 'ENTER YOUR API';
    ```
@@ -139,6 +139,11 @@ You will need python and postgreSQL to run this project. Download postgreSQL if 
 ## Usage
 
 Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+
+Before running, compile households by typing:
+```sh
+   python get_data.py
+```
 
 You can run this project on port 8080 with:
 ```sh
