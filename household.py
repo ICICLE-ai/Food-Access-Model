@@ -34,9 +34,32 @@ class Household(GeoAgent):
         self.vehicles = vehicles
         self.number_of_workers = number_of_workers
 
+        self.distance_to_closest_store = 100000
+        self.rating_num_store_within_mile = "A"
+        self.rating_distance_to_closest_store = "A"
+        self.rating_based_on_num_vehicles = "A"
         # Variable to store number of stores within 1 mile of a Household
         self.num_store_within_mile = self.stores_with_1_miles() 
-        
+        # print(self.stores_with_1_miles())
+
+
+    def rating_evaluation(self,total):
+        if total < 2: 
+            self.rating_num_store_within_mile = "D"
+        if total < 5 and total >= 2: 
+            self.rating_num_store_within_mile = "C"    
+        if total < 10 and total >= 5: 
+            self.rating_num_store_within_mile = "B"  
+        if self.distance_to_closest_store > 2.00: 
+            self.rating_distance_to_closest_store  = "D"  
+        if self.distance_to_closest_store > 1.00 and self.distance_to_closest_store <= 2.00: 
+            self.rating_distance_to_closest_store  = "C"  
+        if self.distance_to_closest_store > 0.50 and self.distance_to_closest_store <= 1.00: 
+            self.rating_distance_to_closest_store  = "B"   
+        if self.vehicles == 0:  
+            self.rating_based_on_num_vehicles = "C"   
+        if self.vehicles < self.number_of_workers and self.vehicles > 0: 
+            self.rating_based_on_num_vehicles = "B"     
         
     def stores_with_1_miles (self):
         total = 0 
@@ -44,6 +67,9 @@ class Household(GeoAgent):
          distance = self.model.space.distance(self,store)
          if distance <= 1609.34:
           total += 1 
+          if self.distance_to_closest_store > distance: 
+             self.distance_to_closest_store = round((distance)/1609.34,2)
+        self.rating_evaluation(total)
         return total 
 
     def step(self) -> None:

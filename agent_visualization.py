@@ -66,14 +66,18 @@ def agent_portrayal(agent):
             "Household Size: " + str(agent.household_size) , 
             "Vehicles: " + str(agent.vehicles) , 
             "Number of Workers: " + str(agent.number_of_workers),
-            "Stores within 1 Mile: " + "A"
+            "Stores within 1.0 Miles: " + str(agent.num_store_within_mile), 
+            "Distance to the Closest Store: " + str(agent.distance_to_closest_store) + " miles", 
+            "Rating for Distance to Closest Store: " +  str(agent.rating_distance_to_closest_store), 
+            "Rating for Number of Stores within 1.0 Miles: " + str(agent.rating_num_store_within_mile) , 
+            "Ratings Based on Num of Vehicle: " + str(agent.rating_based_on_num_vehicles)  
             ]
 
     # Adding attributes to define a Store like its color and overall description. 
     if isinstance(agent,Store):
-        portrayal["color"] = "Blue" 
+        portrayal["color"] = "Blue"   
         portrayal["description"] = [
             "Category: " + str(agent.type),
             "Name: " + str(agent.name)]
 
-    return portrayal
+    return portrayal 
