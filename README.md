@@ -108,7 +108,7 @@ To get a local copy up and running follow these simple steps.
 
 ### Prerequisites
 
-You will need python to run this project.
+You will need python and postgreSQL to run this project. Download postgreSQL if you have not already.
 
 ### Installation
 
@@ -125,7 +125,12 @@ You will need python to run this project.
    ```py
    API_KEY = 'ENTER YOUR API';
    ```
-
+5. Create a postgres database and enter your credentials in config.py
+   ```py
+   USER = "database name";
+   PASS = "database password";
+   ```
+   
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
