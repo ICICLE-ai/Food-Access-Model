@@ -4,6 +4,8 @@ from mesa_geo import GeoSpace #GeoSpace that houses agents
 import pandas as pd
 from store import Store # Store agent class
 from household import Household # Household agent class
+import psycopg2
+from config import USER, PASS
 
 from constants import(
     SEARCHRADIUS,
@@ -17,7 +19,7 @@ class GeoModel(Model):
     between themselves and Store Agents.
     """
 
-    def __init__(self, stores: pd.DataFrame, households: pd.DataFrame):
+    def __init__(self):
         """
         Initialize the Model, intialize all agents and, add all agents to GeoSpace and Model.
 
@@ -31,35 +33,55 @@ class GeoModel(Model):
         # Specify that agents should be activated randomly during each step
         self.schedule = RandomActivation(self) 
         # Initializing empty list to collect all the store objects
-        stores_list = []
-        
+        self.stores_list = []
+
+        # Connect to the PostgreSQL database
+        connection = psycopg2.connect(
+            host="localhost",
+            database="FASS_DB",
+            user=USER,
+            password=PASS
+        )
+        cursor = connection.cursor()
+
+        # Execute the SQL query
+        cursor.execute("SELECT * FROM food_stores;")
+
+        # Fetch all rows from the executed query
+        stores = cursor.fetchall()
+
+        # Execute the SQL query
+        cursor.execute("SELECT * FROM households;")
+
+        # Fetch all rows from the executed query
+        households = cursor.fetchall()
+
+
         # Initialize all store agents and add them to the GeoSpace
-        for index,row in stores.iterrows():
+        index_count = 0
+        for store in stores:
             agent = Store(
                 self, 
-                index+len(households), 
-                row["name"],
-                row["type"], 
-                row["latitude"],
-                row["longitude"],
-                CRS)
+                index_count + len(households), 
+                store[3], #name
+                store[0], #shop
+                store[1] #geo
+                )
+            index_count+=1
             self.space.add_agents(agent) 
             # Initializing empty list to collect all the store objects
-            stores_list.append(agent)
+            self.stores_list.append(agent)
 
         # Initialize all household agents and add them to the scheduler and the Geospace
-        for index,row in households.iterrows():
+        for house in households:
             agent = Household(
                 self, 
-                row["id"], 
-                float(row["latitude"]), 
-                float(row["longitude"]), 
-                row["polygon"], 
-                row["income"],
-                row["household_size"],
-                row["vehicles"],
-                row["number_of_workers"],
-                stores_list,
+                house[0],
+                house[1], 
+                house[2],
+                house[3],
+                house[4],
+                house[5],
                 SEARCHRADIUS,
                 CRS)
             self.schedule.add(agent)
@@ -70,21 +92,6 @@ class GeoModel(Model):
         #    #agent_reporters={"Mfai": "mfai"}
         #)
         #self.datacollector.collect(self)
-        
-    """
-    @property
-    def avg_mfai(self):
-        """"""
-        Function that returns avg mfai scores of all agents, used in self.datacollector to display a chart.
-        """"""
-        total = 0
-        count = 0
-        for agent in self.schedule.agents:
-            total += agent.mfai
-            count += 1
-        print(total/count)
-        return int(total/count)
-    """
 
     def step(self) -> None:
 
