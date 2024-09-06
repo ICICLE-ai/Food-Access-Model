@@ -108,7 +108,7 @@ To get a local copy up and running follow these simple steps.
 
 ### Prerequisites
 
-You will need python and postgreSQL to run this project. Download postgreSQL if you have not already.
+You will need python and postgreSQL to run this project. Download postgreSQL if you have not already. You can download postgres here: https://www.postgresql.org/download/
 
 ### Installation
 
