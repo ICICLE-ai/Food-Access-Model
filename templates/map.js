@@ -82,7 +82,26 @@ function PopUpProperties(feature, layer) {
     let popupContent = '<table>'
     if (feature.properties.popupProperties) {
         for (const p in feature.properties.popupProperties) {
-            popupContent += '<tr><td>' + feature.properties.popupProperties[p] +'</td></tr>'
+            // Extract the last letter
+            const lastLetter = feature.properties.popupProperties[p].slice(-2).toLowerCase();
+
+            // Define colors based on the last letter
+            let color;
+            switch (lastLetter) {
+                case ' a':
+                    color = 'green';
+                    break;
+                case ' b':
+                    color = 'orange';
+                    break;
+                case ' c':
+                    color = 'red';
+                    break;
+                // Add more cases as needed
+                default:
+                    color = 'black'; // Default color
+            }
+            popupContent += '<tr><td>' + `<span style="color: ${color};">${feature.properties.popupProperties[p]}</span>` +'</td></tr>'
         }
     }
     popupContent += '</table>'

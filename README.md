@@ -94,8 +94,8 @@ This project, the ICICLE Food Access Model, is an Agent-Based model that simulat
 
 ### Built With
 
-* [![Python][Python3]][Python-url]
-* [![React][React.js]][React-url]
+* Python
+* React.js
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -108,7 +108,7 @@ To get a local copy up and running follow these simple steps.
 
 ### Prerequisites
 
-You will need python to run this project.
+You will need python and postgreSQL to run this project. Download postgreSQL if you have not already.
 
 ### Installation
 
@@ -121,11 +121,16 @@ You will need python to run this project.
    pip install -r requirements.txt
    ```
 3. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html)
-4. Enter your API in `config.py`
+4. create a file `config.py` in the main folder and enter your API in `config.py`
    ```py
    API_KEY = 'ENTER YOUR API';
    ```
-
+5. Create a postgres database and enter your credentials in config.py
+   ```py
+   USER = "database name";
+   PASS = "database password";
+   ```
+   
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
@@ -135,10 +140,15 @@ You will need python to run this project.
 
 Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
 
+Before running, compile households by typing:
+```sh
+   python get_data.py
+```
+
 You can run this project on port 8080 with:
-'''sh
-python server.py
-'''
+```sh
+   python server.py
+```
 
 _For more examples, please refer to the [Documentation](https://example.com)_
 
@@ -169,30 +179,6 @@ Don't forget to give the project a star! Thanks again!
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- CONTACT -->
-## Contact
-
-Your Name - [@twitter_handle](https://twitter.com/twitter_handle) - email@email_client.com
-
-Project Link: [https://github.com/ICICLE-ai/Food-Access-Model](https://github.com/ICICLE-ai/Food-Access-Model)
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- ACKNOWLEDGMENTS -->
-## Acknowledgments
-
-* []()
-* []()
-* []()
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
