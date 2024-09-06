@@ -5,7 +5,7 @@ import pandas as pd
 from store import Store # Store agent class
 from household import Household # Household agent class
 import psycopg2
-from data.config import USER, PASS
+from config import USER, PASS
 
 from constants import(
     SEARCHRADIUS,
@@ -45,7 +45,7 @@ class GeoModel(Model):
         cursor = connection.cursor()
 
         # Execute the SQL query
-        cursor.execute("SELECT * FROM stores;")
+        cursor.execute("SELECT * FROM food_stores;")
 
         # Fetch all rows from the executed query
         stores = cursor.fetchall()
@@ -60,14 +60,12 @@ class GeoModel(Model):
         # Initialize all store agents and add them to the GeoSpace
         index_count = 0
         for store in stores:
-            print(type(store))
-            print(store)
             agent = Store(
                 self, 
                 index_count + len(households), 
-                store["name"],
-                store["shop"], 
-                store["geometry"]
+                store[3], #name
+                store[0], #shop
+                store[1] #geo
                 )
             index_count+=1
             self.space.add_agents(agent) 
