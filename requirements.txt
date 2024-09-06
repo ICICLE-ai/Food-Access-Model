@@ -1,1 +1,4 @@
+# python_version=='3.11.4'
 mesa_geo==0.7.1
+osmnx==1.9.4
+psycopg2==2.9.9
