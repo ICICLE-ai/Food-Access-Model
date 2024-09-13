@@ -5,7 +5,7 @@ import pandas as pd
 from store import Store # Store agent class
 from household import Household # Household agent class
 import psycopg2
-from config import USER, PASS
+from config import USER, PASS, HOST, NAME
 
 from constants import(
     SEARCHRADIUS,
@@ -37,8 +37,8 @@ class GeoModel(Model):
 
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(
-            host="localhost",
-            database="FASS_DB",
+            host=HOST,
+            database=NAME,
             user=USER,
             password=PASS
         )
