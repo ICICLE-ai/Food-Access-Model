@@ -33,7 +33,7 @@ state_code = FIBSCODE[:2]
 center_point = (39.959813,-83.00514)
 dist = 3000
 
-from config import APIKEY, USER, PASS, NAME
+from config import APIKEY, USER, PASS, NAME, HOST
 
 #Read csvs into pandas dataframes
 #For loop runs a census API pull for each loop iteration
@@ -91,7 +91,7 @@ print(data["geometry"])
 
 # Connect to the PostgreSQL database
 connection = psycopg2.connect(
-    host="localhost",
+    host=HOST,
     database=NAME,
     user=USER,
     password=PASS
