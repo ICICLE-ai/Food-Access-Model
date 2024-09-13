@@ -104,7 +104,7 @@ CREATE TABLE roads (
     name TEXT,
     highway VARCHAR(30),
     length NUMERIC,
-    geometry GEOMETRY,
+    geometry TEXT,
     service VARCHAR(30)
 );
 '''
@@ -113,7 +113,7 @@ CREATE TABLE roads (
 create_food_stores_query = '''
 CREATE TABLE food_stores (
     shop VARCHAR(15),
-    geometry GEOMETRY,
+    geometry TEXT,
     amenity VARCHAR(20),
     name VARCHAR(50)
 );
