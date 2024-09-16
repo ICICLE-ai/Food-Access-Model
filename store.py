@@ -21,7 +21,7 @@ class Store(GeoAgent):
             - lon (float): longitude of agent
             - crs (string): constant value (i.e.3857),used to map stores on a flat earth display 
         """
-        point = shapely.wkb.loads(geometry)
+        point = shapely.wkt.loads(geometry)
         polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
         super().__init__(id,model,polygon,"epsg:3857") # epsg:3857 is the mercator projection
         self.type = type

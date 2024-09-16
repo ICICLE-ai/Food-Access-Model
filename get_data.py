@@ -13,6 +13,7 @@ import os
 import numpy as np
 import geopandas
 import random
+from psycopg2 import extras
 from io import BytesIO
 from household_constants import(
     households_variables_dict,
@@ -31,9 +32,9 @@ county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
 
 center_point = (39.959813,-83.00514)
-dist = 3000
+dist = 2500
 
-from config import APIKEY, USER, PASS, NAME, HOST
+from config import APIKEY, USER, PASS, NAME, HOST, PORT
 
 #Read csvs into pandas dataframes
 #For loop runs a census API pull for each loop iteration
@@ -87,16 +88,22 @@ data = pd.merge(county_geodata, county_data, on = "tract_y", how="inner")
 data.rename(columns=households_variables_dict, inplace = True)
 data = data.to_crs("epsg:3857")
 tract_index = STRtree(data["geometry"])
-print(data["geometry"])
 
 # Connect to the PostgreSQL database
 connection = psycopg2.connect(
     host=HOST,
     database=NAME,
     user=USER,
-    password=PASS
+    password=PASS,
+    port=PORT
 )
 cursor = connection.cursor()
+
+# Execute the drop table command for roads
+cursor.execute('DROP TABLE IF EXISTS roads;')
+
+# Execute the drop table command for stores
+cursor.execute('DROP TABLE IF EXISTS food_stores;')
 
 # SQL query to create the 'roads' table
 create_roads_query = '''
@@ -104,7 +111,7 @@ CREATE TABLE roads (
     name TEXT,
     highway VARCHAR(30),
     length NUMERIC,
-    geometry GEOMETRY,
+    geometry TEXT,
     service VARCHAR(30)
 );
 '''
@@ -113,17 +120,10 @@ CREATE TABLE roads (
 create_food_stores_query = '''
 CREATE TABLE food_stores (
     shop VARCHAR(15),
-    geometry GEOMETRY,
-    amenity VARCHAR(20),
+    geometry TEXT,
     name VARCHAR(50)
 );
 '''
-
-# Execute the drop table command for roads
-cursor.execute('DROP TABLE IF EXISTS roads;')
-
-# Execute the drop table command for stores
-cursor.execute('DROP TABLE IF EXISTS food_stores;')
 
 # Execute the create table command
 cursor.execute(create_roads_query)
@@ -143,10 +143,7 @@ gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
 gdf_edges = gdf_edges.to_crs("epsg:3857")
 gdf_edges = gdf_edges[["name","highway","length","geometry","service"]]
 
-
-
 # Insert data into the table using a SQL query
-roads_query = "INSERT INTO roads (name,highway,length,geometry,service) VALUES (%s, %s, %s, %s, %s)"
 for index,row in gdf_edges.iterrows():
     if (row["highway"] == "residential") or (row["highway"] == "living_street") or (row["service"] == "alley"):
         housing_areas.append(row["geometry"].buffer(30))
@@ -161,27 +158,32 @@ for index,row in gdf_edges.iterrows():
         map_elements.append((row["geometry"]).buffer(10))
     elif isinstance((row["geometry"]), LineString):
         map_elements.append((row["geometry"]))
-    cursor.execute(roads_query, (row["name"],row["highway"],int(row["length"]),str(row["geometry"]),row["service"]))
+
+gdf_edges["length"] = gdf_edges["length"].astype(int)
+gdf_edges["geometry"] = gdf_edges["geometry"].astype(str)
+roads_query = "INSERT INTO roads (name,highway,length,geometry,service) VALUES %s"
+data_tuples = list(gdf_edges.itertuples(index=False, name=None))
+#extras.execute_values(cursor, roads_query, data_tuples)
 
 #Get food stores
 features = ox.features.features_from_point(center_point,dist=dist,tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']})
 features = features.to_crs("epsg:3857")
-features = features[["shop","geometry","amenity","name"]]
+features = features[["shop","geometry","name"]]
 
 #Insert food stores into postgres database
 
-food_stores_query = "INSERT INTO food_stores (shop,geometry,amenity,name) VALUES (%s, %s, %s, %s)"
+food_stores_query = "INSERT INTO food_stores (shop,geometry,name) VALUES (%s, %s, %s)"
 for index,row in features.iterrows():
     if not isinstance(row["geometry"],Point):
         point = row["geometry"].centroid
         polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
         map_elements.append(polygon.buffer(20))
-        cursor.execute(food_stores_query, (row["shop"],str(row["geometry"].centroid),row["amenity"],row["name"]))
+        cursor.execute(food_stores_query, (row["shop"],str(row["geometry"].centroid),row["name"]))
     else:
         point = row["geometry"]
         polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
         map_elements.append(polygon.buffer(20))
-        cursor.execute(food_stores_query, (row["shop"],str(row["geometry"]),row["amenity"],row["name"]))
+        cursor.execute(food_stores_query, (row["shop"],str(row["geometry"]),row["name"]))
 
 map_elements_index = STRtree(map_elements)
 
@@ -189,7 +191,7 @@ map_elements_index = STRtree(map_elements)
 create_households_query = '''
 CREATE TABLE households (
     id NUMERIC,
-    polygon GEOMETRY,
+    polygon TEXT,
     income NUMERIC,
     household_size NUMERIC,
     vehicles NUMERIC,
@@ -204,13 +206,16 @@ cursor.execute('DROP TABLE IF EXISTS households;')
 # Execute the create table command
 cursor.execute(create_households_query)
 
-household_query = "INSERT INTO households (id,polygon,income,household_size,vehicles,number_of_workers) VALUES (%s, %s, %s, %s, %s, %s)"
+household_query = "INSERT INTO households (id,polygon,income,household_size,vehicles,number_of_workers) VALUES %s"
 
-
+connection.commit()
+cursor.close()
+connection.close()
 
 houses = list()
 houses_index = rtree.index.Index()
 total_count = 0
+house_tuples = list()
 housing_areas_count = 0
 for housing_area in housing_areas:
     housing_areas_count+=1
@@ -405,10 +410,22 @@ for housing_area in housing_areas:
             else:
                 vehicle_combined_weights = np.array(vehicle_weights[(size_indexes[0]):(size_indexes[1])])+np.array(vehicle_weights[(workers_indexes[0]):])
             vehicles = random.choices([0,1,2,3,4],weights=vehicle_combined_weights)[0]
-            cursor.execute(household_query, (total_count,str(house),income,household_size,vehicles,num_workers))
+            house_tuples.append((total_count,str(house),income,household_size,vehicles,num_workers))
+            #cursor.execute(household_query, (total_count,str(house),income,household_size,vehicles,num_workers))
             total_count+=1
 
 
+# Connect to the PostgreSQL database
+connection = psycopg2.connect(
+    host=HOST,
+    database=NAME,
+    user=USER,
+    password=PASS,
+    port=PORT
+)
+cursor = connection.cursor()
+
+extras.execute_values(cursor, household_query, house_tuples)
 
 # Close the cursor and connection
 connection.commit()
