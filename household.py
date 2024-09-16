@@ -25,7 +25,7 @@ class Household(GeoAgent):
             - search_radius (int): how far to search for stores
             - crs (string): constant value (i.e.3857),used to map households on a flat earth display
         """
-        polygon = shapely.wkb.loads(polygon)
+        polygon = shapely.wkt.loads(polygon)
         # Setting argument values to the passed parameteric values.
         super().__init__(id,model,polygon,crs)
         self.income = income

@@ -5,7 +5,7 @@ import pandas as pd
 from store import Store # Store agent class
 from household import Household # Household agent class
 import psycopg2
-from config import USER, PASS, HOST, NAME
+from config import USER, PASS, HOST, NAME, PORT
 
 from constants import(
     SEARCHRADIUS,
@@ -40,7 +40,8 @@ class GeoModel(Model):
             host=HOST,
             database=NAME,
             user=USER,
-            password=PASS
+            password=PASS,
+            port=PORT
         )
         cursor = connection.cursor()
 
@@ -63,7 +64,7 @@ class GeoModel(Model):
             agent = Store(
                 self, 
                 index_count + len(households), 
-                store[3], #name
+                store[2], #name
                 store[0], #shop
                 store[1] #geo
                 )
