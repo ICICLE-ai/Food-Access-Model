@@ -92,7 +92,7 @@ function PopUpProperties(feature, layer) {
                     color = 'green';
                     break;
                 case ' b':
-                    color = 'yellow';
+                    color = 'orange';
                     break;
                 case ' c':
                     color = 'orange';
