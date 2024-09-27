@@ -15,6 +15,7 @@ import geopandas
 import random
 from psycopg2 import extras
 from io import BytesIO
+import csv
 from household_constants import(
     households_variables_dict,
     households_key_list,
@@ -31,8 +32,8 @@ place_name = "Franklin County, Ohio, USA"
 county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
 
-center_point = (39.959813,-83.00514)
-dist = 2500
+center_point = (39.942813,-82.977814)
+dist = 1000
 
 from config import APIKEY, USER, PASS, NAME, HOST, PORT
 
@@ -171,21 +172,22 @@ features = features.to_crs("epsg:3857")
 features = features[["shop","geometry","name"]]
 
 #Insert food stores into postgres database
-
-food_stores_query = "INSERT INTO food_stores (shop,geometry,name) VALUES (%s, %s, %s)"
+store_tuples = list()
+food_stores_query = "INSERT INTO food_stores (shop,geometry,name) VALUES %s"
 for index,row in features.iterrows():
     if not isinstance(row["geometry"],Point):
         point = row["geometry"].centroid
         polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
         map_elements.append(polygon.buffer(20))
-        cursor.execute(food_stores_query, (row["shop"],str(row["geometry"].centroid),row["name"]))
+        store_tuples.append((str(row["shop"]),str(polygon),str(row["name"])))
     else:
         point = row["geometry"]
         polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
         map_elements.append(polygon.buffer(20))
-        cursor.execute(food_stores_query, (row["shop"],str(row["geometry"]),row["name"]))
+        store_tuples.append((str(row["shop"]),str(polygon),str(row["name"])))
 
 map_elements_index = STRtree(map_elements)
+extras.execute_values(cursor, food_stores_query, store_tuples)
 
 # SQL query to create the 'households' table
 create_households_query = '''
@@ -411,7 +413,6 @@ for housing_area in housing_areas:
                 vehicle_combined_weights = np.array(vehicle_weights[(size_indexes[0]):(size_indexes[1])])+np.array(vehicle_weights[(workers_indexes[0]):])
             vehicles = random.choices([0,1,2,3,4],weights=vehicle_combined_weights)[0]
             house_tuples.append((total_count,str(house),income,household_size,vehicles,num_workers))
-            #cursor.execute(household_query, (total_count,str(house),income,household_size,vehicles,num_workers))
             total_count+=1
 
 

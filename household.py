@@ -1,5 +1,6 @@
 from mesa_geo import GeoAgent
 import shapely
+import random
 
 
 class Household(GeoAgent):
@@ -33,14 +34,13 @@ class Household(GeoAgent):
         self.household_size = household_size
         self.vehicles = vehicles
         self.number_of_workers = number_of_workers
-
+        
         self.distance_to_closest_store = 100000
         self.rating_num_store_within_mile = "A"
         self.rating_distance_to_closest_store = "A"
         self.rating_based_on_num_vehicles = "A"
-        # Variable to store number of stores within 1 mile of a Household
         self.num_store_within_mile = self.stores_with_1_miles() 
-        # print(self.stores_with_1_miles())
+        self.mfai = self.get_mfai()
 
 
     def rating_evaluation(self,total):
@@ -71,6 +71,41 @@ class Household(GeoAgent):
              self.distance_to_closest_store = round((distance)/1609.34,2)
         self.rating_evaluation(total)
         return total 
+    
+    def closest_cspm_and_spm(self):
+        cspm = None
+        cspm_distance = 10000000
+        spm = None
+        spm_distance = 10000000
+        for store in self.model.stores_list: 
+            distance = self.model.space.distance(self,store)
+            if store.type == "supermarket":
+                if distance <= spm_distance:
+                    spm = store
+            else:
+                if distance <= cspm_distance:
+                    cspm = store
+        return cspm, spm
+    
+    def get_mfai(self):
+        #calculate mfai
+        cspm, spm = self.closest_cspm_and_spm()
+        food_avail = list()
+        for i in range(7):
+            chance_of_choosing_spm = int((self.vehicles*5)+(self.income/200000)*10+60)
+            store = random.choices([cspm,spm], [(chance_of_choosing_spm-100)*-1,chance_of_choosing_spm], k=1)[0]
+            fsa = 0
+            if store.type == "supermarket":
+                fsa = 100
+            else:
+                fsa = 50
+            if self.vehicles == 0:
+                food_avail.append(fsa*0.8)
+            else:
+                food_avail.append(fsa)
+
+        return int(sum(food_avail)/700)*100
 
     def step(self) -> None:
-       return None
+        self.mfai = self.get_mfai()
+        return None
