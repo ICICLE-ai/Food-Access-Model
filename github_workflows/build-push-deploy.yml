@@ -1,0 +1,89 @@
+### Set Up by: Christian Garcia (TACC)
+### Modified by: Carlos Guzman (ICICLE)
+### Release-* methodology originally authored by Nathan Freeman (TACC) here:
+### https://github.com/tapis-project/tapis-workflows/blob/prod/.github/workflows/ci.yml#L59
+# Description. This Github action runs when there are new commits to dev, stage, main, or release-*.
+# The action logs into GHCR with the Github action environment secrets `GHCR_USERNAME`
+# and `GHCR_TOKEN`.
+# The action pulls the repo and builds the icicle-ai/store-closure-abm image and uses branch name as the
+# docker tag. In instance of `release-1.2.0`, sed will delete `release-`, leaving `1.2.0`.
+# If branch = main, tag becomes `latest` so latest is built.
+#
+### Variables
+#   vars.GHCR_USERNAME: Docker username
+#   secrets.GHCR_TOKEN: Docker token
+#   secrets.TAPIS_ICICLE_PROD_TOKEN: token for Tapis user
+#   vars.POD_ID: storeclosureabm
+#   vars.DEV_POD_ID: storeclosureabmdev
+
+name: Build & Push & Deploy
+on:
+  push:
+    branches: [ staging, main, release-* ]
+  workflow_dispatch:
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: icicle-ai/food_access_model_abm
+
+jobs:
+  build-and-push-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get tag name from branch. SED removes `release-`, replaces `main` with `latest`.
+        id: get_tag_name
+        shell: bash
+        run: echo "tag_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/main/latest/g' | sed 's/release-//g')" >> $GITHUB_OUTPUT
+        
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        
+      # - name: Grab config file
+      #   shell: bash
+      #   env: 
+      #     CONFIG_FILE: ${{ contains('refs/heads/main', github.ref) && secrets.OAUTH_CONFIG_PROD || secrets.OAUTH_CONFIG_DEV }}
+      #   run: echo ${CONFIG_FILE}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 #v3.0.0
+
+      - name: Log in to ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+        
+      - name: Build & push tagged Docker backend image
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag_name.outputs.tag_name }}
+
+  deploy-images-dev:
+    runs-on: ubuntu-latest
+    needs: [build-and-push-images]
+    if:
+      contains('refs/heads/dev', github.ref)
+    steps:
+    - name: Restart dev pod
+      uses: fjogeleit/http-request-action@v1
+      with:
+        url: 'https://icicle.tapis.io/v3/pods/${{ vars.DEV_POD_ID }}/restart'
+        method: 'GET'
+        customHeaders: '{"Content-Type": "application/json", "X-Tapis-Token": "${{ secrets.TAPIS_ICICLE_PROD_TOKEN }}"}'
+
+  deploy-images:
+    runs-on: ubuntu-latest
+    needs: [build-and-push-images]
+    if:
+      contains('refs/heads/main', github.ref)
+    steps:
+    - name: Restart pod
+      uses: fjogeleit/http-request-action@v1
+      with:
+        url: 'https://icicle.tapis.io/v3/pods/${{ vars.POD_ID }}/restart'
+        method: 'GET'
+        customHeaders: '{"Content-Type": "application/json", "X-Tapis-Token": "${{ secrets.TAPIS_ICICLE_PROD_TOKEN }}"}'

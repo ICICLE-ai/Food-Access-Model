@@ -13,7 +13,7 @@ def number_to_color_word(value):
     top_range = 255
 
     # Normalize value to a range of 0 to 1
-    normalized = (value) / 200000
+    normalized = ((value)-50)/50
 
     # If value is too low just return red
     if normalized < 0:
@@ -58,19 +58,20 @@ def agent_portrayal(agent):
     # Adding attributes to define a Household. 
     if isinstance(agent,Household):
         # Sets the house color based on its income 
-        portrayal["color"] = number_to_color_word(agent.income)
+        portrayal["color"] = number_to_color_word(agent.mfai)
         # Overall Description of the house
         portrayal["description"] = [
             "Household",
-            "Income: " + "{:,}".format(agent.income) , 
-            "Household Size: " + str(agent.household_size) , 
-            "Vehicles: " + str(agent.vehicles) , 
+            "Income: " + "{:,}".format(agent.income), 
+            "Household Size: " + str(agent.household_size), 
+            "Vehicles: " + str(agent.vehicles), 
             "Number of Workers: " + str(agent.number_of_workers),
             "Stores within 1.0 Miles: " + str(agent.num_store_within_mile), 
             "Distance to the Closest Store: " + str(agent.distance_to_closest_store) + " miles", 
             "Rating for Distance to Closest Store: " +  str(agent.rating_distance_to_closest_store), 
-            "Rating for Number of Stores within 1.0 Miles: " + str(agent.rating_num_store_within_mile) , 
-            "Ratings Based on Num of Vehicle: " + str(agent.rating_based_on_num_vehicles)  
+            "Rating for Number of Stores within 1.0 Miles: " + str(agent.rating_num_store_within_mile), 
+            "Ratings Based on Num of Vehicle: " + str(agent.rating_based_on_num_vehicles),
+            "MFAI Score: " + str(agent.mfai)
             ]
 
     # Adding attributes to define a Store like its color and overall description. 
