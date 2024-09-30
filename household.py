@@ -104,7 +104,7 @@ class Household(GeoAgent):
             else:
                 food_avail.append(fsa)
 
-        return int(sum(food_avail)/700)*100
+        return int(sum(food_avail)/700*100)
 
     def step(self) -> None:
         self.mfai = self.get_mfai()
