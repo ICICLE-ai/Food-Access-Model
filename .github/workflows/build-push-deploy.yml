@@ -25,7 +25,7 @@ env:
   # Use docker.io for Docker Hub if empty
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
-  IMAGE_NAME: icicle-ai/food_access_model_abm
+  IMAGE_NAME: icicle-ai/abm_app
 
 jobs:
   build-and-push-images:
