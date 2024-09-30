@@ -125,11 +125,7 @@ You will need python and postgreSQL to run this project. Download postgreSQL if 
    ```py
    API_KEY = 'ENTER YOUR API';
    ```
-5. Create a postgres database and enter your credentials in config.py
-   ```py
-   USER = "database name";
-   PASS = "database password";
-   ```
+5. Ask Charlie for the rest of the config file
    
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -139,11 +135,6 @@ You will need python and postgreSQL to run this project. Download postgreSQL if 
 ## Usage
 
 Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
-
-Before running, compile households by typing:
-```sh
-   python get_data.py
-```
 
 You can run this project on port 8080 with:
 ```sh
