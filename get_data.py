@@ -9,6 +9,9 @@ import pandas as pd
 import requests
 from zipfile import ZipFile
 import tempfile
+import shapely
+import googlemaps
+from datetime import datetime
 import os
 import numpy as np
 import geopandas
@@ -35,7 +38,7 @@ state_code = FIBSCODE[:2]
 center_point = (39.942813,-82.977814)
 dist = 1000
 
-from config import APIKEY, USER, PASS, NAME, HOST, PORT
+from config import APIKEY, GOOGLEAPIKEY, USER, PASS, NAME, HOST, PORT
 
 #Read csvs into pandas dataframes
 #For loop runs a census API pull for each loop iteration
@@ -208,7 +211,7 @@ cursor.execute('DROP TABLE IF EXISTS households;')
 # Execute the create table command
 cursor.execute(create_households_query)
 
-household_query = "INSERT INTO households (id,polygon,income,household_size,vehicles,number_of_workers) VALUES %s"
+household_query = "INSERT INTO households (id,polygon,income,household_size,vehicles,number_of_workers,transport_time) VALUES %s"
 
 connection.commit()
 cursor.close()
@@ -412,7 +415,31 @@ for housing_area in housing_areas:
             else:
                 vehicle_combined_weights = np.array(vehicle_weights[(size_indexes[0]):(size_indexes[1])])+np.array(vehicle_weights[(workers_indexes[0]):])
             vehicles = random.choices([0,1,2,3,4],weights=vehicle_combined_weights)[0]
-            house_tuples.append((total_count,str(house),income,household_size,vehicles,num_workers))
+            nearest_store = None
+            store_distance = 100000000
+            for store in store_tuples:
+                store = shapely.wkt.loads(store[1])
+                if store.distance(house) <= store_distance:
+                    nearest_store = store
+            
+            # Initialize the Google Maps client with your API key
+            gmaps = googlemaps.Client(key=GOOGLEAPIKEY)
+
+            # Define the origin and destination as (latitude, longitude) pairs
+            print((house.centroid.x, house.centroid.y))
+            print(house.centroid.x)
+            print(type(house.centroid.x))
+            origin = (house.centroid.x, house.centroid.y)
+            destination = (store.centroid.x, store.centroid.y)
+            transport_time = None
+            # Get directions via public transport
+            directions_result = gmaps.directions(origin,
+                                                destination,
+                                                mode="transit",
+                                                departure_time=datetime.now())
+            print(directions_result)
+            print(type(directions_result))
+            house_tuples.append((total_count,str(house),income,household_size,vehicles,num_workers,transport_time))
             total_count+=1
 
 
