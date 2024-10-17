@@ -419,6 +419,7 @@ for housing_area in housing_areas:
             vehicles = random.choices([0,1,2,3,4],weights=vehicle_combined_weights)[0]
             nearest_store = None
             store_distance = 100000000
+            #TODO get nearest SPM and nearest CSPM
             for store in store_tuples:
                 store = shapely.wkt.loads(store[1])
                 if store.distance(house) <= store_distance:
