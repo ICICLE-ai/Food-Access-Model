@@ -17,6 +17,8 @@ import numpy as np
 import geopandas
 import random
 from psycopg2 import extras
+import shapely.geometry as geometry
+from pyproj import Transformer
 from io import BytesIO
 import csv
 from household_constants import(
@@ -426,16 +428,28 @@ for housing_area in housing_areas:
             gmaps = googlemaps.Client(key=GOOGLEAPIKEY)
 
             # Define the origin and destination as (latitude, longitude) pairs
-            print((house.centroid.x, house.centroid.y))
-            print(house.centroid.x)
-            print(type(house.centroid.x))
-            origin = (house.centroid.x, house.centroid.y)
-            destination = (store.centroid.x, store.centroid.y)
+            # Define the source CRS and target CRS (e.g., from EPSG:4326 to EPSG:3857)
+            source_crs = "EPSG:3857" # WGS84 (lat/lon)
+            target_crs = "EPSG:4326" # Web Mercator (meters)
+
+            # Create a transformer object
+            transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
+
+            # Transform the polygon by transforming each coordinate
+            house_4326 = [transformer.transform(x, y) for x, y in house.exterior.coords]
+
+            store_4326 = [transformer.transform(x, y) for x, y in nearest_store.exterior.coords]
+
+            # Create a new Shapely polygon with the transformed coordinates
+            house_4326 = geometry.Polygon(house_4326)
+            store_4326 = geometry.Polygon(store_4326)
+            origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
+            destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
             transport_time = None
             # Get directions via public transport
             directions_result = gmaps.directions(origin,
                                                 destination,
-                                                mode="transit",
+                                                mode="walking",
                                                 departure_time=datetime.now())
             print(directions_result)
             print(type(directions_result))
