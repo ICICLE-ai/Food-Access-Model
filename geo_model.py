@@ -83,6 +83,10 @@ class GeoModel(Model):
                 house[3],
                 house[4],
                 house[5],
+                house[6],
+                house[7],
+                house[8],
+                house[9],
                 SEARCHRADIUS,
                 CRS)
             self.schedule.add(agent)
