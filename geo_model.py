@@ -6,7 +6,7 @@ from store import Store # Store agent class
 from household import Household # Household agent class
 import psycopg2
 from config import USER, PASS, HOST, NAME, PORT
-
+import logging
 from constants import(
     SEARCHRADIUS,
     CRS
@@ -18,7 +18,7 @@ class GeoModel(Model):
     and then places the agents in the mesa_geo GeoSpace, which allows the Household agents to calculate distances between
     between themselves and Store Agents.
     """
-
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     def __init__(self):
         """
         Initialize the Model, intialize all agents and, add all agents to GeoSpace and Model.
@@ -50,13 +50,21 @@ class GeoModel(Model):
 
         # Fetch all rows from the executed query
         stores = cursor.fetchall()
-
+        logging.info(f"csv households: {stores}")
         # Execute the SQL query
         cursor.execute("SELECT * FROM households;")
 
         # Fetch all rows from the executed query
-        households = cursor.fetchall()
-
+        households = cursor.fetchall() 
+        #logging.info(f"Fetched households: {households}")
+        #For Testing
+        households = pd.read_csv("./old_benchmarking/testing_data_columbus_cols.csv").values.tolist()
+        logging.info(f"csv households: {str(households)}")
+        #stores = pd.read_csv("./old_benchmarking/stores_columbus.csv", header=None)
+        logging.info(f"stores households: {stores}")
+        #FOR BENCHMARKING
+        #households = pd.read_csv("testdata_home.csv")
+        #stores = pd.read_csv("testdata_store.csv")
 
         # Initialize all store agents and add them to the GeoSpace
         index_count = 0
@@ -75,6 +83,7 @@ class GeoModel(Model):
 
         # Initialize all household agents and add them to the scheduler and the Geospace
         for house in households:
+            logging.info(f"the subscriptable {households}")
             agent = Household(
                 self, 
                 house[0],

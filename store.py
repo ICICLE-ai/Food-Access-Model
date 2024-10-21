@@ -1,13 +1,13 @@
 from mesa_geo import GeoAgent
 from shapely.geometry import Polygon, Point
 import shapely
-
+import logging
 
 class Store(GeoAgent):
     """
     Represents a Store. Extends the mesa_geo GeoAgent class.
     """
-
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     def __init__(self, model, id: int, name, type, geometry) -> None:
         """
         Initialize the Household Agent.
@@ -21,6 +21,7 @@ class Store(GeoAgent):
             - lon (float): longitude of agent
             - crs (string): constant value (i.e.3857),used to map stores on a flat earth display 
         """
+        #logging.info(f"geometry {geometry}")
         polygon = shapely.wkt.loads(geometry)
         #polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
         super().__init__(id,model,polygon,"epsg:3857") # epsg:3857 is the mercator projection
