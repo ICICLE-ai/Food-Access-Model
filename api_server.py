@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from geo_model import GeoModel
+
 
 app = FastAPI()
 
@@ -11,6 +13,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+model = GeoModel()
+
 @app.get("/api/data")
 async def get_data():
     return {"message": "Hello from FastAPI"}
+
+@app.get("/api/stores")
+async def get_stores():
+    stores = model.get_stores()
+    return {"stores": stores}
