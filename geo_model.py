@@ -49,8 +49,7 @@ class GeoModel(Model):
         cursor.execute("SELECT * FROM food_stores;")
 
         # Fetch all rows from the executed query
-        stores = cursor.fetchall()
-
+        self.stores = cursor.fetchall()
         # Execute the SQL query
         cursor.execute("SELECT * FROM households;")
 
@@ -60,7 +59,7 @@ class GeoModel(Model):
 
         # Initialize all store agents and add them to the GeoSpace
         index_count = 0
-        for store in stores:
+        for store in self.stores:
             agent = Store(
                 self, 
                 index_count + len(households), 
@@ -93,7 +92,8 @@ class GeoModel(Model):
         #    #agent_reporters={"Mfai": "mfai"}
         #)
         #self.datacollector.collect(self)
-
+    def get_stores(self):
+        return self.stores
     def step(self) -> None:
 
         """
