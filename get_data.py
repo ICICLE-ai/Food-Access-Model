@@ -132,7 +132,7 @@ CREATE TABLE food_stores (
 '''
 
 # Execute the create table command
-cursor.execute(create_roads_query)
+#cursor.execute(create_roads_query)
 
 # Execute the create table command
 cursor.execute(create_food_stores_query)
