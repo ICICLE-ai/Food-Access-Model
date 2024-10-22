@@ -98,6 +98,7 @@ class GeoModel(Model):
         #self.datacollector.collect(self)
     def get_stores(self):
         return self.stores
+    
     def step(self) -> None:
 
         """
