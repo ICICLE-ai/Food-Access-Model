@@ -9,11 +9,16 @@ import pandas as pd
 import requests
 from zipfile import ZipFile
 import tempfile
+import shapely
+import googlemaps
+from datetime import datetime
 import os
 import numpy as np
 import geopandas
 import random
 from psycopg2 import extras
+import shapely.geometry as geometry
+from pyproj import Transformer
 from io import BytesIO
 import csv
 from household_constants import(
@@ -32,10 +37,10 @@ place_name = "Franklin County, Ohio, USA"
 county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
 
-center_point = (39.942813,-82.977814)
-dist = 1000
+center_point = (39.949614, -82.999420)
+dist = 400
 
-from config import APIKEY, USER, PASS, NAME, HOST, PORT
+from config import APIKEY, GOOGLEAPIKEY, USER, PASS, NAME, HOST, PORT
 
 #Read csvs into pandas dataframes
 #For loop runs a census API pull for each loop iteration
@@ -142,13 +147,20 @@ gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
 
 #convert to epsg:3857
 gdf_edges = gdf_edges.to_crs("epsg:3857")
-gdf_edges = gdf_edges[["name","highway","length","geometry","service"]]
+if "service" in gdf_edges.columns:
+    gdf_edges = gdf_edges[["name","highway","length","geometry","service"]]
+else:
+    gdf_edges = gdf_edges[["name","highway","length","geometry"]]
 
 # Insert data into the table using a SQL query
 for index,row in gdf_edges.iterrows():
-    if (row["highway"] == "residential") or (row["highway"] == "living_street") or (row["service"] == "alley"):
+    if (row["highway"] == "residential") or (row["highway"] == "living_street"):
         housing_areas.append(row["geometry"].buffer(30))
         map_elements.append((row["geometry"]).buffer(2))
+    elif "service" in gdf_edges.columns:
+        if (row["service"])=="alley":
+            housing_areas.append(row["geometry"].buffer(30))
+            map_elements.append((row["geometry"]).buffer(2))
     elif (row["highway"] == "motorway"):
         map_elements.append((row["geometry"]).buffer(100))
     elif (row["highway"] == "trunk"):
@@ -197,8 +209,11 @@ CREATE TABLE households (
     income NUMERIC,
     household_size NUMERIC,
     vehicles NUMERIC,
-    number_of_workers NUMERIC
-
+    number_of_workers NUMERIC,
+    walking_time TEXT,
+    biking_time TEXT,
+    transit_time TEXT,
+    driving_time TEXT
 );
 '''
 
@@ -208,7 +223,7 @@ cursor.execute('DROP TABLE IF EXISTS households;')
 # Execute the create table command
 cursor.execute(create_households_query)
 
-household_query = "INSERT INTO households (id,polygon,income,household_size,vehicles,number_of_workers) VALUES %s"
+household_query = "INSERT INTO households (id,polygon,income,household_size,vehicles,number_of_workers,walking_time,biking_time,transit_time,driving_time) VALUES %s"
 
 connection.commit()
 cursor.close()
@@ -412,7 +427,52 @@ for housing_area in housing_areas:
             else:
                 vehicle_combined_weights = np.array(vehicle_weights[(size_indexes[0]):(size_indexes[1])])+np.array(vehicle_weights[(workers_indexes[0]):])
             vehicles = random.choices([0,1,2,3,4],weights=vehicle_combined_weights)[0]
-            house_tuples.append((total_count,str(house),income,household_size,vehicles,num_workers))
+            nearest_store = None
+            store_distance = 100000000
+            #TODO get nearest SPM and nearest CSPM
+            for store in store_tuples:
+                store = shapely.wkt.loads(store[1])
+                if store.distance(house) <= store_distance:
+                    nearest_store = store
+            
+            # Initialize the Google Maps client with your API key
+            gmaps = googlemaps.Client(key=GOOGLEAPIKEY)
+
+            # Define the origin and destination as (latitude, longitude) pairs
+            # Define the source CRS and target CRS (e.g., from EPSG:4326 to EPSG:3857)
+            source_crs = "EPSG:3857" # WGS84 (lat/lon)
+            target_crs = "EPSG:4326" # Web Mercator (meters)
+
+            # Create a transformer object
+            transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
+
+            # Transform the polygon by transforming each coordinate
+            house_4326 = [transformer.transform(x, y) for x, y in house.exterior.coords]
+
+            store_4326 = [transformer.transform(x, y) for x, y in nearest_store.exterior.coords]
+
+            # Create a new Shapely polygon with the transformed coordinates
+            house_4326 = geometry.Polygon(house_4326)
+            store_4326 = geometry.Polygon(store_4326)
+            origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
+            destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
+            walking_time = gmaps.directions(origin,
+                                                destination,
+                                                mode="walking",
+                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
+            biking_time = gmaps.directions(origin,
+                                                destination,
+                                                mode="bicycling",
+                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
+            transit_time = gmaps.directions(origin,
+                                                destination,
+                                                mode="transit",
+                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
+            driving_time = gmaps.directions(origin,
+                                                destination,
+                                                mode="driving",
+                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
+            house_tuples.append((total_count,str(house),income,household_size,vehicles,num_workers,walking_time,biking_time,transit_time,driving_time))
             total_count+=1
 
 
