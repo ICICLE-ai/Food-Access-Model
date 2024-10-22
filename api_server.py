@@ -23,3 +23,8 @@ async def get_data():
 async def get_stores():
     stores = model.get_stores()
     return {"stores": stores}
+
+@app.get("api/agents")
+async def get_agents():
+    agents = model.agents
+    return {"agents_json": agents}
