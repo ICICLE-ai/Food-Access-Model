@@ -3,7 +3,6 @@ import psycopg2
 from shapely.geometry import Point, Polygon, LineString
 from shapely.strtree import STRtree
 import rtree
-import time
 import math
 import pandas as pd
 import requests
@@ -20,7 +19,6 @@ from psycopg2 import extras
 import shapely.geometry as geometry
 from pyproj import Transformer
 from io import BytesIO
-import csv
 from household_constants import(
     households_variables_dict,
     households_key_list,
@@ -38,7 +36,7 @@ county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
 
 center_point = (39.949614, -82.999420)
-dist = 400
+dist = 300
 
 from config import APIKEY, GOOGLEAPIKEY, USER, PASS, NAME, HOST, PORT
 
@@ -132,7 +130,7 @@ CREATE TABLE food_stores (
 '''
 
 # Execute the create table command
-#cursor.execute(create_roads_query)
+cursor.execute(create_roads_query)
 
 # Execute the create table command
 cursor.execute(create_food_stores_query)
@@ -157,10 +155,9 @@ for index,row in gdf_edges.iterrows():
     if (row["highway"] == "residential") or (row["highway"] == "living_street"):
         housing_areas.append(row["geometry"].buffer(30))
         map_elements.append((row["geometry"]).buffer(2))
-    elif "service" in gdf_edges.columns:
-        if (row["service"])=="alley":
-            housing_areas.append(row["geometry"].buffer(30))
-            map_elements.append((row["geometry"]).buffer(2))
+    elif ("service" in gdf_edges.columns) and ((row["service"])=="alley"):
+        housing_areas.append(row["geometry"].buffer(30))
+        map_elements.append((row["geometry"]).buffer(2))
     elif (row["highway"] == "motorway"):
         map_elements.append((row["geometry"]).buffer(100))
     elif (row["highway"] == "trunk"):
@@ -229,14 +226,18 @@ connection.commit()
 cursor.close()
 connection.close()
 
+# This whole thing creates houses and assigns attributes to them, and then stores the households in a SQL DB
 houses = list()
 houses_index = rtree.index.Index()
 total_count = 0
+total_google_pulls = 0
 house_tuples = list()
 housing_areas_count = 0
+#Iterate through each road and place houses next to the road (housing area means aread around a residential road)
 for housing_area in housing_areas:
     housing_areas_count+=1
     print(str(round(housing_areas_count/len(housing_areas)*100)) + "%")
+    print(total_google_pulls)
     count = 0
     # Get the exterior coordinates of the polygon
     exterior_coords = list(housing_area.exterior.coords)
@@ -244,7 +245,9 @@ for housing_area in housing_areas:
     edges = [LineString([exterior_coords[i], exterior_coords[i+1]]) 
             for i in range(len(exterior_coords) - 1)]
         
+    # Basically, draw a polygon around each road and then place houses on the edges of that rectangle
     for edge in edges:
+        # Calculate the vector representation of each edge of the polygon
         length = edge.length
         coord1 = edge.coords[0]
         coord2 = edge.coords[1]
@@ -254,6 +257,8 @@ for housing_area in housing_areas:
         normalized_vector = (0,0)
         if vector_magnitude != 0:
             normalized_vector = (vector_direction[0]/vector_magnitude,vector_direction[1]/vector_magnitude)
+        
+        #place houses on the vector, each 20 meters away from each other until the vector ends
         for i in range(int(vector_magnitude/20)+1):
             location = Point(coord1[0]+normalized_vector[0]*i*30,coord1[1]+normalized_vector[1]*i*30)
 
@@ -272,10 +277,14 @@ for housing_area in housing_areas:
             
             
             valid = True
+
+            # Get all nearby elements in map to check that house is not on top of anything
             intersecting_map_elements_indexes = map_elements_index.query(Polygon(((location.x+10, location.y+20),
                                                                         (location.x-10, location.y+20),
                                                                         (location.x-10, location.y-5),
                                                                         (location.x+10, location.y-5))))
+            
+            # Check if house is on an element
             if len(intersecting_map_elements_indexes) != 0:
                 for index in intersecting_map_elements_indexes:
                     if map_elements[index].intersects(house):
@@ -284,14 +293,17 @@ for housing_area in housing_areas:
             if not valid:
                 continue
 
-            
+            # Check if house is touching another house
             intersecting_houses_indexes = houses_index.intersection(house.bounds)
             if len(list(intersecting_houses_indexes)) != 0:
                 continue
 
+            # If we got here, that means that this house placement is valid, so we add the house to our list
             houses.append(house)
+            # This is a special index that makes it faster to query houses when we check if houses are on top of each other
             houses_index.add(total_count,house.bounds)
             
+            # Get the tract that the house is in
             tract_row_numbers = tract_index.query(house.centroid)
             tract_row = 0
             for row_number in tract_row_numbers:
@@ -299,8 +311,9 @@ for housing_area in housing_areas:
                     tract_row = row_number
                     break
             tract = data.loc[tract_row]
+
             #Iterate through each tract and create households
-            #Get amount of people in each tract at each income levela
+            #Get amount of people in each tract at each income levels
             income_weights = np.array(tract["10k to 15k":"150k to 200k"]).astype(int)
             if sum(income_weights)==0:
                 continue
@@ -427,18 +440,21 @@ for housing_area in housing_areas:
             else:
                 vehicle_combined_weights = np.array(vehicle_weights[(size_indexes[0]):(size_indexes[1])])+np.array(vehicle_weights[(workers_indexes[0]):])
             vehicles = random.choices([0,1,2,3,4],weights=vehicle_combined_weights)[0]
+
+            # Get nearest store to house
             nearest_store = None
             store_distance = 100000000
             #TODO get nearest SPM and nearest CSPM
             for store in store_tuples:
                 store = shapely.wkt.loads(store[1])
-                if store.distance(house) <= store_distance:
+                dist = store.distance(house)
+                if dist <= store_distance:
                     nearest_store = store
+                    store_distance = dist
             
             # Initialize the Google Maps client with your API key
             gmaps = googlemaps.Client(key=GOOGLEAPIKEY)
 
-            # Define the origin and destination as (latitude, longitude) pairs
             # Define the source CRS and target CRS (e.g., from EPSG:4326 to EPSG:3857)
             source_crs = "EPSG:3857" # WGS84 (lat/lon)
             target_crs = "EPSG:4326" # Web Mercator (meters)
@@ -456,22 +472,30 @@ for housing_area in housing_areas:
             store_4326 = geometry.Polygon(store_4326)
             origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
             destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
-            walking_time = gmaps.directions(origin,
+
+            # Get transport times to the closest store for each house
+            """walking_time = gmaps.directions(origin,
                                                 destination,
                                                 mode="walking",
-                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
-            biking_time = gmaps.directions(origin,
+                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]"""
+            walking_time = 0
+            """biking_time = gmaps.directions(origin,
                                                 destination,
                                                 mode="bicycling",
-                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
+                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]"""
+            biking_time = 0
             transit_time = gmaps.directions(origin,
                                                 destination,
                                                 mode="transit",
                                                 departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
-            driving_time = gmaps.directions(origin,
+            #TODO Maybe add driving time if vehicles is > 0 
+            """driving_time = gmaps.directions(origin,
                                                 destination,
                                                 mode="driving",
                                                 departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
+                                                """
+            driving_time = 0
+            total_google_pulls += 1
             house_tuples.append((total_count,str(house),income,household_size,vehicles,num_workers,walking_time,biking_time,transit_time,driving_time))
             total_count+=1
 
