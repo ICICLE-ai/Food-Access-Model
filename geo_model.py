@@ -54,7 +54,7 @@ class GeoModel(Model):
         cursor.execute("SELECT * FROM households;")
 
         # Fetch all rows from the executed query
-        households = cursor.fetchall()
+        self.households = cursor.fetchall()
 
 
         # Initialize all store agents and add them to the GeoSpace
@@ -62,7 +62,7 @@ class GeoModel(Model):
         for store in self.stores:
             agent = Store(
                 self, 
-                index_count + len(households), 
+                index_count + len(self.households), 
                 store[2], #name
                 store[0], #shop
                 store[1] #geo
@@ -73,7 +73,7 @@ class GeoModel(Model):
             self.stores_list.append(agent)
 
         # Initialize all household agents and add them to the scheduler and the Geospace
-        for house in households:
+        for house in self.households:
             agent = Household(
                 self, 
                 house[0],
@@ -98,6 +98,8 @@ class GeoModel(Model):
         #self.datacollector.collect(self)
     def get_stores(self):
         return self.stores
+    def get_households(self):
+        return self.households
     
     def step(self) -> None:
 

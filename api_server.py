@@ -26,10 +26,10 @@ async def get_stores():
     stores = model.get_stores()
     return {"stores": stores}
 
-@app.get("api/agents")
-async def get_agents():
-    agents = model.agents
-    return {"agents_json": agents}
+@app.get("/api/households")
+async def get_households():
+    households = model.get_households()
+    return {"households_json": households}
 
 @app.post("api/remove-store")
 async def remove_store(store):
