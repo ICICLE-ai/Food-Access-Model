@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from geo_model import GeoModel
+from household import Household
+from store import Store
 
 
 app = FastAPI()
@@ -28,3 +30,9 @@ async def get_stores():
 async def get_agents():
     agents = model.agents
     return {"agents_json": agents}
+
+@app.post("api/remove-store")
+async def remove_store(store):
+    print(store)
+    print(type(store))
+    model.deregister_agent(store)
