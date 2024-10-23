@@ -50,6 +50,7 @@ class GeoModel(Model):
 
         # Fetch all rows from the executed query
         self.stores = cursor.fetchall()
+        
         # Execute the SQL query
         cursor.execute("SELECT * FROM households;")
 
