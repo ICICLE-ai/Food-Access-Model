@@ -50,13 +50,15 @@ class GeoModel(Model):
 
         # Fetch all rows from the executed query
         self.stores = cursor.fetchall()
-        
+
         # Execute the SQL query
         cursor.execute("SELECT * FROM households;")
 
         # Fetch all rows from the executed query
         self.households = cursor.fetchall()
 
+        cursor.close()
+        connection.close()
 
         # Initialize all store agents and add them to the GeoSpace
         index_count = 0
@@ -91,6 +93,8 @@ class GeoModel(Model):
                 CRS)
             self.schedule.add(agent)
             self.space.add_agents(agent)
+        
+
 
         #self.datacollector = DataCollector(
         #    model_reporters={"Average mfai": "avg_mfai"}#,
@@ -101,6 +105,28 @@ class GeoModel(Model):
         return self.stores
     def get_households(self):
         return self.households
+    def reset_stores(self):
+        # Connect to the PostgreSQL database
+        connection = psycopg2.connect(
+            host=HOST,
+            database=NAME,
+            user=USER,
+            password=PASS,
+            port=PORT
+        )
+        cursor = connection.cursor()
+
+        # Execute the SQL query
+        cursor.execute("SELECT * FROM food_stores;")
+
+        # Fetch all rows from the executed query
+        self.stores = cursor.fetchall()
+        print(self.stores)
+
+        cursor.close()
+        connection.close()
+
+        return None
     
     def step(self) -> None:
 

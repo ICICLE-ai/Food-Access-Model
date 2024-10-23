@@ -18,7 +18,8 @@ model = GeoModel()
 
 @app.get("/api/stores")
 async def get_stores():
-    stores = model.get_stores()
+    print(model.stores)
+    stores = model.stores
     return {"stores": stores}
 
 @app.get("/api/agents")
@@ -33,12 +34,11 @@ async def get_households():
 
 @app.post("/api/remove-store")
 async def remove_store(store: str = Body(...)):
-    print(store)
-    print(type(store))
-    model.stores.pop(-1) #Placeholder remove TODO find store in list and remove
+    model.stores.pop(-1) #Placeholder for remove: TODO find store in list and remove correct store
     print(model.stores)
     return {"removed_store": store}
 
-@app.post("/api/reset")
+@app.put("/api/reset")
 async def reset_all():
+    model.stores = model.reset_stores()
     return {"success"}
