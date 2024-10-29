@@ -126,6 +126,21 @@ class GeoModel(Model):
         cursor.close()
         connection.close()
 
+         # Initialize all store agents and add them to the GeoSpace
+        index_count = 0
+        for store in self.stores:
+            agent = Store(
+                self, 
+                index_count + len(self.households), 
+                store[2], #name
+                store[0], #shop
+                store[1] #geo
+                )
+            index_count+=1
+            self.space.add_agents(agent) 
+            # Initializing empty list to collect all the store objects
+            self.stores_list.append(agent)
+
         return None
     
     def step(self) -> None:
