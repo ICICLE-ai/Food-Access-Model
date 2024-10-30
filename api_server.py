@@ -19,9 +19,8 @@ model = GeoModel()
 
 @app.get("/api/stores")
 async def get_stores():
-    print(model.stores)
-    stores = model.stores
-    return {"stores": stores}
+    stores = model.get_stores()
+    return {"stores_json": stores}
 
 @app.get("/api/agents")
 async def get_agents():
