@@ -50,5 +50,17 @@ async def remove_store(store_name: str = Body(...)):
 
 @app.put("/api/reset")
 async def reset_all():
+    #currently only resets stores, do we want to reset steps too?
     model.reset_stores()
     return {"success"}
+
+@app.get("/api/get-step-number")
+async def get_step_number():
+    step_number = model.schedule.steps
+    return {"step_number": step_number}
+
+@app.put("/api/step")
+async def step():
+    model.step()
+    step_number = model.schedule.steps
+    return {"step_number": step_number}
