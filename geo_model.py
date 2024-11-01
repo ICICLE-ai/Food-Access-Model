@@ -113,7 +113,8 @@ class GeoModel(Model):
                 "Walking time":  "walking_time",
                 "Biking time":  "biking_time",
                 "Driving time":  "driving_time",
-                "MFAI Score" :  "mfai"}
+                "MFAI Score" :  "mfai",
+                "Color": "color"}
         )
         self.datacollector.collect(self)
     def get_stores(self):
