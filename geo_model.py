@@ -96,15 +96,30 @@ class GeoModel(Model):
         
 
 
-        #self.datacollector = DataCollector(
-        #    model_reporters={"Average mfai": "avg_mfai"}#,
-        #    #agent_reporters={"Mfai": "mfai"}
-        #)
-        #self.datacollector.collect(self)
+        self.datacollector = DataCollector(
+            #model_reporters={"Average mfai": "avg_mfai"}#,
+            agent_reporters={
+                "Geometry": "geometry",
+                "Income": "income", 
+                "Household Size": "household_size", 
+                "Vehicles":  "vehicles", 
+                "Number of Workers":  "number_of_workers",
+                "Stores within 1.0 Miles" :  "num_store_within_mile", 
+                "Distance to the Closest Store" :  "distance_to_closest_store", 
+                "Rating for Distance to Closest Store" :   "rating_distance_to_closest_store", 
+                "Rating for Number of Stores within 1.0 Miles" :  "rating_num_store_within_mile", 
+                "Ratings Based on Num of Vehicle" :  "rating_based_on_num_vehicles",
+                "Transit time":  "transit_time",
+                "Walking time":  "walking_time",
+                "Biking time":  "biking_time",
+                "Driving time":  "driving_time",
+                "MFAI Score" :  "mfai"}
+        )
+        self.datacollector.collect(self)
     def get_stores(self):
         return self.stores
     def get_households(self):
-        return self.households
+        return self.datacollector.get_agent_vars_dataframe()
     def reset_stores(self):
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(
@@ -121,7 +136,6 @@ class GeoModel(Model):
 
         # Fetch all rows from the executed query
         self.stores = cursor.fetchall()
-        print(self.stores)
 
         cursor.close()
         connection.close()

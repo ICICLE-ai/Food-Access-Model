@@ -1,9 +1,20 @@
 from http.client import HTTPException
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from geo_model import GeoModel
 from household import Household
 from store import Store
+import json
+from decimal import Decimal
+
+# Custom encoder for Decimal
+class CustomEncoder(json.JSONEncoder):
+    def encode(self, obj):
+        if not isinstance(obj, str):
+            return str(obj)  # Or use str(obj) if you prefer strings
+        return super().default(obj)
 
 app = FastAPI()
 
@@ -29,8 +40,10 @@ async def get_agents():
 
 @app.get("/api/households")
 async def get_households():
-    households = model.get_households()
-    return {"households_json": households}
+    households = model.get_households().astype(str)
+    households_dict = households.to_dict(orient="records")
+    # Return as JSON response
+    return {"households_json": households_dict}
 
 @app.delete("/api/remove-store")
 async def remove_store(store_name: str = Body(...)):
@@ -45,7 +58,6 @@ async def remove_store(store_name: str = Body(...)):
     #remove from store (names displayed) and stores_list (actual model)
     model.stores.pop(store_index) 
     model.stores_list.pop(storelist_index)
-    print(model.stores)
     return {"removed_store": store_name}
 
 @app.put("/api/reset")
