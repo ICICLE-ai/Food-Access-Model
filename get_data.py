@@ -36,7 +36,7 @@ county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
 
 center_point = (39.949614, -82.999420)
-dist = 300
+dist = 1000
 
 from config import APIKEY, GOOGLEAPIKEY, USER, PASS, NAME, HOST, PORT
 
@@ -154,14 +154,14 @@ else:
 for index,row in gdf_edges.iterrows():
     if (row["highway"] == "residential") or (row["highway"] == "living_street"):
         housing_areas.append(row["geometry"].buffer(30))
-        map_elements.append((row["geometry"]).buffer(2))
+        map_elements.append((row["geometry"]).buffer(3))
     elif ("service" in gdf_edges.columns) and ((row["service"])=="alley"):
         housing_areas.append(row["geometry"].buffer(30))
-        map_elements.append((row["geometry"]).buffer(2))
+        map_elements.append((row["geometry"]).buffer(3))
     elif (row["highway"] == "motorway"):
         map_elements.append((row["geometry"]).buffer(100))
     elif (row["highway"] == "trunk"):
-        map_elements.append((row["geometry"]).buffer(50))
+        map_elements.append((row["geometry"]).buffer(30))
     elif (row["highway"] == "primary"):
         map_elements.append((row["geometry"]).buffer(10))
     elif (row["highway"] == "secondary"):
@@ -237,7 +237,7 @@ housing_areas_count = 0
 for housing_area in housing_areas:
     housing_areas_count+=1
     print(str(round(housing_areas_count/len(housing_areas)*100)) + "%")
-    print(total_google_pulls)
+    #print(total_google_pulls)
     count = 0
     # Get the exterior coordinates of the polygon
     exterior_coords = list(housing_area.exterior.coords)
@@ -484,10 +484,12 @@ for housing_area in housing_areas:
                                                 mode="bicycling",
                                                 departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]"""
             biking_time = 0
-            transit_time = gmaps.directions(origin,
+            """transit_time = gmaps.directions(origin,
                                                 destination,
                                                 mode="transit",
                                                 departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
+                                                """
+            transit_time = 0
             #TODO Maybe add driving time if vehicles is > 0 
             """driving_time = gmaps.directions(origin,
                                                 destination,
