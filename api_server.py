@@ -58,13 +58,13 @@ async def remove_store(store_name: str = Body(...)):
     #remove from store (names displayed) and stores_list (actual model)
     model.stores.pop(store_index) 
     model.stores_list.pop(storelist_index)
-    return {"removed_store": store_name}
+    return {"removed_store": store_name, "store_json": model.stores}
 
 @app.put("/api/reset")
 async def reset_all():
     #currently only resets stores, do we want to reset steps too?
     model.reset_stores()
-    return {"success"}
+    return {"store_json": model.stores}
 
 @app.get("/api/get-step-number")
 async def get_step_number():
