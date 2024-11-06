@@ -38,7 +38,7 @@ state_code = FIBSCODE[:2]
 center_point = (39.949614, -82.999420)
 dist = 1000
 
-from config import APIKEY, GOOGLEAPIKEY, USER, PASS, NAME, HOST, PORT
+from config import APIKEY, USER, PASS, NAME, HOST, PORT #, GOOGLEAPIKEY
 
 #Read csvs into pandas dataframes
 #For loop runs a census API pull for each loop iteration
@@ -176,7 +176,7 @@ data_tuples = list(gdf_edges.itertuples(index=False, name=None))
 #extras.execute_values(cursor, roads_query, data_tuples)
 
 #Get food stores
-features = ox.features.features_from_point(center_point,dist=dist,tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']})
+features = ox.features.features_from_point(center_point,dist=dist+1000,tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']})
 features = features.to_crs("epsg:3857")
 features = features[["shop","geometry","name"]]
 
@@ -453,7 +453,7 @@ for housing_area in housing_areas:
                     store_distance = dist
             
             # Initialize the Google Maps client with your API key
-            gmaps = googlemaps.Client(key=GOOGLEAPIKEY)
+            #gmaps = googlemaps.Client(key=GOOGLEAPIKEY)
 
             # Define the source CRS and target CRS (e.g., from EPSG:4326 to EPSG:3857)
             source_crs = "EPSG:3857" # WGS84 (lat/lon)
