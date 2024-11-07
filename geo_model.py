@@ -120,7 +120,8 @@ class GeoModel(Model):
     def get_stores(self):
         return self.stores
     def get_households(self):
-        return self.datacollector.get_agent_vars_dataframe()
+        print(len(self.datacollector.get_agent_vars_dataframe().tail(len(self.households))))
+        return self.datacollector.get_agent_vars_dataframe().tail(len(self.households))
     def reset_stores(self):
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(
@@ -164,5 +165,5 @@ class GeoModel(Model):
         Step function. Runs one step of the GeoModel.
         """
         self.schedule.step() 
-        #self.datacollector.collect(self)
+        self.datacollector.collect(self)
         

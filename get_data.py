@@ -35,7 +35,7 @@ place_name = "Franklin County, Ohio, USA"
 county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
 
-center_point = (39.949614, -82.999420)
+center_point = (39.938806, -82.972361)
 dist = 1000
 
 from config import APIKEY, USER, PASS, NAME, HOST, PORT #, GOOGLEAPIKEY
@@ -176,7 +176,7 @@ data_tuples = list(gdf_edges.itertuples(index=False, name=None))
 #extras.execute_values(cursor, roads_query, data_tuples)
 
 #Get food stores
-features = ox.features.features_from_point(center_point,dist=dist+1000,tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']})
+features = ox.features.features_from_point(center_point,dist=dist*3,tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']})
 features = features.to_crs("epsg:3857")
 features = features[["shop","geometry","name"]]
 
