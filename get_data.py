@@ -184,16 +184,22 @@ features = features[["shop","geometry","name"]]
 store_tuples = list()
 food_stores_query = "INSERT INTO food_stores (shop,geometry,name) VALUES %s"
 for index,row in features.iterrows():
+    point = None
     if not isinstance(row["geometry"],Point):
         point = row["geometry"].centroid
-        polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
-        map_elements.append(polygon.buffer(20))
-        store_tuples.append((str(row["shop"]),str(polygon),str(row["name"])))
     else:
         point = row["geometry"]
-        polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
-        map_elements.append(polygon.buffer(20))
-        store_tuples.append((str(row["shop"]),str(polygon),str(row["name"])))
+
+    if (row["shop"] == "supermarket") or (row["shop"]=="grocery") or (row["shop"]=="greengrocer"):
+        polygon = Polygon([(point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle))) for angle in range(0, 360, 60)])
+    else:
+        polygon = Polygon([
+            (point.x, point.y + 20),           # Top vertex
+            (point.x + 25, point.y - 30),      # Bottom right vertex
+            (point.x - 25, point.y - 30)       # Bottom left vertex
+        ])
+    map_elements.append(polygon.buffer(20))
+    store_tuples.append((str(row["shop"]),str(polygon),str(row["name"])))
 
 map_elements_index = STRtree(map_elements)
 extras.execute_values(cursor, food_stores_query, store_tuples)
