@@ -41,9 +41,9 @@ async def get_agents():
 @app.get("/api/households")
 async def get_households():
     households = model.get_households().astype(str)
-    households_dict = households.to_dict(orient="records")
+    households_json = households.to_dict(orient="records")
     # Return as JSON response
-    return {"households_json": households_dict}
+    return {"households_json": households_json}
 
 @app.delete("/api/remove-store")
 async def remove_store(store_name: str = Body(...)):

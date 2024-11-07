@@ -61,7 +61,7 @@ class Household(GeoAgent):
         top_range = 255
 
         # Normalize value to a range of 0 to 1
-        normalized = ((value)-50)/50
+        normalized = abs(((value)-40)/60) #this is hardcoded
 
         # If value is too low just return red
         if normalized < 0:
@@ -143,7 +143,7 @@ class Household(GeoAgent):
         cspm, spm = self.closest_cspm_and_spm()
         food_avail = list()
         for i in range(7):
-            chance_of_choosing_spm = int((self.vehicles*5)+(self.income/200000)*10+60)
+            chance_of_choosing_spm = int(((self.vehicles*10)+(self.income/200000)*80))
             store = random.choices([cspm,spm], [(chance_of_choosing_spm-100)*-1,chance_of_choosing_spm], k=1)[0]
             fsa = 0
             if store.type == "supermarket":
