@@ -1,0 +1,13 @@
+[project]
+name = "food-access-model"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "contextily==1.6.2",
+    "fastapi==0.115.2",
+    "mesa-geo==0.7.1",
+    "osmnx==1.9.4",
+    "psycopg2==2.9.9",
+]

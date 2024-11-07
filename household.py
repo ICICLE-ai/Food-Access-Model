@@ -46,7 +46,6 @@ class Household(GeoAgent):
         self.num_store_within_mile = self.stores_with_1_miles() 
         self.mfai = self.get_mfai()
         self.color = self.get_color()
-        print(self.color)
 
 
     def get_color(self):
