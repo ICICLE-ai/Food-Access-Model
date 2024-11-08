@@ -159,4 +159,5 @@ class Household(GeoAgent):
 
     def step(self) -> None:
         self.mfai = self.get_mfai()
+        self.color = self.get_color()
         return None
