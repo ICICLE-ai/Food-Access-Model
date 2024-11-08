@@ -1,5 +1,4 @@
-from http.client import HTTPException
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -8,6 +7,7 @@ from household import Household
 from store import Store
 import json
 from decimal import Decimal
+from api_helper import StoreInput, convert_centroid_to_polygon
 
 # Custom encoder for Decimal
 class CustomEncoder(json.JSONEncoder):
@@ -64,6 +64,31 @@ async def remove_store(store_name: str = Body(...)):
 async def reset_all():
     #currently only resets stores, do we want to reset steps too?
     model.reset_stores()
+    return {"store_json": model.stores}
+
+@app.post("/api/add-store")
+async def add_store(store: StoreInput):
+    store_data = {"name": store.name, "category": store.category, "latitude": store.latitude, "longitude": store.longitude}
+
+    # Parse the JSON data from the request body
+    name = store_data["name"]
+    print(model.stores[0])
+    print(model.stores_list[0])
+    # checking stores and storelist for name
+    store_exists_in_stores = any(name == store[2] for store in model.stores)
+    store_exists_in_stores_list = any(name == store.name for store in model.stores_list)
+    # # If the store name exists in either list, return an error message (should change to id later on but doing this for MVP)
+    if store_exists_in_stores or store_exists_in_stores_list:
+        raise HTTPException(status_code=409, detail=f"Store with name '{name}' already exists.")
+    
+    #convert latitude and longitude to a polygon
+    geo = str(convert_centroid_to_polygon(store_data["latitude"], store_data["longitude"]))
+    #does id matter if some get deleted, like does some operation rely on them being contiguous?
+    model.stores.append([store_data["category"], geo, store_data["name"]])
+    #TODO: investigate if we could get messed up by the id if a store gets deleted and now the ids are the same
+    model.stores_list.append(Store(model=model, id=len(model.stores) + 1, name=name, type=store_data["category"], geometry=geo))
+    #TODO: need type checking like category = SPM and name not in store_list
+    print(model.stores)
     return {"store_json": model.stores}
 
 @app.get("/api/get-step-number")
