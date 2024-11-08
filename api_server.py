@@ -82,7 +82,7 @@ async def add_store(store: StoreInput):
         raise HTTPException(status_code=409, detail=f"Store with name '{name}' already exists.")
     
     #convert latitude and longitude to a polygon
-    geo = str(convert_centroid_to_polygon(store_data["latitude"], store_data["longitude"]))
+    geo = str(convert_centroid_to_polygon(store_data["latitude"], store_data["longitude"], store_data["category"]))
     #does id matter if some get deleted, like does some operation rely on them being contiguous?
     model.stores.append([store_data["category"], geo, store_data["name"]])
     #TODO: investigate if we could get messed up by the id if a store gets deleted and now the ids are the same
