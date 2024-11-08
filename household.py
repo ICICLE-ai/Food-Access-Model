@@ -146,7 +146,7 @@ class Household(GeoAgent):
             chance_of_choosing_spm = int(((self.vehicles*10)+(self.income/200000)*80))
             store = random.choices([cspm,spm], [(chance_of_choosing_spm-100)*-1,chance_of_choosing_spm], k=1)[0]
             fsa = 0
-            if store.type == "supermarket":
+            if store is not None and store.type == "supermarket":
                 fsa = 100
             else:
                 fsa = 50
