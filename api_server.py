@@ -101,3 +101,13 @@ async def step():
     model.step()
     step_number = model.schedule.steps
     return {"step_number": step_number}
+
+@app.get("/api/get-num-households")
+async def get_num_households():
+    num_households = len(model.households)
+    return {"num_households": num_households}
+
+@app.get("/api/get-num-stores")
+async def get_num_stores():
+    num_stores = len(model.stores)
+    return {"num_stores": num_stores}
