@@ -110,4 +110,26 @@ async def get_num_households():
 @app.get("/api/get-num-stores")
 async def get_num_stores():
     num_stores = len(model.stores)
-    return {"num_stores": num_stores}
+    stores = model.stores_list
+    numSPM = 0
+    numNonSPM = 0
+    for store in stores:
+        if store is None:
+            continue
+        elif store.type == "supermarket" or store.type == "greengrocer" or store.type == "grocery":
+            numSPM += 1
+        else:
+            numNonSPM += 1
+    return {"num_stores": num_stores, "numSPM": numSPM, "numNonSPM": numNonSPM}
+
+@app.get("/api/get-household-stats")
+async def get_household_stats():
+    households = model.households
+    income = 0
+    vehicles = 0
+    for house in households:
+        income += house[2]
+        vehicles += house[4]
+    avg_income = float(income)/len(households)
+    avg_vehicles = float(vehicles)/len(households)
+    return {"avg_income": avg_income, "avg_vehicles": avg_vehicles}

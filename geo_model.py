@@ -79,16 +79,16 @@ class GeoModel(Model):
         for house in self.households:
             agent = Household(
                 self, 
-                house[0],
-                house[1], 
-                house[2],
-                house[3],
-                house[4],
-                house[5],
-                house[6],
-                house[7],
-                house[8],
-                house[9],
+                house[0], #id
+                house[1], #polygon
+                house[2], #income
+                house[3], #household_size
+                house[4], #vehicles
+                house[5], #number of workers
+                house[6], #walking_time
+                house[7], #biking_time
+                house[8], #transit_time
+                house[9], #driving_time
                 SEARCHRADIUS,
                 CRS)
             self.schedule.add(agent)
@@ -144,6 +144,7 @@ class GeoModel(Model):
 
          # Initialize all store agents and add them to the GeoSpace
         index_count = 0
+        self.stores_list.clear()
         for store in self.stores:
             agent = Store(
                 self, 
