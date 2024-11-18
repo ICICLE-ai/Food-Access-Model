@@ -18,7 +18,7 @@ class GeoModel(Model):
     and then places the agents in the mesa_geo GeoSpace, which allows the Household agents to calculate distances between
     between themselves and Store Agents.
     """
-
+        
     def __init__(self):
         """
         Initialize the Model, intialize all agents and, add all agents to GeoSpace and Model.
@@ -87,12 +87,25 @@ class GeoModel(Model):
                 CRS)
             self.schedule.add(agent)
             self.space.add_agents(agent)
+        def calculate_average_mfai(model):
+        # Assuming each agent has an 'mfai' attribute that you want to average
+            total_mfai = 0
+            agent_count = 0
 
-        #self.datacollector = DataCollector(
-        #    model_reporters={"Average mfai": "avg_mfai"}#,
-        #    #agent_reporters={"Mfai": "mfai"}
-        #)
-        #self.datacollector.collect(self)
+            # Loop through all the agents in the model
+            for agent in model.schedule.agents:
+                total_mfai += agent.mfai  # Or any attribute related to the mfai value
+                agent_count += 1
+
+            if agent_count > 0:
+                return total_mfai / agent_count
+            else:
+                return 0
+        self.datacollector = DataCollector(
+           model_reporters={"Average mfai": calculate_average_mfai}#,
+           #agent_reporters={"Mfai": "mfai"}
+        )
+        self.datacollector.collect(self)
 
     def step(self) -> None:
 
@@ -100,5 +113,6 @@ class GeoModel(Model):
         Step function. Runs one step of the GeoModel.
         """
         self.schedule.step() 
-        #self.datacollector.collect(self)
-        
+        self.datacollector.collect(self)
+    
+    
