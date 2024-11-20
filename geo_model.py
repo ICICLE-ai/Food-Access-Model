@@ -104,8 +104,8 @@ class GeoModel(Model):
                 "Household Size": "household_size", 
                 "Vehicles":  "vehicles", 
                 "Number of Workers":  "number_of_workers",
-                "Stores within 1.0 Miles" :  "num_store_within_mile", 
-                "Distance to the Closest Store" :  "distance_to_closest_store", 
+                "Stores within 1 Mile" :  "num_store_within_mile", 
+                "Closest Store (Miles)" :  "distance_to_closest_store", 
                 "Rating for Distance to Closest Store" :   "rating_distance_to_closest_store", 
                 "Rating for Number of Stores within 1.0 Miles" :  "rating_num_store_within_mile", 
                 "Ratings Based on Num of Vehicle" :  "rating_based_on_num_vehicles",
@@ -113,7 +113,7 @@ class GeoModel(Model):
                 "Walking time":  "walking_time",
                 "Biking time":  "biking_time",
                 "Driving time":  "driving_time",
-                "MFAI Score" :  "mfai",
+                "Food Access Score" :  "mfai",
                 "Color": "color"}
         )
         self.datacollector.collect(self)

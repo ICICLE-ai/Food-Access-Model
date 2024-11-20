@@ -1,3 +1,4 @@
+import math
 from mesa_geo import GeoAgent
 import shapely
 import random
@@ -39,7 +40,7 @@ class Household(GeoAgent):
         self.transit_time = transit_time
         self.driving_time = driving_time
         
-        self.distance_to_closest_store = 100000
+        f,f,self.distance_to_closest_store,f = self.closest_cspm_and_spm()
         self.rating_num_store_within_mile = "A"
         self.rating_distance_to_closest_store = "A"
         self.rating_based_on_num_vehicles = "A"
@@ -118,8 +119,6 @@ class Household(GeoAgent):
          distance = self.model.space.distance(self,store)
          if distance <= 1609.34:
           total += 1 
-          if self.distance_to_closest_store > distance: 
-             self.distance_to_closest_store = round((distance)/1609.34,2)
         self.rating_evaluation(total)
         return total 
     
@@ -130,17 +129,20 @@ class Household(GeoAgent):
         spm_distance = 10000000
         for store in self.model.stores_list: 
             distance = self.model.space.distance(self,store)
+            distance = round(distance/1609.34,2)
             if store.type == "supermarket":
                 if distance <= spm_distance:
                     spm = store
+                    spm_distance = distance
             else:
                 if distance <= cspm_distance:
                     cspm = store
-        return cspm, spm
+                    cspm_distance = distance
+        return cspm, spm, spm_distance, cspm_distance
     
     def get_mfai(self):
         #calculate mfai
-        cspm, spm = self.closest_cspm_and_spm()
+        cspm, spm,f,f = self.closest_cspm_and_spm()
         food_avail = list()
         for i in range(7):
             chance_of_choosing_spm = int(((self.vehicles*10)+(self.income/200000)*80))
@@ -149,15 +151,17 @@ class Household(GeoAgent):
             if store is not None and store.type == "supermarket":
                 fsa = 100
             else:
-                fsa = 50
+                fsa = 55
             if self.vehicles == 0:
-                food_avail.append(fsa*0.8)
-            else:
-                food_avail.append(fsa)
+                fsa = fsa*0.8
+            fsa = fsa*0.85+fsa*0.25*abs(1-self.distance_to_closest_store)
+            food_avail.append(fsa)
 
         return int(sum(food_avail)/700*100)
 
     def step(self) -> None:
         self.mfai = self.get_mfai()
         self.color = self.get_color()
+        f,spm,self.distance_to_closest_store,f = self.closest_cspm_and_spm()
+        self.num_store_within_mile = self.stores_with_1_miles()
         return None

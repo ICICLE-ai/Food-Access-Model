@@ -72,8 +72,6 @@ async def add_store(store: StoreInput):
 
     # Parse the JSON data from the request body
     name = store_data["name"]
-    print(model.stores[0])
-    print(model.stores_list[0])
     # checking stores and storelist for name
     store_exists_in_stores = any(name == store[2] for store in model.stores)
     store_exists_in_stores_list = any(name == store.name for store in model.stores_list)
@@ -88,7 +86,6 @@ async def add_store(store: StoreInput):
     #TODO: investigate if we could get messed up by the id if a store gets deleted and now the ids are the same
     model.stores_list.append(Store(model=model, id=len(model.stores) + 1, name=name, type=store_data["category"], geometry=geo))
     #TODO: need type checking like category = SPM and name not in store_list
-    print(model.stores)
     return {"store_json": model.stores}
 
 @app.get("/api/get-step-number")
