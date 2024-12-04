@@ -9,4 +9,5 @@ dependencies = [
     "mesa-geo==0.8.0",
     "osmnx==2.0.0",
     "psycopg2==2.9.10",
+    "gunicorn==22.0.0",
 ]
