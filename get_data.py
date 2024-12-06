@@ -9,7 +9,7 @@ import requests
 from zipfile import ZipFile
 import tempfile
 import shapely
-import googlemaps
+#import googlemaps
 from datetime import datetime
 import os
 import numpy as np
