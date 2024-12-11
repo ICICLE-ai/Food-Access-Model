@@ -5,7 +5,14 @@ import pandas as pd
 from store import Store # Store agent class
 from household import Household # Household agent class
 import psycopg2
-from config import USER, PASS, HOST, NAME, PORT
+import os
+
+PASS = os.getenv("PASS")
+APIKEY = os.getenv("APIKEY")
+USER = os.getenv("USER")
+NAME = os.getenv("NAME")
+HOST = os.getenv("HOST")
+PORT = os.getenv("PORT")
 
 from constants import(
     SEARCHRADIUS,
@@ -34,6 +41,7 @@ class GeoModel(Model):
         self.schedule = RandomActivation(self) 
         # Initializing empty list to collect all the store objects
         self.stores_list = []
+
 
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(
