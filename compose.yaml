@@ -8,15 +8,17 @@ services:
       - "80:80"
     restart: always
     environment:
-      VITE_API_URL: "http://fass-back"
+      VITE_API_URL: "http://localhost:8080/api"
     networks:
       - fass-network
   fass-back:
     image: fass-back
-    env_file:
-      - .env
     ports:
       - "8080:8080"
     restart: always
     environment:
-      FRONT_URL: "http://fass-front"
+      NAME: "fassdb"
+      USER:
+      PASS:
+      HOST:
+      PORT: 443
