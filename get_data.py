@@ -38,7 +38,12 @@ state_code = FIBSCODE[:2]
 center_point = (39.938806, -82.972361)
 dist = 1000
 
-from config import APIKEY, USER, PASS, NAME, HOST, PORT #, GOOGLEAPIKEY
+PASS = os.getenv("PASS")
+APIKEY = os.getenv("APIKEY")
+USER = os.getenv("USER")
+NAME = os.getenv("NAME")
+HOST = os.getenv("HOST")
+PORT = os.getenv("PORT")
 
 #Read csvs into pandas dataframes
 #For loop runs a census API pull for each loop iteration
