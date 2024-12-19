@@ -116,16 +116,24 @@ You will need python to run this application.
    ```sh
    git clone https://github.com/ICICLE-ai/Food-Access-Model.git
    ```
-2. Install python packages
+2. Install python dependencies from pyproject.toml
    ```sh
-   pip install -r requirements.txt
+   pip install poetry
+   poetry install
    ```
 3. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html)
-4. create a file `config.py` in the main folder and enter your API in `config.py`
+4. create a file `.env` at the root and enter your API in `config.py`
    ```py
    API_KEY = 'ENTER YOUR API';
    ```
-5. Ask Charlie for the rest of the config file
+5. Create a local postgres database for other fields
+   ```py
+   NAME = 'name of postgres database'
+   USER = 'postgres user'
+   PASS = 'password'
+   HOST = 'localhost'
+   PORT = 'port number'
+   ```
    
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -134,12 +142,14 @@ You will need python to run this application.
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
-
-You can run this project on port 8080 with:
+You can run this project on localhost with:
 ```sh
-   python server.py
+   python run_local.py
 ```
+
+Beyond testing api calls, running this project and the FASS-Frontend concurrently results in a user-experience
+using data within the database.
+
 
 _For more examples, please refer to the [Documentation](https://example.com)_
 
