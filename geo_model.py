@@ -7,12 +7,12 @@ from household import Household # Household agent class
 import psycopg2
 import os
 
-PASS = os.getenv("PASS")
+DB_PASS = os.getenv("DB_PASS")
 APIKEY = os.getenv("APIKEY")
-USER = os.getenv("USER")
-NAME = os.getenv("NAME")
-HOST = os.getenv("HOST")
-PORT = os.getenv("PORT")
+DB_USER = os.getenv("DB_USER")
+DB_NAME = os.getenv("DB_NAME")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
 
 from constants import(
     SEARCHRADIUS,
@@ -45,11 +45,11 @@ class GeoModel(Model):
 
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(
-            host=HOST,
-            database=NAME,
-            user=USER,
-            password=PASS,
-            port=PORT
+            host=DB_HOST,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASS,
+            port=DB_PORT
         )
         cursor = connection.cursor()
 
@@ -133,11 +133,11 @@ class GeoModel(Model):
     def reset_stores(self):
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(
-            host=HOST,
-            database=NAME,
-            user=USER,
-            password=PASS,
-            port=PORT
+            host=DB_HOST,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASS,
+            port=DB_PORT
         )
         cursor = connection.cursor()
 

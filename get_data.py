@@ -38,12 +38,12 @@ state_code = FIBSCODE[:2]
 center_point = (39.938806, -82.972361)
 dist = 1000
 
-PASS = os.getenv("PASS")
+PASS = os.getenv("DB_PASS")
 APIKEY = os.getenv("APIKEY")
-USER = os.getenv("USER")
-NAME = os.getenv("NAME")
-HOST = os.getenv("HOST")
-PORT = os.getenv("PORT")
+USER = os.getenv("DB_USER")
+NAME = os.getenv("DB_NAME")
+HOST = os.getenv("DB_HOST")
+PORT = os.getenv("DB_PORT")
 
 #Read csvs into pandas dataframes
 #For loop runs a census API pull for each loop iteration
@@ -518,7 +518,7 @@ connection = psycopg2.connect(
     host=HOST,
     database=NAME,
     user=USER,
-    password=PASS,
+    # password=PASS,
     port=PORT
 )
 cursor = connection.cursor()
