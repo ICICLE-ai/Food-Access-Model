@@ -19,31 +19,24 @@
 *** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
 *** https://www.markdownguide.org/basic-syntax/#reference-style-links
 -->
+<!--
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
 [![LinkedIn][linkedin-shield]][linkedin-url]
-
+-->
 
 
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/ICICLE-ai/Food-Access-Model">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
-  </a>
-
 <h3 align="center">Food Access Model</h3>
 
   <p align="center">
     This project, the ICICLE Food Access Model, is an Agent-Based model that simulates how households may access food in the real world.
     <br />
-    <a href="https://github.com/ICICLE-ai/Food-Access-Model"><strong>Explore the docs »</strong></a>
-    <br />
-    <br />
-    <a href="https://github.com/ICICLE-ai/Food-Access-Model">View Demo</a>
     ·
     <a href="https://github.com/ICICLE-ai/Food-Access-Model/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     ·
@@ -84,8 +77,6 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
-
 This project, the ICICLE Food Access Model, is an Agent-Based model that simulates how households may access food in the real world.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -118,21 +109,13 @@ You will need python to run this application.
    ```
 2. Install python dependencies from pyproject.toml
    ```sh
-   pip install poetry
-   poetry install
+   pip install uv
+   uv install
    ```
-3. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html)
+3. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html). This is only neccessary if you want to create new data. The current database will hold brown county data.
 4. create a file `.env` at the root and enter your API in `config.py`
    ```py
    API_KEY = 'ENTER YOUR API';
-   ```
-5. Create a local postgres database for other fields
-   ```py
-   NAME = 'name of postgres database'
-   USER = 'postgres user'
-   PASS = 'password'
-   HOST = 'localhost'
-   PORT = 'port number'
    ```
    
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -144,14 +127,11 @@ You will need python to run this application.
 
 You can run this project on localhost with:
 ```sh
-   python run_local.py
+   uv run run.py
 ```
 
 Beyond testing api calls, running this project and the FASS-Frontend concurrently results in a user-experience
 using data within the database.
-
-
-_For more examples, please refer to the [Documentation](https://example.com)_
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
