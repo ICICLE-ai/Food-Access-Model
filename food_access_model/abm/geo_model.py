@@ -6,18 +6,17 @@ from store import Store # Store agent class
 from household import Household # Household agent class
 import psycopg2
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 PASS = os.getenv("PASS")
-APIKEY = os.getenv("APIKEY")
 USER = os.getenv("USER")
 NAME = os.getenv("NAME")
 HOST = os.getenv("HOST")
 PORT = os.getenv("PORT")
 
-from constants import(
-    SEARCHRADIUS,
-    CRS
-)
+SEARCHRADIUS = 500
+CRS = "3857"
 
 class GeoModel(Model):
     """
