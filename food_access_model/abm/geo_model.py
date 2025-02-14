@@ -1,21 +1,19 @@
 from mesa import Model, DataCollector #Base class for GeoModel
 from mesa.time import RandomActivation #Used to specify that agents are run randomly within each step
 from mesa_geo import GeoSpace #GeoSpace that houses agents
-import pandas as pd
-from store import Store # Store agent class
-from household import Household # Household agent class
+from food_access_model.abm.store import Store # Store agent class
+from food_access_model.abm.household import Household # Household agent class
 import psycopg2
 import os
 
 PASS = os.getenv("PASS")
-APIKEY = os.getenv("APIKEY")
 USER = os.getenv("USER")
 NAME = os.getenv("NAME")
 HOST = os.getenv("HOST")
 PORT = os.getenv("PORT")
 
 SEARCHRADIUS = 500
-CRS = 3857
+CRS = "3857"
 
 class GeoModel(Model):
     """
