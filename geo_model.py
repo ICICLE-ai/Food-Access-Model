@@ -14,10 +14,8 @@ NAME = os.getenv("NAME")
 HOST = os.getenv("HOST")
 PORT = os.getenv("PORT")
 
-from constants import(
-    SEARCHRADIUS,
-    CRS
-)
+SEARCHRADIUS = 500
+CRS = 3857
 
 class GeoModel(Model):
     """

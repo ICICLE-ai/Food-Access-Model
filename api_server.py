@@ -1,12 +1,9 @@
 from fastapi import FastAPI, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
 from geo_model import GeoModel
 from household import Household
 from store import Store
 import json
-from decimal import Decimal
 from api_helper import StoreInput, convert_centroid_to_polygon
 
 # Custom encoder for Decimal
