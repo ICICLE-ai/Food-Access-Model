@@ -19,31 +19,24 @@
 *** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
 *** https://www.markdownguide.org/basic-syntax/#reference-style-links
 -->
+<!--
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
 [![LinkedIn][linkedin-shield]][linkedin-url]
-
+-->
 
 
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/ICICLE-ai/Food-Access-Model">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
-  </a>
-
 <h3 align="center">Food Access Model</h3>
 
   <p align="center">
     This project, the ICICLE Food Access Model, is an Agent-Based model that simulates how households may access food in the real world.
     <br />
-    <a href="https://github.com/ICICLE-ai/Food-Access-Model"><strong>Explore the docs »</strong></a>
-    <br />
-    <br />
-    <a href="https://github.com/ICICLE-ai/Food-Access-Model">View Demo</a>
     ·
     <a href="https://github.com/ICICLE-ai/Food-Access-Model/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     ·
@@ -84,8 +77,6 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
-
 This project, the ICICLE Food Access Model, is an Agent-Based model that simulates how households may access food in the real world.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -116,16 +107,16 @@ You will need python to run this application.
    ```sh
    git clone https://github.com/ICICLE-ai/Food-Access-Model.git
    ```
-2. Install python packages
+2. Install python dependencies from pyproject.toml
    ```sh
-   pip install -r requirements.txt
+   pip install uv
+   uv install
    ```
-3. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html)
-4. create a file `config.py` in the main folder and enter your API in `config.py`
+3. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html). This is only neccessary if you want to create new data. The current database will hold brown county data.
+4. create a file `.env` at the root and enter your API in `config.py`
    ```py
    API_KEY = 'ENTER YOUR API';
    ```
-5. Ask Charlie for the rest of the config file
    
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -134,14 +125,13 @@ You will need python to run this application.
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
-
-You can run this project on port 8080 with:
+You can run this project on localhost with:
 ```sh
-   python server.py
+   uv run run.py
 ```
 
-_For more examples, please refer to the [Documentation](https://example.com)_
+Beyond testing api calls, running this project and the FASS-Frontend concurrently results in a user-experience
+using data within the database.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

@@ -1,4 +1,3 @@
-import math
 from mesa_geo import GeoAgent
 import shapely
 import random

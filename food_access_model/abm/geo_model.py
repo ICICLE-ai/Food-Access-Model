@@ -1,23 +1,19 @@
 from mesa import Model, DataCollector #Base class for GeoModel
 from mesa.time import RandomActivation #Used to specify that agents are run randomly within each step
 from mesa_geo import GeoSpace #GeoSpace that houses agents
-import pandas as pd
-from store import Store # Store agent class
-from household import Household # Household agent class
+from food_access_model.abm.store import Store # Store agent class
+from food_access_model.abm.household import Household # Household agent class
 import psycopg2
 import os
 
-DB_PASS = os.getenv("DB_PASS")
-APIKEY = os.getenv("APIKEY")
-DB_USER = os.getenv("DB_USER")
-DB_NAME = os.getenv("DB_NAME")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
+PASS = os.getenv("PASS")
+USER = os.getenv("USER")
+NAME = os.getenv("NAME")
+HOST = os.getenv("HOST")
+PORT = os.getenv("PORT")
 
-from constants import(
-    SEARCHRADIUS,
-    CRS
-)
+SEARCHRADIUS = 500
+CRS = "3857"
 
 class GeoModel(Model):
     """
@@ -45,11 +41,11 @@ class GeoModel(Model):
 
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(
-            host=DB_HOST,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASS,
-            port=DB_PORT
+            host=HOST,
+            database=NAME,
+            user=USER,
+            password=PASS,
+            port=PORT
         )
         cursor = connection.cursor()
 
@@ -133,11 +129,11 @@ class GeoModel(Model):
     def reset_stores(self):
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(
-            host=DB_HOST,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASS,
-            port=DB_PORT
+            host=HOST,
+            database=NAME,
+            user=USER,
+            password=PASS,
+            port=PORT
         )
         cursor = connection.cursor()
 
