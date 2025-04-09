@@ -25,16 +25,16 @@ env:
   # Use docker.io for Docker Hub if empty
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
-  IMAGE_NAME: icicle-ai/fass-api
+  IMAGE_NAME: icicle-ai/fass-back
 
 jobs:
   build-and-push-images:
     runs-on: ubuntu-latest
     steps:
-      - name: Get tag name from branch. SED removes `release-`, replaces `main` with `latest`.
+      - name: Get tag name from branch. SED replaces `staging` with `stage`, replaces `main` with `latest`.
         id: get_tag_name
         shell: bash
-        run: echo "tag_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/main/latest/g' | sed 's/release-//g')" >> $GITHUB_OUTPUT
+        run: echo "tag_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/main/latest/g' | sed 's/staging/stage/g')" >> $GITHUB_OUTPUT
         
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -62,16 +62,16 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag_name.outputs.tag_name }}
 
-  deploy-images-dev:
+  deploy-images-staging:
     runs-on: ubuntu-latest
     needs: [build-and-push-images]
     if:
-      contains('refs/heads/dev', github.ref)
+      contains('refs/heads/staging', github.ref)
     steps:
-    - name: Restart dev pod
+    - name: Restart staging pod
       uses: fjogeleit/http-request-action@v1
       with:
-        url: 'https://icicleai.tapis.io/v3/pods/${{ vars.DEV_POD_ID }}/restart'
+        url: 'https://icicleai.tapis.io/v3/pods/${{ vars.STAGE_POD_ID }}/restart'
         method: 'GET'
         customHeaders: '{"Content-Type": "application/json", "X-Tapis-Token": "${{ secrets.TAPIS_ICICLE_PROD_TOKEN }}"}'
 
