@@ -83,9 +83,9 @@ async def add_store(store: StoreInput):
     #convert latitude and longitude to a polygon
     geo = str(convert_centroid_to_polygon(store_data["latitude"], store_data["longitude"], store_data["category"]))
     #does id matter if some get deleted, like does some operation rely on them being contiguous?
-    model.stores.routerend([store_data["category"], geo, store_data["name"]])
+    model.stores.append([store_data["category"], geo, store_data["name"]])
     #TODO: investigate if we could get messed up by the id if a store gets deleted and now the ids are the same
-    model.stores_list.routerend(Store(model=model, id=len(model.stores) + 1, name=name, type=store_data["category"], geometry=geo))
+    model.stores_list.append(Store(model=model, id=len(model.stores) + 1, name=name, type=store_data["category"], geometry=geo))
     #TODO: need type checking like category = SPM and name not in store_list
     return {"store_json": model.stores}
 
