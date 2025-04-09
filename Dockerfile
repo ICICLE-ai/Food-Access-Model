@@ -18,6 +18,8 @@ COPY ./pyproject.toml .
 RUN uv sync --frozen --no-cache
 
 # Copy all necessary python code to run the server
+# COPY ./*.py ./
+COPY food_access_model ./food_access_model
 COPY ./*.py ./
 
 # Container Entrypoint
