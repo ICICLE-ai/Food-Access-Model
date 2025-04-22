@@ -3,19 +3,22 @@ import psycopg2
 from shapely.geometry import Point, Polygon, LineString
 from shapely.strtree import STRtree
 import rtree
-import time
 import math
 import pandas as pd
 import requests
 from zipfile import ZipFile
 import tempfile
+import shapely
+#import googlemaps
+from datetime import datetime
 import os
 import numpy as np
 import geopandas
 import random
 from psycopg2 import extras
+import shapely.geometry as geometry
+from pyproj import Transformer
 from io import BytesIO
-import csv
 from household_constants import(
     households_variables_dict,
     households_key_list,
@@ -32,10 +35,15 @@ place_name = "Franklin County, Ohio, USA"
 county_code = FIBSCODE[2:]
 state_code = FIBSCODE[:2]
 
-center_point = (39.942813,-82.977814)
+center_point = (39.938806, -82.972361)
 dist = 1000
 
-from config import APIKEY, USER, PASS, NAME, HOST, PORT
+PASS = os.getenv("DB_PASS")
+APIKEY = os.getenv("APIKEY")
+USER = os.getenv("DB_USER")
+NAME = os.getenv("DB_NAME")
+HOST = os.getenv("DB_HOST")
+PORT = os.getenv("DB_PORT")
 
 #Read csvs into pandas dataframes
 #For loop runs a census API pull for each loop iteration
@@ -142,17 +150,23 @@ gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
 
 #convert to epsg:3857
 gdf_edges = gdf_edges.to_crs("epsg:3857")
-gdf_edges = gdf_edges[["name","highway","length","geometry","service"]]
+if "service" in gdf_edges.columns:
+    gdf_edges = gdf_edges[["name","highway","length","geometry","service"]]
+else:
+    gdf_edges = gdf_edges[["name","highway","length","geometry"]]
 
 # Insert data into the table using a SQL query
 for index,row in gdf_edges.iterrows():
-    if (row["highway"] == "residential") or (row["highway"] == "living_street") or (row["service"] == "alley"):
+    if (row["highway"] == "residential") or (row["highway"] == "living_street"):
         housing_areas.append(row["geometry"].buffer(30))
-        map_elements.append((row["geometry"]).buffer(2))
+        map_elements.append((row["geometry"]).buffer(3))
+    elif ("service" in gdf_edges.columns) and ((row["service"])=="alley"):
+        housing_areas.append(row["geometry"].buffer(30))
+        map_elements.append((row["geometry"]).buffer(3))
     elif (row["highway"] == "motorway"):
         map_elements.append((row["geometry"]).buffer(100))
     elif (row["highway"] == "trunk"):
-        map_elements.append((row["geometry"]).buffer(50))
+        map_elements.append((row["geometry"]).buffer(30))
     elif (row["highway"] == "primary"):
         map_elements.append((row["geometry"]).buffer(10))
     elif (row["highway"] == "secondary"):
@@ -167,7 +181,7 @@ data_tuples = list(gdf_edges.itertuples(index=False, name=None))
 #extras.execute_values(cursor, roads_query, data_tuples)
 
 #Get food stores
-features = ox.features.features_from_point(center_point,dist=dist,tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']})
+features = ox.features.features_from_point(center_point,dist=dist*3,tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']})
 features = features.to_crs("epsg:3857")
 features = features[["shop","geometry","name"]]
 
@@ -175,16 +189,22 @@ features = features[["shop","geometry","name"]]
 store_tuples = list()
 food_stores_query = "INSERT INTO food_stores (shop,geometry,name) VALUES %s"
 for index,row in features.iterrows():
+    point = None
     if not isinstance(row["geometry"],Point):
         point = row["geometry"].centroid
-        polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
-        map_elements.append(polygon.buffer(20))
-        store_tuples.append((str(row["shop"]),str(polygon),str(row["name"])))
     else:
         point = row["geometry"]
-        polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
-        map_elements.append(polygon.buffer(20))
-        store_tuples.append((str(row["shop"]),str(polygon),str(row["name"])))
+
+    if (row["shop"] == "supermarket") or (row["shop"]=="grocery") or (row["shop"]=="greengrocer"):
+        polygon = Polygon([(point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle))) for angle in range(0, 360, 60)])
+    else:
+        polygon = Polygon([
+            (point.x, point.y + 20),           # Top vertex
+            (point.x + 25, point.y - 30),      # Bottom right vertex
+            (point.x - 25, point.y - 30)       # Bottom left vertex
+        ])
+    map_elements.append(polygon.buffer(20))
+    store_tuples.append((str(row["shop"]),str(polygon),str(row["name"])))
 
 map_elements_index = STRtree(map_elements)
 extras.execute_values(cursor, food_stores_query, store_tuples)
@@ -197,8 +217,11 @@ CREATE TABLE households (
     income NUMERIC,
     household_size NUMERIC,
     vehicles NUMERIC,
-    number_of_workers NUMERIC
-
+    number_of_workers NUMERIC,
+    walking_time TEXT,
+    biking_time TEXT,
+    transit_time TEXT,
+    driving_time TEXT
 );
 '''
 
@@ -208,20 +231,24 @@ cursor.execute('DROP TABLE IF EXISTS households;')
 # Execute the create table command
 cursor.execute(create_households_query)
 
-household_query = "INSERT INTO households (id,polygon,income,household_size,vehicles,number_of_workers) VALUES %s"
+household_query = "INSERT INTO households (id,polygon,income,household_size,vehicles,number_of_workers,walking_time,biking_time,transit_time,driving_time) VALUES %s"
 
 connection.commit()
 cursor.close()
 connection.close()
 
+# This whole thing creates houses and assigns attributes to them, and then stores the households in a SQL DB
 houses = list()
 houses_index = rtree.index.Index()
 total_count = 0
+total_google_pulls = 0
 house_tuples = list()
 housing_areas_count = 0
+#Iterate through each road and place houses next to the road (housing area means aread around a residential road)
 for housing_area in housing_areas:
     housing_areas_count+=1
     print(str(round(housing_areas_count/len(housing_areas)*100)) + "%")
+    #print(total_google_pulls)
     count = 0
     # Get the exterior coordinates of the polygon
     exterior_coords = list(housing_area.exterior.coords)
@@ -229,7 +256,9 @@ for housing_area in housing_areas:
     edges = [LineString([exterior_coords[i], exterior_coords[i+1]]) 
             for i in range(len(exterior_coords) - 1)]
         
+    # Basically, draw a polygon around each road and then place houses on the edges of that rectangle
     for edge in edges:
+        # Calculate the vector representation of each edge of the polygon
         length = edge.length
         coord1 = edge.coords[0]
         coord2 = edge.coords[1]
@@ -239,6 +268,8 @@ for housing_area in housing_areas:
         normalized_vector = (0,0)
         if vector_magnitude != 0:
             normalized_vector = (vector_direction[0]/vector_magnitude,vector_direction[1]/vector_magnitude)
+        
+        #place houses on the vector, each 20 meters away from each other until the vector ends
         for i in range(int(vector_magnitude/20)+1):
             location = Point(coord1[0]+normalized_vector[0]*i*30,coord1[1]+normalized_vector[1]*i*30)
 
@@ -257,10 +288,14 @@ for housing_area in housing_areas:
             
             
             valid = True
+
+            # Get all nearby elements in map to check that house is not on top of anything
             intersecting_map_elements_indexes = map_elements_index.query(Polygon(((location.x+10, location.y+20),
                                                                         (location.x-10, location.y+20),
                                                                         (location.x-10, location.y-5),
                                                                         (location.x+10, location.y-5))))
+            
+            # Check if house is on an element
             if len(intersecting_map_elements_indexes) != 0:
                 for index in intersecting_map_elements_indexes:
                     if map_elements[index].intersects(house):
@@ -269,14 +304,17 @@ for housing_area in housing_areas:
             if not valid:
                 continue
 
-            
+            # Check if house is touching another house
             intersecting_houses_indexes = houses_index.intersection(house.bounds)
             if len(list(intersecting_houses_indexes)) != 0:
                 continue
 
+            # If we got here, that means that this house placement is valid, so we add the house to our list
             houses.append(house)
+            # This is a special index that makes it faster to query houses when we check if houses are on top of each other
             houses_index.add(total_count,house.bounds)
             
+            # Get the tract that the house is in
             tract_row_numbers = tract_index.query(house.centroid)
             tract_row = 0
             for row_number in tract_row_numbers:
@@ -284,8 +322,9 @@ for housing_area in housing_areas:
                     tract_row = row_number
                     break
             tract = data.loc[tract_row]
+
             #Iterate through each tract and create households
-            #Get amount of people in each tract at each income levela
+            #Get amount of people in each tract at each income levels
             income_weights = np.array(tract["10k to 15k":"150k to 200k"]).astype(int)
             if sum(income_weights)==0:
                 continue
@@ -412,7 +451,65 @@ for housing_area in housing_areas:
             else:
                 vehicle_combined_weights = np.array(vehicle_weights[(size_indexes[0]):(size_indexes[1])])+np.array(vehicle_weights[(workers_indexes[0]):])
             vehicles = random.choices([0,1,2,3,4],weights=vehicle_combined_weights)[0]
-            house_tuples.append((total_count,str(house),income,household_size,vehicles,num_workers))
+
+            # Get nearest store to house
+            nearest_store = None
+            store_distance = 100000000
+            #TODO get nearest SPM and nearest CSPM
+            for store in store_tuples:
+                store = shapely.wkt.loads(store[1])
+                dist = store.distance(house)
+                if dist <= store_distance:
+                    nearest_store = store
+                    store_distance = dist
+            
+            # Initialize the Google Maps client with your API key
+            #gmaps = googlemaps.Client(key=GOOGLEAPIKEY)
+
+            # Define the source CRS and target CRS (e.g., from EPSG:4326 to EPSG:3857)
+            source_crs = "EPSG:3857" # WGS84 (lat/lon)
+            target_crs = "EPSG:4326" # Web Mercator (meters)
+
+            # Create a transformer object
+            transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
+
+            # Transform the polygon by transforming each coordinate
+            house_4326 = [transformer.transform(x, y) for x, y in house.exterior.coords]
+
+            store_4326 = [transformer.transform(x, y) for x, y in nearest_store.exterior.coords]
+
+            # Create a new Shapely polygon with the transformed coordinates
+            house_4326 = geometry.Polygon(house_4326)
+            store_4326 = geometry.Polygon(store_4326)
+            origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
+            destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
+
+            # Get transport times to the closest store for each house
+            """walking_time = gmaps.directions(origin,
+                                                destination,
+                                                mode="walking",
+                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]"""
+            walking_time = 0
+            """biking_time = gmaps.directions(origin,
+                                                destination,
+                                                mode="bicycling",
+                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]"""
+            biking_time = 0
+            """transit_time = gmaps.directions(origin,
+                                                destination,
+                                                mode="transit",
+                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
+                                                """
+            transit_time = 0
+            #TODO Maybe add driving time if vehicles is > 0 
+            """driving_time = gmaps.directions(origin,
+                                                destination,
+                                                mode="driving",
+                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
+                                                """
+            driving_time = 0
+            total_google_pulls += 1
+            house_tuples.append((total_count,str(house),income,household_size,vehicles,num_workers,walking_time,biking_time,transit_time,driving_time))
             total_count+=1
 
 
@@ -421,7 +518,7 @@ connection = psycopg2.connect(
     host=HOST,
     database=NAME,
     user=USER,
-    password=PASS,
+    # password=PASS,
     port=PORT
 )
 cursor = connection.cursor()
