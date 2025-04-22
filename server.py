@@ -1,4 +1,4 @@
-from geo_model import GeoModel
+from food_access_model.abm.geo_model import GeoModel
 from custom_map_visualization import MapModule
 from mesa.visualization import ModularServer, Slider, ChartModule
 from agent_visualization import agent_portrayal

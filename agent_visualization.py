@@ -1,5 +1,5 @@
-from household import Household
-from store import Store
+from food_access_model.abm.household import Household
+from food_access_model.abm.store import Store
 
 
 def number_to_color_word(value):
@@ -71,6 +71,10 @@ def agent_portrayal(agent):
             "Rating for Distance to Closest Store: " +  str(agent.rating_distance_to_closest_store), 
             "Rating for Number of Stores within 1.0 Miles: " + str(agent.rating_num_store_within_mile), 
             "Ratings Based on Num of Vehicle: " + str(agent.rating_based_on_num_vehicles),
+            "Transit time:" + str(agent.transit_time),
+            "Walking time:" + str(agent.walking_time),
+            "Biking time:" + str(agent.biking_time),
+            "Driving time:" + str(agent.driving_time),
             "MFAI Score: " + str(agent.mfai)
             ]
 

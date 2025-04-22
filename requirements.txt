@@ -1,5 +1,4 @@
-# python_version=='3.11.4'
-mesa_geo==0.7.1
-osmnx==1.9.4
-psycopg2==2.9.9
-contextily==1.6.2
+et_xmlfile==2.0.0
+openpyxl==3.1.5
+uv==0.5.27
+
