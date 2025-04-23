@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = "==3.11.11"
 
 [[package]]
@@ -190,7 +191,7 @@ name = "click"
 version = "8.1.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/96/d3/f04c7bfcf5c1862a2a5b845c6b2b360488cf47af55dfa79c98f6a6bf98b5/click-8.1.7.tar.gz", hash = "sha256:ca9853ad459e787e2192211578cc907e7594e294c7ccc834310722b41b9ca6de", size = 336121 }
 wheels = [
@@ -397,6 +398,7 @@ dependencies = [
     { name = "mesa-geo" },
     { name = "osmnx" },
     { name = "psycopg2-binary" },
+    { name = "pyinstrument" },
 ]
 
 [package.metadata]
@@ -406,6 +408,7 @@ requires-dist = [
     { name = "mesa-geo", specifier = "==0.8.0" },
     { name = "osmnx", specifier = "==2.0.0" },
     { name = "psycopg2-binary", specifier = "==2.9.10" },
+    { name = "pyinstrument", specifier = "==4.6.2" },
 ]
 
 [[package]]
@@ -469,7 +472,7 @@ name = "ipykernel"
 version = "6.29.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "appnope", marker = "platform_system == 'Darwin'" },
+    { name = "appnope", marker = "sys_platform == 'darwin'" },
     { name = "comm" },
     { name = "debugpy" },
     { name = "ipython" },
@@ -1122,6 +1125,24 @@ wheels = [
 ]
 
 [[package]]
+name = "pyinstrument"
+version = "4.6.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/54/b1/3cc18e0b39f3b043c8ceda8c0d52f36fffb8e28e8773ad75cccc4dee0955/pyinstrument-4.6.2.tar.gz", hash = "sha256:0002ee517ed8502bbda6eb2bb1ba8f95a55492fcdf03811ba13d4806e50dd7f6", size = 128412 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2b/e2/69cebd674cc61733141b51d97afe7c7dc90a37bbf2b7ea632bb4a500e888/pyinstrument-4.6.2-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:62f6014d2b928b181a52483e7c7b82f2c27e22c577417d1681153e5518f03317", size = 92159 },
+    { url = "https://files.pythonhosted.org/packages/88/70/81931097221146d909b0dd8997af59825fb29bff8a0de17bc2e60b0b1322/pyinstrument-4.6.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:dcb5c8d763c5df55131670ba2a01a8aebd0d490a789904a55eb6a8b8d497f110", size = 86613 },
+    { url = "https://files.pythonhosted.org/packages/55/c1/c67c96c8b9838c2720e36ddabeaf89e04de602571dd85c8bcab93bbd8067/pyinstrument-4.6.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6ed4e8c6c84e0e6429ba7008a66e435ede2d8cb027794c20923c55669d9c5633", size = 105256 },
+    { url = "https://files.pythonhosted.org/packages/a5/44/a15a267fa9bec6c775de6be8f6285e80f503515ab4a6a00ccc186be7fc0f/pyinstrument-4.6.2-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:6c0f0e1d8f8c70faa90ff57f78ac0dda774b52ea0bfb2d9f0f41ce6f3e7c869e", size = 103928 },
+    { url = "https://files.pythonhosted.org/packages/fa/f1/a5834ab1e8fce5b293d9f8603491513488acbc15e008b61339afdf83169e/pyinstrument-4.6.2-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8b3c44cb037ad0d6e9d9a48c14d856254ada641fbd0ae9de40da045fc2226a2a", size = 104871 },
+    { url = "https://files.pythonhosted.org/packages/f1/46/085a27fbe5c7c943c52b941dd15da951877dff3354d6a01275893d9566ba/pyinstrument-4.6.2-cp311-cp311-musllinux_1_1_aarch64.whl", hash = "sha256:be9901f17ac2f527c352f2fdca3d717c1d7f2ce8a70bad5a490fc8cc5d2a6007", size = 109183 },
+    { url = "https://files.pythonhosted.org/packages/cc/48/0d836ced594b9b7215a75be5c8c3c6395a63647bb6ab41fcf86b8288a047/pyinstrument-4.6.2-cp311-cp311-musllinux_1_1_i686.whl", hash = "sha256:8a9791bf8916c1cf439c202fded32de93354b0f57328f303d71950b0027c7811", size = 108916 },
+    { url = "https://files.pythonhosted.org/packages/5d/6d/1200f09197410bb48f68eef330618da21c6a870dd087d25b7d2e46528901/pyinstrument-4.6.2-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:d6162615e783c59e36f2d7caf903a7e3ecb6b32d4a4ae8907f2760b2ef395bf6", size = 109237 },
+    { url = "https://files.pythonhosted.org/packages/2d/e1/50f200fa4de18da60885161a7a79cfbdd43ea41685223a4f7cffb9751228/pyinstrument-4.6.2-cp311-cp311-win32.whl", hash = "sha256:28af084aa84bbfd3620ebe71d5f9a0deca4451267f363738ca824f733de55056", size = 89251 },
+    { url = "https://files.pythonhosted.org/packages/40/92/4224f99c3a6c679f32a725fc168de6846d9dd533f1a112f75fc1412c64fa/pyinstrument-4.6.2-cp311-cp311-win_amd64.whl", hash = "sha256:dd6007d3c2e318e09e582435dd8d111cccf30d342af66886b783208813caf3d7", size = 89887 },
+]
+
+[[package]]
 name = "pymdown-extensions"
 version = "10.12"
 source = { registry = "https://pypi.org/simple" }
@@ -1609,7 +1630,7 @@ name = "tqdm"
 version = "4.67.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e8/4f/0153c21dc5779a49a0598c445b1978126b1344bab9ee71e53e44877e14e0/tqdm-4.67.0.tar.gz", hash = "sha256:fe5a6f95e6fe0b9755e9469b77b9c3cf850048224ecaa8293d7d2d31f97d869a", size = 169739 }
 wheels = [

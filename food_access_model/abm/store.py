@@ -25,3 +25,4 @@ class Store(GeoAgent):
         super().__init__(id,model,polygon,"epsg:3857") # epsg:3857 is the mercator projection
         self.type = type
         self.name = name
+        self.raw_geometry = geometry

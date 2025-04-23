@@ -3,6 +3,7 @@ from mesa.time import RandomActivation #Used to specify that agents are run rand
 from mesa_geo import GeoSpace #GeoSpace that houses agents
 from food_access_model.abm.store import Store # Store agent class
 from food_access_model.abm.household import Household # Household agent class
+from typing import List, Any
 import psycopg2
 import os
 
@@ -22,7 +23,7 @@ class GeoModel(Model):
     between themselves and Store Agents.
     """
 
-    def __init__(self):
+    def __init__(self, households: List[Any], stores: List[Any]):
         """
         Initialize the Model, intialize all agents and, add all agents to GeoSpace and Model.
 
@@ -31,39 +32,27 @@ class GeoModel(Model):
             - households: dataframe containing data for household agents
         """
         super().__init__() 
+
+        self.raw_step_number = 0
+        
+        # print("Initializing GeoModel...\n", flush=True)
+        # print("# Of households: ", len(households), flush=True)
+        # print("# Of stores: ", len(stores), flush=True)
+        
+        # Instead of RandomActivation or BaseScheduler, use ParallelScheduler
+        #self.schedule = ParallelScheduler(self)
         # Create new GeoSpace to contain agents
         self.space = GeoSpace(warn_crs_conversion=False) 
         # Specify that agents should be activated randomly during each step
         self.schedule = RandomActivation(self) 
         # Initializing empty list to collect all the store objects
         self.stores_list = []
-
-
-        # Connect to the PostgreSQL database
-        connection = psycopg2.connect(
-            host=HOST,
-            database=NAME,
-            user=USER,
-            password=PASS,
-            port=PORT
-        )
-        cursor = connection.cursor()
-
-        # Execute the SQL query
-        cursor.execute("SELECT * FROM food_stores;")
-
-        # Fetch all rows from the executed query
-        self.stores = cursor.fetchall()
-
-        # Execute the SQL query
-        cursor.execute("SELECT * FROM households;")
-
-        # Fetch all rows from the executed query
-        self.households = cursor.fetchall()
-
-        cursor.close()
-        connection.close()
-
+        
+        # start_time = time.time()
+        
+        self.stores = stores
+        self.households = households
+        
         # Initialize all store agents and add them to the GeoSpace
         index_count = 0
         for store in self.stores:
@@ -94,16 +83,22 @@ class GeoModel(Model):
                 house[8], #transit_time
                 house[9], #driving_time
                 SEARCHRADIUS,
-                CRS)
+                CRS,
+                house[10] if len(house) > 10 else 0, #distance_to_closest_store (Coming from a previous model's step execution)
+                house[11] if len(house) > 11 else 0, # num_store_within_mile (Coming from a previous model's step execution)
+                house[12] if len(house) > 12 else 0, # mfai (Coming from a previous model's step execution)
+                house[13] if len(house) > 13 else None # color (Coming from a previous model's step execution)
+            )
             self.schedule.add(agent)
             self.space.add_agents(agent)
         
 
 
         self.datacollector = DataCollector(
-            #model_reporters={"Average mfai": "avg_mfai"}#,
+            #model_reporters={"Average mfai": "avg_mfai"},
             agent_reporters={
-                "Geometry": "geometry",
+                "Type": "type",
+                "Geometry": "raw_geometry",
                 "Income": "income", 
                 "Household Size": "household_size", 
                 "Vehicles":  "vehicles", 
@@ -118,9 +113,14 @@ class GeoModel(Model):
                 "Biking time":  "biking_time",
                 "Driving time":  "driving_time",
                 "Food Access Score" :  "mfai",
-                "Color": "color"}
-        )
+                "Color": "color",
+            }
+       )
         self.datacollector.collect(self)
+        
+    def set_step_number(self, step_number):
+        self.raw_step_number = step_number
+            
     def get_stores(self):
         return self.stores
     def get_households(self):
@@ -143,7 +143,7 @@ class GeoModel(Model):
         # Fetch all rows from the executed query
         self.stores = cursor.fetchall()
 
-        cursor.close()
+        #cursor.close()
         connection.close()
 
          # Initialize all store agents and add them to the GeoSpace

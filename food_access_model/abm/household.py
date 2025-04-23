@@ -10,7 +10,7 @@ class Household(GeoAgent):
     defines the behavior of a single household on each step through the model.
     """
 
-    def __init__(self, model, id: int, polygon, income, household_size,vehicles,number_of_workers,walking_time,biking_time,transit_time,driving_time,search_radius: int, crs: int):
+    def __init__(self, model, id: int, polygon, income, household_size,vehicles,number_of_workers,walking_time,biking_time,transit_time,driving_time,search_radius: int, crs: int, distance_to_closest_store: float = None, num_store_within_mile: int = None, mfai: int = None, color: str= None):
         """
         Initialize the Household Agent.
 
@@ -26,6 +26,9 @@ class Household(GeoAgent):
             - search_radius (int): how far to search for stores
             - crs (string): constant value (i.e.3857),used to map households on a flat earth display
         """
+        
+        self.raw_geometry = polygon 
+        
         polygon = shapely.wkt.loads(polygon)
         # Setting argument values to the passed parameteric values.
         super().__init__(id,model,polygon,crs)
@@ -38,15 +41,19 @@ class Household(GeoAgent):
         self.biking_time = biking_time
         self.transit_time = transit_time
         self.driving_time = driving_time
+        self.type="household"
         
-        f,f,self.distance_to_closest_store,f = self.closest_cspm_and_spm()
+        #f,f,self.distance_to_closest_store,f = self.closest_cspm_and_spm()
         self.rating_num_store_within_mile = "A"
         self.rating_distance_to_closest_store = "A"
         self.rating_based_on_num_vehicles = "A"
-        self.num_store_within_mile = self.stores_with_1_miles() 
-        self.mfai = self.get_mfai()
-        self.color = self.get_color()
-
+        
+        
+        self.distances_map =None
+        self.distance_to_closest_store = distance_to_closest_store
+        self.num_store_within_mile = num_store_within_mile
+        self.mfai = mfai
+        self.color = color
 
     def get_color(self):
         #change to chosen variable
@@ -115,7 +122,8 @@ class Household(GeoAgent):
     def stores_with_1_miles (self):
         total = 0 
         for store in self.model.stores_list: 
-         distance = self.model.space.distance(self,store)
+         #distance = self.model.space.distance(self,store)
+         distance = self.distances_map[store.unique_id]
          if distance <= 1609.34:
           total += 1 
         self.rating_evaluation(total)
@@ -127,8 +135,9 @@ class Household(GeoAgent):
         spm = None
         spm_distance = 10000000
         for store in self.model.stores_list: 
-            distance = self.model.space.distance(self,store)
-            distance = round(distance/1609.34,2)
+            #distance = self.model.space.distance(self,store)
+            #distance = round(distance/1609.34,2)
+            distance = self.distances_map[store.unique_id]
             if store.type == "supermarket":
                 if distance <= spm_distance:
                     spm = store
@@ -139,9 +148,9 @@ class Household(GeoAgent):
                     cspm_distance = distance
         return cspm, spm, spm_distance, cspm_distance
     
-    def get_mfai(self):
+    def get_mfai(self,cspm, spm):
         #calculate mfai
-        cspm, spm,f,f = self.closest_cspm_and_spm()
+        #cspm, spm,f,f = self.closest_cspm_and_spm()
         food_avail = list()
         for i in range(7):
             chance_of_choosing_spm = int(((self.vehicles*10)+(self.income/200000)*80))
@@ -157,10 +166,21 @@ class Household(GeoAgent):
             food_avail.append(fsa)
 
         return int(sum(food_avail)/700*100)
+    
+    def calculate_distances(self)-> None:
+        self.distances_map = dict()
+        for store in self.model.stores_list: 
+            agent_unique_id  = store.unique_id
+            distance = self.model.space.distance(self,store)
+            distance = round(distance/1609.34,2)
+            self.distances_map[agent_unique_id] = distance 
 
     def step(self) -> None:
-        self.mfai = self.get_mfai()
-        self.color = self.get_color()
-        f,spm,self.distance_to_closest_store,f = self.closest_cspm_and_spm()
+        if self.distances_map is None:
+            self.calculate_distances()
+        cspm, spm, self.distance_to_closest_store, f = self.closest_cspm_and_spm()
         self.num_store_within_mile = self.stores_with_1_miles()
+        self.mfai = self.get_mfai(cspm, spm)
+        self.color = self.get_color()
+        
         return None
