@@ -1,0 +1,13 @@
+[project]
+name = "food-access-model"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = "==3.11.11"
+dependencies = [
+    "fastapi==0.115.5",
+    "mesa-geo==0.8.0",
+    "osmnx==2.0.0",
+    "psycopg2-binary==2.9.10",
+    "gunicorn==22.0.0",
+]

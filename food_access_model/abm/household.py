@@ -10,7 +10,7 @@ class Household(GeoAgent):
     defines the behavior of a single household on each step through the model.
     """
 
-    def __init__(self, model, id: int, polygon, income, household_size,vehicles,number_of_workers, search_radius: int, crs: int):
+    def __init__(self, model, id: int, polygon, income, household_size,vehicles,number_of_workers,walking_time,biking_time,transit_time,driving_time,search_radius: int, crs: int):
         """
         Initialize the Household Agent.
 
@@ -34,13 +34,64 @@ class Household(GeoAgent):
         self.household_size = household_size
         self.vehicles = vehicles
         self.number_of_workers = number_of_workers
+        self.walking_time = walking_time
+        self.biking_time = biking_time
+        self.transit_time = transit_time
+        self.driving_time = driving_time
         
-        self.distance_to_closest_store = 100000
+        f,f,self.distance_to_closest_store,f = self.closest_cspm_and_spm()
         self.rating_num_store_within_mile = "A"
         self.rating_distance_to_closest_store = "A"
         self.rating_based_on_num_vehicles = "A"
         self.num_store_within_mile = self.stores_with_1_miles() 
         self.mfai = self.get_mfai()
+        self.color = self.get_color()
+
+
+    def get_color(self):
+        #change to chosen variable
+        value = self.mfai
+        """
+        helper function for agent_portrayal. Assigns a name to a value on a red-yellow-green scale.
+
+        Args:
+            - value: the value that is to be parsed into hex color.
+        """
+        #used to change how dark the color is
+        top_range = 255
+
+        # Normalize value to a range of 0 to 1
+        normalized = abs(((value)-40)/60) #this is hardcoded
+
+        # If value is too low just return red
+        if normalized < 0:
+            red = top_range
+            green = 0
+            blue = 0
+        # Calculate the red, green, and blue components
+        elif normalized < 0.5:
+            # Interpolate between red (255, 0, 0) and yellow (255, 255, 0)
+            red = top_range
+            green = int(top_range * (normalized * 2))
+            blue = 0
+        else:
+            # Interpolate between yellow (255, 255, 0) and green (0, 255, 0)
+            red = int(top_range * (2 - 2 * normalized))
+            green = top_range
+            blue = 0
+        
+        gray = 128
+        desaturation_factor = .25
+
+        # Desaturating respective colors (RED,GREEN,BLUE)
+        red = int(red * (1 - desaturation_factor) + gray * desaturation_factor)
+        green = int(green * (1 - desaturation_factor) + gray * desaturation_factor)
+        blue = int(blue * (1 - desaturation_factor) + gray * desaturation_factor)
+
+        # Convert RGB to hexadecimal
+        hex_color = f"#{red:02x}{green:02x}{blue:02x}"
+        
+        return hex_color
 
 
     def rating_evaluation(self,total):
@@ -67,8 +118,6 @@ class Household(GeoAgent):
          distance = self.model.space.distance(self,store)
          if distance <= 1609.34:
           total += 1 
-          if self.distance_to_closest_store > distance: 
-             self.distance_to_closest_store = round((distance)/1609.34,2)
         self.rating_evaluation(total)
         return total 
     
@@ -79,33 +128,39 @@ class Household(GeoAgent):
         spm_distance = 10000000
         for store in self.model.stores_list: 
             distance = self.model.space.distance(self,store)
+            distance = round(distance/1609.34,2)
             if store.type == "supermarket":
                 if distance <= spm_distance:
                     spm = store
+                    spm_distance = distance
             else:
                 if distance <= cspm_distance:
                     cspm = store
-        return cspm, spm
+                    cspm_distance = distance
+        return cspm, spm, spm_distance, cspm_distance
     
     def get_mfai(self):
         #calculate mfai
-        cspm, spm = self.closest_cspm_and_spm()
+        cspm, spm,f,f = self.closest_cspm_and_spm()
         food_avail = list()
         for i in range(7):
-            chance_of_choosing_spm = int((self.vehicles*5)+(self.income/200000)*10+60)
+            chance_of_choosing_spm = int(((self.vehicles*10)+(self.income/200000)*80))
             store = random.choices([cspm,spm], [(chance_of_choosing_spm-100)*-1,chance_of_choosing_spm], k=1)[0]
             fsa = 0
-            if store.type == "supermarket":
+            if store is not None and store.type == "supermarket":
                 fsa = 100
             else:
-                fsa = 50
+                fsa = 55
             if self.vehicles == 0:
-                food_avail.append(fsa*0.8)
-            else:
-                food_avail.append(fsa)
+                fsa = fsa*0.8
+            fsa = fsa*0.85+fsa*0.25*abs(1-self.distance_to_closest_store)
+            food_avail.append(fsa)
 
         return int(sum(food_avail)/700*100)
 
     def step(self) -> None:
         self.mfai = self.get_mfai()
+        self.color = self.get_color()
+        f,spm,self.distance_to_closest_store,f = self.closest_cspm_and_spm()
+        self.num_store_within_mile = self.stores_with_1_miles()
         return None

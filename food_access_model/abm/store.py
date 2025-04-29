@@ -1,5 +1,4 @@
 from mesa_geo import GeoAgent
-from shapely.geometry import Polygon, Point
 import shapely
 
 

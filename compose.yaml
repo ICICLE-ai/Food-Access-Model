@@ -1,0 +1,24 @@
+networks:
+  fass-network:
+    driver: bridge
+services:
+  fass-front:
+    image: fass-front
+    ports:
+      - "80:80"
+    restart: always
+    environment:
+      VITE_API_URL: "http://localhost:8080/api"
+    networks:
+      - fass-network
+  fass-back:
+    image: fass-back
+    ports:
+      - "8080:8080"
+    restart: always
+    environment:
+      NAME: "fassdb"
+      USER:
+      PASS:
+      HOST:
+      PORT: 443

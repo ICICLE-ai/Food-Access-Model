@@ -1,15 +1,28 @@
-FROM python:3.12
+FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install --yes libgdal-dev && apt-get install --yes libspatialindex-dev
+# Install required system dependencies
+ RUN apt-get update && apt-get install -y \
+     gcc \
+     libpq-dev \
+     && apt-get clean
 
-WORKDIR /abm-app
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-COPY requirements.txt /abm-app/
+WORKDIR /app
 
-RUN pip3 install --no-cache-dir -r requirements.txt
+COPY ./uv.lock .
+COPY ./pyproject.toml .
 
-COPY . /abm-app/
+RUN uv sync --frozen --no-cache
 
-EXPOSE 8080
+# Copy all necessary python code to run the server
+# COPY ./*.py ./
+COPY food_access_model ./food_access_model
+COPY ./*.py ./
 
-CMD ["python3", "server.py"]
+# Container Entrypoint
+COPY entrypoint.sh .
+
+ENTRYPOINT ["sh", "entrypoint.sh"]
