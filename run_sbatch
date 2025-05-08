@@ -30,5 +30,5 @@ export PORT=443
 
 
 echo "RUNNING"
-uv run gunicorn api_server:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout=7200
-#uvicorn api_server:app --host 0.0.0.0 --port 8000 --workers 2 --loop asyncio
+uv run gunicorn food_access_model.main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout=7200
+

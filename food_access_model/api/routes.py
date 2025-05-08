@@ -12,9 +12,9 @@ from fastapi import APIRouter, Body, HTTPException, Depends
 
 from food_access_model.api.helpers import StoreInput, convert_centroid_to_polygon
 from food_access_model.abm.geo_model import GeoModel
-from model_multi_processing.batch_running import batch_run
+from food_access_model.model_multi_processing.batch_running import batch_run
 from food_access_model.abm.store import Store
-from repository.db_repository import DBRepository, get_db_repository
+from food_access_model.repository.db_repository import DBRepository, get_db_repository
 from food_access_model.abm.geo_model import GeoModel
 
 

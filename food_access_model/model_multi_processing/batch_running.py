@@ -76,7 +76,7 @@ def batch_run(
     runs_list = []
     run_id = 0
 
-    print(f"Batch runner begining", flush=True)
+    print(f"Batch runner began", flush=True)
      
     household_chunks = create_household_chunks(parameters["households"], number_processes)
     
@@ -86,7 +86,6 @@ def batch_run(
         model_config = {"stores": parameters['stores'], "households": household_group}
         runs_list.append((run_id, 0, model_config))
         run_id += 1
-        print(f"Run {run_id} added", flush=True)
         
 
     process_func = partial(
@@ -96,7 +95,6 @@ def batch_run(
         data_collection_period=data_collection_period,
     )
 
-    print(f"PROCESS FUNCTION END", flush=True)
     
     results: List[Dict[str, Any]] = []
 
@@ -109,14 +107,10 @@ def batch_run(
                
         else:
             try:
-                #print(f"Number of processes: {number_processes}", flush=True)
                 with Pool(number_processes) as pool:
                     for data in pool.imap_unordered(process_func, runs_list):
-                        #print("Got data from pool:", data, flush=True)
                         results.append(data)
                         pbar.update()
-                        #print(f"Data {data}", flush=True)
-                        #print(f"Results {results} finished", flush=True)
                     # Ensure all processes are properly terminated
                     pool.close()
                     pool.join()
