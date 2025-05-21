@@ -152,7 +152,8 @@ Don't forget to give the project a star! Thanks again!
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
+### Contributors
+[Steve](https://github.com/blue442)
 
 <!-- LICENSE -->
 ## License
