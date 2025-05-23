@@ -154,7 +154,7 @@ Don't forget to give the project a star! Thanks again!
 
 <!-- CONTRIBUTORS -->
 ## Contributors
-`[Shrivas Shankar](https://github.com/shrivasshankar)`
+`Shrivas Shankar https://github.com/shrivasshankar`
 
 
 
