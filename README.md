@@ -154,7 +154,10 @@ Don't forget to give the project a star! Thanks again!
 
 ### Contributors
 [Steve](https://github.com/blue442)
+[Oscar Almaraz](https://github.com/OscarA974)
 [Ira](https://github.com/irahande22)
+[Shrivas](https://github.com/shrivasshankar)
+[Sophia](https://github.com/schen625)
 
 <!-- LICENSE -->
 ## License
@@ -194,3 +197,7 @@ Don't forget to give the project a star! Thanks again!
 [Bootstrap-url]: https://getbootstrap.com
 [JQuery.com]: https://img.shields.io/badge/jQuery-0769AD?style=for-the-badge&logo=jquery&logoColor=white
 [JQuery-url]: https://jquery.com 
+
+## Contributors
+
+- [Oscar Almaraz](https://github.com/OscarA974)
