@@ -154,9 +154,10 @@ Don't forget to give the project a star! Thanks again!
 
 ### Contributors
 [Steve](https://github.com/blue442)
+[Oscar Almaraz](https://github.com/OscarA974)
+[Ira](https://github.com/irahande22)
 [Shrivas](https://github.com/shrivasshankar)
 [Sophia](https://github.com/schen625)
-
 
 <!-- LICENSE -->
 ## License
