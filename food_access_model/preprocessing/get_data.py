@@ -1,24 +1,37 @@
-import osmnx as ox
-import psycopg2
-from shapely.geometry import Point, Polygon, LineString
-from shapely.strtree import STRtree
-import rtree
-import math
-import pandas as pd
-import requests
-from zipfile import ZipFile
-import tempfile
-import shapely
-#import googlemaps
-from datetime import datetime
-import os
-import numpy as np
-import geopandas
-import random
-from psycopg2 import extras
-import shapely.geometry as geometry
-from pyproj import Transformer
-from io import BytesIO
+
+"""
+get_data.py
+
+This file collects, processes, and stores household, road, and food store data
+for Franklin County, Ohio using data from OSM and the US Census API.
+
+Author: Abanish and Shrivas 
+Date: 31st May, 2025
+"""
+
+# importing required libraries, lists and dictionary.
+import osmnx as ox                    # For retrieving and analyzing OpenStreetMap data
+import psycopg2                       # For PostgreSQL database connections
+from shapely.geometry import Point, Polygon, LineString  # For working with spatial shapes
+from shapely.strtree import STRtree   # Fast spatial indexing for geometric queries
+import rtree                          # Spatial indexing used for spatial search
+import math                           # Math operations like cos, sin, etc.
+import pandas as pd                   # Data manipulation and table handling
+import requests                       # Making HTTP requests (used for APIs)
+from zipfile import ZipFile           # Unzipping downloaded shapefiles
+import tempfile                       # Temporary folder to store unzipped files
+import shapely                        # Additional geometry operations
+from datetime import datetime         # To handle dates and timestamps
+import os                             # Access environment variables like API keys
+import numpy as np                    # Numerical operations and array handling
+import geopandas                      # Spatial data handling built on pandas
+import random                         # For generating random samples if needed
+from psycopg2 import extras           # For efficient bulk inserts into PostgreSQL
+import shapely.geometry as geometry   # Shorthand import for geometry
+from pyproj import Transformer        # Coordinate transformation (e.g., from lat/lon to EPSG:3857)
+from io import BytesIO                # Used to read files directly from memory
+
+# Importing constants and configuration values for household dataset processing
 from household_constants import(
     households_variables_dict,
     households_key_list,
@@ -29,15 +42,19 @@ from household_constants import(
     workers_index_dict
 )
 
+# -----------------------------------------------------------------
+# Configuration and Setting of constants for later repitative usage.
+# -----------------------------------------------------------------
 
-place_name = "Franklin County, Ohio, USA"
+place_name = "Franklin County, Ohio, USA"   # The geographic area of focus. 
 
-county_code = FIBSCODE[2:]
-state_code = FIBSCODE[:2]
+county_code = FIBSCODE[2:]                  # Extract county part of FIPS code
+state_code = FIBSCODE[:2]                   # Extract state part of FIPS code
 
-center_point = (39.938806, -82.972361)
+center_point = (39.938806, -82.972361)      # Central coordinate for pulling OSM data
 dist = 1000
 
+# Load sensitive credentials from environment variables
 PASS = os.getenv("DB_PASS")
 APIKEY = os.getenv("APIKEY")
 USER = os.getenv("DB_USER")
@@ -45,13 +62,14 @@ NAME = os.getenv("DB_NAME")
 HOST = os.getenv("DB_HOST")
 PORT = os.getenv("DB_PORT")
 
-#Read csvs into pandas dataframes
-#For loop runs a census API pull for each loop iteration
-#this is neccessary because we can only pull 50 variables at a time and we have >50
+#Starts Census Data Retrieval.  
+# Create an empty DataFrame to hold all census data
 county_data = pd.DataFrame()
+
+# Since the Census API limits to 50 variables per call, we split the full household variable list into multiple batches of >50
 for count in range(int(len(households_key_list)/50)+1):
     variables = ""
-    #put variables from above into census readable lists
+    # Create a comma-separated list of variables for the current batch
     if ((count+1)*50) > len(households_key_list):
         variables = ",".join(households_key_list[(50*count):])
     elif count == 0:
@@ -61,44 +79,73 @@ for count in range(int(len(households_key_list)/50)+1):
             variables = ",".join(households_key_list[:(50*(count+1)-1)])
     else:
         variables = ",".join(households_key_list[(50*count):(50*(count+1)-1)])
-    #Pull data and add to dataframe
-    url = f"https://api.census.gov/data/{YEAR}/acs/acs5?get=NAME,{variables}&for=tract:*&in=state:{state_code}&in=county:{county_code}&key={APIKEY}"
+
+    #Pull data and add to dataframe with constructing the API request URL with the selected variables for this batch.
+    url = f"https://api.census.gov/data/{YEAR}/acs/acs5?get=NAME,
+    {variables}&for=tract:*&in=state:{state_code}&in=county:{county_code}&key={APIKEY}"
+
+    # Send the request to the Census API and get the response
     response = requests.request("GET", url)
     if len(county_data != 0):
-        county_data = pd.merge(pd.DataFrame(response.json()[1:], columns=response.json()[0]), county_data, on='NAME', how='inner')
+        # Merge the new response with the existing dataset on the 'NAME' field
+        county_data = pd.merge(
+            pd.DataFrame(response.json()[1:], 
+            columns=response.json()[0]), 
+            county_data, 
+            on='NAME', 
+            how='inner')
     else:
+         # If this is the first batch, initialize the dataset
         county_data = pd.DataFrame(response.json()[1:], columns=response.json()[0])
 
+# ------------------------------------------
+# Load Geographical Tract Data (Shapefiles)
+# ------------------------------------------
 
-# Load in geographical tract data
 tract_url = f"https://www2.census.gov/geo/tiger/TIGER{YEAR}/TRACT/tl_{YEAR}_{state_code}_tract.zip"
 response = requests.request("GET", tract_url)
-# Use BytesIO to handle the zip file in memory
+# Read the zipped shapefile directly from memory
 with ZipFile(BytesIO(response.content)) as zip_ref:
     # Create a temporary directory to extract the zip file
     with tempfile.TemporaryDirectory() as tmpdirname:
         zip_ref.extractall(tmpdirname)
         
-        # Find the shapefile or GeoJSON file in the extracted contents
+        # Loop through the extracted files to locate the .shp or .geojson
         for root, dirs, files in os.walk(tmpdirname):
             for file in files:
                 if file.endswith(".shp") or file.endswith(".geojson"):
                     file_path = os.path.join(root, file)
-                    # Load the file into a GeoDataFrame
+                    # Load shapefile/geojson into a GeoDataFrame and convert to EPSG:3857 projection
                     geodata = (geopandas.read_file(file_path)).to_crs("epsg:3857")
 
+# ---------------------------------------------------------------------------
+# Merge Geographical Dataframe (containing shapely ploygons) with Census Data
+# ---------------------------------------------------------------------------
 
-#Merge geographical dataframe (containing shapely ploygons) with census data
+# Filter down to just the county-level geometries
 county_geodata = geodata[geodata['COUNTYFP'] == county_code]
+
+# Rename the tract code column so we can merge it later
 county_geodata = county_geodata.rename(columns={"TRACTCE":"tract_y"})
+
+# Convert tract codes to integer for a successful merge
 county_geodata["tract_y"] = county_geodata["tract_y"].astype(int)
 county_data["tract_y"] = county_data["tract_y"].astype(int)
+
+# Merge geographic and census data on 'tract_y' and # Rename the columns
 data = pd.merge(county_geodata, county_data, on = "tract_y", how="inner")
 data.rename(columns=households_variables_dict, inplace = True)
+
+# Convert all geometries to EPSG:3857 projection (used for consistent spatial analysis)
 data = data.to_crs("epsg:3857")
 tract_index = STRtree(data["geometry"])
 
-# Connect to the PostgreSQL database
+
+# ---------------------------------
+# Setting up PostgreSQL Connection
+# ---------------------------------
+
+# Connect to the PostgreSQL database using credentials from environment variables
 connection = psycopg2.connect(
     host=HOST,
     database=NAME,
@@ -114,7 +161,7 @@ cursor.execute('DROP TABLE IF EXISTS roads;')
 # Execute the drop table command for stores
 cursor.execute('DROP TABLE IF EXISTS food_stores;')
 
-# SQL query to create the 'roads' table
+# Create SQL table to store road metadata and geometry
 create_roads_query = '''
 CREATE TABLE roads (
     name TEXT,
@@ -125,7 +172,7 @@ CREATE TABLE roads (
 );
 '''
 
-# SQL query to create the 'roads' table
+# Define SQL schema for the 'food_stores' table
 create_food_stores_query = '''
 CREATE TABLE food_stores (
     shop VARCHAR(15),
@@ -134,32 +181,40 @@ CREATE TABLE food_stores (
 );
 '''
 
-# Execute the create table command
+# Execute command to create the 'roads' table in the database
 cursor.execute(create_roads_query)
 
-# Execute the create table command
+# Execute command to create the 'food_stores' table in the database
 cursor.execute(create_food_stores_query)
 
+
+# --------------------------------
+# Extracting Road Network from OSM
+# --------------------------------
+
 place_name = "Franklin County, Ohio, USA"
-map_elements = list()
-housing_areas = list()
+map_elements = list()  # Holds buffered geometries of interest for later spatial operations
+housing_areas = list() # Stores areas near residential roads to simulate housing zones. 
 
 #Get road network from open street maps
 G = ox.graph_from_point(center_point,dist=dist, network_type='all',retain_all=True)
+# Convert the OSM road graph into GeoDataFrames: one for nodes, one for edges
 gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
 
-#convert to epsg:3857
+# Convert the coordinate reference system to Web Mercator (meters)
 gdf_edges = gdf_edges.to_crs("epsg:3857")
+
+# Depending on available columns, select relevant fields
 if "service" in gdf_edges.columns:
     gdf_edges = gdf_edges[["name","highway","length","geometry","service"]]
 else:
     gdf_edges = gdf_edges[["name","highway","length","geometry"]]
 
-# Insert data into the table using a SQL query
+# Loop through each road segment to categorize and apply appropriate buffer sizes
 for index,row in gdf_edges.iterrows():
     if (row["highway"] == "residential") or (row["highway"] == "living_street"):
-        housing_areas.append(row["geometry"].buffer(30))
-        map_elements.append((row["geometry"]).buffer(3))
+        housing_areas.append(row["geometry"].buffer(30))    # Wider buffer to simulate houses
+        map_elements.append((row["geometry"]).buffer(3))    # Narrow buffer to store the road outline
     elif ("service" in gdf_edges.columns) and ((row["service"])=="alley"):
         housing_areas.append(row["geometry"].buffer(30))
         map_elements.append((row["geometry"]).buffer(3))
@@ -174,40 +229,75 @@ for index,row in gdf_edges.iterrows():
     elif isinstance((row["geometry"]), LineString):
         map_elements.append((row["geometry"]))
 
+# Prepare road geometry and attributes for insertion into database
 gdf_edges["length"] = gdf_edges["length"].astype(int)
 gdf_edges["geometry"] = gdf_edges["geometry"].astype(str)
 roads_query = "INSERT INTO roads (name,highway,length,geometry,service) VALUES %s"
 data_tuples = list(gdf_edges.itertuples(index=False, name=None))
-#extras.execute_values(cursor, roads_query, data_tuples)
 
-#Get food stores
-features = ox.features.features_from_point(center_point,dist=dist*3,tags = {"shop":["convenience",'supermarket',"butcher","wholesale","farm",'greengrocer',"health_food",'grocery']})
+
+# -------------------------------------
+# Extract Food Store Locations from OSM
+# -------------------------------------
+
+# Use OSM to fetch food-related retail locations (e.g., supermarkets, groceries)
+features = ox.features.features_from_point(
+    center_point,
+    dist=dist*3,
+    tags = {"shop":[
+        "convenience",
+    'supermarket',
+    "butcher",
+    "wholesale",
+    "farm",
+    "greengrocer",
+    "health_food",
+    "grocery"]})
+
+# Convert coordinates to metric projection for spatial operations
 features = features.to_crs("epsg:3857")
+
+# Keep only relevant columns for database storage
 features = features[["shop","geometry","name"]]
 
-#Insert food stores into postgres database
+# Insert food stores into PostgreSQL database and prepare data for SQL insert
 store_tuples = list()
 food_stores_query = "INSERT INTO food_stores (shop,geometry,name) VALUES %s"
-for index,row in features.iterrows():
-    point = None
-    if not isinstance(row["geometry"],Point):
-        point = row["geometry"].centroid
-    else:
-        point = row["geometry"]
 
-    if (row["shop"] == "supermarket") or (row["shop"]=="grocery") or (row["shop"]=="greengrocer"):
-        polygon = Polygon([(point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle))) for angle in range(0, 360, 60)])
-    else:
+# Loop through each store and create a polygon representation for its location
+for index, row in features.iterrows():
+    # Use the centroid if geometry is not a simple point
+    point = row["geometry"].centroid if not isinstance(row["geometry"], Point) else row["geometry"]
+
+    if row["shop"] in ["supermarket", "grocery", "greengrocer"]:
+        # Generate a hexagonal polygon for large stores like supermarkets
         polygon = Polygon([
-            (point.x, point.y + 20),           # Top vertex
-            (point.x + 25, point.y - 30),      # Bottom right vertex
-            (point.x - 25, point.y - 30)       # Bottom left vertex
+            (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
+            for angle in range(0, 360, 60)
         ])
-    map_elements.append(polygon.buffer(20))
-    store_tuples.append((str(row["shop"]),str(polygon),str(row["name"])))
+    else:
+        # Generate a triangular-style shape for small shops
+        polygon = Polygon([
+            (point.x, point.y + 20),
+            (point.x + 25, point.y - 30),
+            (point.x - 25, point.y - 30)
+        ])
 
+    # Buffer the polygon and add it to the spatial map elements
+    map_elements.append(polygon.buffer(20))
+
+    # Add the store's details to the list for database insertion
+    store_tuples.append((str(row["shop"]), str(polygon), str(row["name"])))
+
+# Build a spatial index for fast lookup of all mapped elements
 map_elements_index = STRtree(map_elements)
+
+# Insert all food store records into the database in bulk
 extras.execute_values(cursor, food_stores_query, store_tuples)
+
+# -----------------------------------
+# Create Households Table in Database
+# -----------------------------------
 
 # SQL query to create the 'households' table
 create_households_query = '''
@@ -225,45 +315,69 @@ CREATE TABLE households (
 );
 '''
 
-# Execute the drop table command
+# Drop existing table to ensure a fresh start
 cursor.execute('DROP TABLE IF EXISTS households;')
 
-# Execute the create table command
+# Create the new households table
 cursor.execute(create_households_query)
 
-household_query = "INSERT INTO households (id,polygon,income,household_size,vehicles,number_of_workers,walking_time,biking_time,transit_time,driving_time) VALUES %s"
+household_query = """
+INSERT INTO households 
+(id,
+polygon,
+income,
+household_size,
+vehicles,
+number_of_workers,
+walking_time,
+biking_time,
+transit_time,
+driving_time) VALUES %s"
+"""
 
+# Commit changes and close DB connection
 connection.commit()
 cursor.close()
 connection.close()
 
-# This whole thing creates houses and assigns attributes to them, and then stores the households in a SQL DB
+
+# ----------------------------------
+# Household Generation and Placement
+# ----------------------------------
+
+# Initialize lists and spatial index to store household polygons and allow spatial querying
 houses = list()
 houses_index = rtree.index.Index()
 total_count = 0
 total_google_pulls = 0
 house_tuples = list()
 housing_areas_count = 0
-#Iterate through each road and place houses next to the road (housing area means aread around a residential road)
+
+# Iterate through each housing area (area around residential roads) to simulate household placement
 for housing_area in housing_areas:
-    housing_areas_count+=1
-    print(str(round(housing_areas_count/len(housing_areas)*100)) + "%")
-    #print(total_google_pulls)
+    housing_areas_count += 1
+
+    # Display current progress as a percentage
+    print(str(round(housing_areas_count / len(housing_areas) * 100)) + "%")
+
     count = 0
-    # Get the exterior coordinates of the polygon
+
+    # Get the boundary points of the polygon to simulate house edges
     exterior_coords = list(housing_area.exterior.coords)
-    # Create LineStrings for each edge
-    edges = [LineString([exterior_coords[i], exterior_coords[i+1]]) 
-            for i in range(len(exterior_coords) - 1)]
-        
-    # Basically, draw a polygon around each road and then place houses on the edges of that rectangle
+
+    # Convert boundary into edge segments to distribute houses along each side
+    edges = [LineString([exterior_coords[i], exterior_coords[i + 1]])
+             for i in range(len(exterior_coords) - 1)]
+
+    # For each edge segment of the polygon, calculate direction and plan house placement
     for edge in edges:
-        # Calculate the vector representation of each edge of the polygon
+        # Calculate the vector and length of the edge
         length = edge.length
         coord1 = edge.coords[0]
         coord2 = edge.coords[1]
         vector_direction = (coord2[0] - coord1[0], coord2[1] - coord1[1])
-        temp = (vector_direction[0])*(vector_direction[0]) + (vector_direction[1])*(vector_direction[1])
+        temp = (vector_direction[0])**2 + (vector_direction[1])**2
+
         vector_magnitude = math.sqrt(temp)
         normalized_vector = (0,0)
         if vector_magnitude != 0:

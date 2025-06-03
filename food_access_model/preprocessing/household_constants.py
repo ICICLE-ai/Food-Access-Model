@@ -1,4 +1,4 @@
-FIBSCODE = "39049"
+
 YEAR = 2022
 
 #Dictionary to describe homedata Variables
