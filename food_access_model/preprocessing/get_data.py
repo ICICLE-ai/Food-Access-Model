@@ -1,37 +1,24 @@
-
-"""
-get_data.py
-
-This file collects, processes, and stores household, road, and food store data
-for Franklin County, Ohio using data from OSM and the US Census API.
-
-Author: Abanish and Shrivas 
-Date: 31st May, 2025
-"""
-
-# importing required libraries, lists and dictionary.
-import osmnx as ox                    # For retrieving and analyzing OpenStreetMap data
-import psycopg2                       # For PostgreSQL database connections
-from shapely.geometry import Point, Polygon, LineString  # For working with spatial shapes
-from shapely.strtree import STRtree   # Fast spatial indexing for geometric queries
-import rtree                          # Spatial indexing used for spatial search
-import math                           # Math operations like cos, sin, etc.
-import pandas as pd                   # Data manipulation and table handling
-import requests                       # Making HTTP requests (used for APIs)
-from zipfile import ZipFile           # Unzipping downloaded shapefiles
-import tempfile                       # Temporary folder to store unzipped files
-import shapely                        # Additional geometry operations
-from datetime import datetime         # To handle dates and timestamps
-import os                             # Access environment variables like API keys
-import numpy as np                    # Numerical operations and array handling
-import geopandas                      # Spatial data handling built on pandas
-import random                         # For generating random samples if needed
-from psycopg2 import extras           # For efficient bulk inserts into PostgreSQL
-import shapely.geometry as geometry   # Shorthand import for geometry
-from pyproj import Transformer        # Coordinate transformation (e.g., from lat/lon to EPSG:3857)
-from io import BytesIO                # Used to read files directly from memory
-
-# Importing constants and configuration values for household dataset processing
+import osmnx as ox
+import psycopg2
+from shapely.geometry import Point, Polygon, LineString
+from shapely.strtree import STRtree
+import rtree
+import math
+import pandas as pd
+import requests
+from zipfile import ZipFile
+import tempfile
+import shapely
+#import googlemaps
+from datetime import datetime
+import os
+import numpy as np
+import geopandas
+import random
+from psycopg2 import extras
+import shapely.geometry as geometry
+from pyproj import Transformer
+from io import BytesIO
 from household_constants import(
     households_variables_dict,
     households_key_list,
@@ -41,6 +28,7 @@ from household_constants import(
     size_index_dict,
     workers_index_dict
 )
+
 
 # -----------------------------------------------------------------
 # Configuration and Setting of constants for later repitative usage.
@@ -340,44 +328,33 @@ connection.commit()
 cursor.close()
 connection.close()
 
-
-# ----------------------------------
-# Household Generation and Placement
-# ----------------------------------
-
-# Initialize lists and spatial index to store household polygons and allow spatial querying
+# This whole thing creates houses and assigns attributes to them, and then stores the households in a SQL DB
 houses = list()
 houses_index = rtree.index.Index()
 total_count = 0
 total_google_pulls = 0
 house_tuples = list()
 housing_areas_count = 0
-
-# Iterate through each housing area (area around residential roads) to simulate household placement
+#Iterate through each road and place houses next to the road (housing area means aread around a residential road)
 for housing_area in housing_areas:
-    housing_areas_count += 1
-
-    # Display current progress as a percentage
-    print(str(round(housing_areas_count / len(housing_areas) * 100)) + "%")
-
+    housing_areas_count+=1
+    print(str(round(housing_areas_count/len(housing_areas)*100)) + "%")
+    #print(total_google_pulls)
     count = 0
-
-    # Get the boundary points of the polygon to simulate house edges
+    # Get the exterior coordinates of the polygon
     exterior_coords = list(housing_area.exterior.coords)
-
-    # Convert boundary into edge segments to distribute houses along each side
-    edges = [LineString([exterior_coords[i], exterior_coords[i + 1]])
-             for i in range(len(exterior_coords) - 1)]
-
-    # For each edge segment of the polygon, calculate direction and plan house placement
+    # Create LineStrings for each edge
+    edges = [LineString([exterior_coords[i], exterior_coords[i+1]]) 
+            for i in range(len(exterior_coords) - 1)]
+        
+    # Basically, draw a polygon around each road and then place houses on the edges of that rectangle
     for edge in edges:
-        # Calculate the vector and length of the edge
+        # Calculate the vector representation of each edge of the polygon
         length = edge.length
         coord1 = edge.coords[0]
         coord2 = edge.coords[1]
         vector_direction = (coord2[0] - coord1[0], coord2[1] - coord1[1])
-        temp = (vector_direction[0])**2 + (vector_direction[1])**2
-
+        temp = (vector_direction[0])*(vector_direction[0]) + (vector_direction[1])*(vector_direction[1])
         vector_magnitude = math.sqrt(temp)
         normalized_vector = (0,0)
         if vector_magnitude != 0:
@@ -528,103 +505,172 @@ for housing_area in housing_areas:
             income_range = random.choices(income_ranges,weights = income_weights)
             income = random.randint(int(income_range[0][0]/1000),int(income_range[0][1]/1000))*1000
 
-            #This is stupid - literally just hardcoded
-            household_size = random.choices([1,2,3,4,5,6,7],weights=[1,1,1,1,0,0,0])[0]
+    household_size = random.choices([1, 2, 3, 4, 5, 6, 7], weights=[1, 1, 1, 1, 0, 0, 0])[0]
+    if household_size == 1:
+        num_workers = random.choices([0, 1], weights=worker_weights[:2], k=1)[0]
+    elif household_size == 2:
+        num_workers = random.choices([0, 1, 2], weights=worker_weights[2:5], k=1)[0]
+    elif household_size == 3:
+        num_workers = random.choices([0, 1, 2, 3], weights=worker_weights[5:9], k=1)[0]
+    else:
+        num_workers = random.choices([0, 1, 2, 3], weights=worker_weights[9:], k=1)[0]
 
-            num_workers = 0
-            if household_size == 1:
-                if sum(worker_weights[:2])==0:
-                    num_workers = 0
-                else:
-                    num_workers = random.choices([0,1], weights=worker_weights[:2], k=1)[0]
-            if household_size == 2:
-                if sum(worker_weights[2:5])==0:
-                    num_workers = 0
-                else:
-                    num_workers = random.choices([0,1,2], weights=worker_weights[2:5], k=1)[0]
-            if household_size == 3:
-                if sum(worker_weights[5:9])==0:
-                    num_workers = 0
-                else:
-                    num_workers = random.choices([0,1,2,3], weights=worker_weights[5:9], k=1)[0]
-            if household_size >= 4:
-                if sum(worker_weights[9:])==0:
-                    num_workers = 0
-                else:
-                    num_workers = random.choices([0,1,2,3], weights=worker_weights[9:], k=1)[0]
-            
-            size_indexes = None
-            if household_size<4:
-                size_indexes = size_index_dict[household_size]
-            else:
-                size_indexes = size_index_dict[4]
-            workers_indexes = workers_index_dict[num_workers]
-            vehicle_combined_weights = None
-            if num_workers != 3:
-                vehicle_combined_weights = np.array(vehicle_weights[(size_indexes[0]):(size_indexes[1])])+np.array(vehicle_weights[(workers_indexes[0]):(workers_indexes[1])])
-            else:
-                vehicle_combined_weights = np.array(vehicle_weights[(size_indexes[0]):(size_indexes[1])])+np.array(vehicle_weights[(workers_indexes[0]):])
-            vehicles = random.choices([0,1,2,3,4],weights=vehicle_combined_weights)[0]
+    size_indexes = size_index_dict[min(household_size, 4)]
+    workers_indexes = workers_index_dict.get(num_workers, (0, 0))
+    if workers_indexes[1] > workers_indexes[0]:
+        vehicle_combined_weights = (
+            np.array(vehicle_weights[size_indexes[0]:size_indexes[1]])
+            + np.array(vehicle_weights[workers_indexes[0]:workers_indexes[1]])
+        )
+    else:
+        vehicle_combined_weights = np.array(vehicle_weights[size_indexes[0]:size_indexes[1]])
+    vehicles = random.choices([0, 1, 2, 3, 4], weights=vehicle_combined_weights)[0]
+    return income, household_size, num_workers, vehicles
 
-            # Get nearest store to house
-            nearest_store = None
-            store_distance = 100000000
-            #TODO get nearest SPM and nearest CSPM
-            for store in store_tuples:
-                store = shapely.wkt.loads(store[1])
-                dist = store.distance(house)
-                if dist <= store_distance:
-                    nearest_store = store
-                    store_distance = dist
-            
-            # Initialize the Google Maps client with your API key
-            #gmaps = googlemaps.Client(key=GOOGLEAPIKEY)
+def get_nearest_store(house: Polygon, store_tuples : List[Tuple[str, str, str]], shapely_loader: Any) -> Optional[Polygon]:
+    """
+    Find the nearest store polygon to house. 
 
-            # Define the source CRS and target CRS (e.g., from EPSG:4326 to EPSG:3857)
-            source_crs = "EPSG:3857" # WGS84 (lat/lon)
-            target_crs = "EPSG:4326" # Web Mercator (meters)
+    Args:
+        house (polygon): The house polygon to check
+        store_tuples: (List[Tuple[str, str, str]]): List of tuples (shop type, WKT polygon, name) for stores.
+        shapely_loader (Any): Function to convert WKT string to Shapely geometry.
+    
+    Returns:
+        Optional[Polygon]: The nearest store polygon, or None if no stores found.
+    """
+    nearest_store = None
+    store_distance = float('inf')
+    for store in store_tuples:
+        store_poly = shapely_loader(store[1])
+        dist = store_poly.distance(house)
+        if dist <= store_distance:
+            nearest_store = store_poly
+            store_distance = dist
+    return nearest_store
 
-            # Create a transformer object
-            transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
+def transform_polygon_coords(polygon: Polygon, source_crs : str, target_crs : str,) -> Polygon:
+    """
+    Function to transform polygon coordinates to another CRS
+    """
+    transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
+    coords = [transformer.transform(x, y) for x, y in polygon.exterior.coords]
+    return Polygon(coords)
 
-            # Transform the polygon by transforming each coordinate
-            house_4326 = [transformer.transform(x, y) for x, y in house.exterior.coords]
+def process_housing_areas(
+        housing_areas: List[Polygon],
+    map_elements_index: STRtree,
+    map_elements: List[Polygon],
+    houses_index: Index,
+    tract_index: STRtree,
+    data: pd.DataFrame,
+    income_ranges: List[Tuple[int, int]],
+    size_index_dict: dict,
+    workers_index_dict: dict,
+    vehicle_weights: List[int],
+    worker_weights: List[int],
+    store_tuples: List[Tuple[str, str, str]],
+    shapely_loader: Any
+) -> List[Tuple]:
+    """
+    Process housing areas and generate household tuples. Make sure the Args/data are defined somewhere!
 
-            store_4326 = [transformer.transform(x, y) for x, y in nearest_store.exterior.coords]
+    Args:
+        housing_areas (List[Polygon]): housing area polygons
+        map_elements_index (STRtree): Map elements spatial index
+        map_elements (List[Polygon]): Map element polygons
+        houses_index (Index): R-tree for houses
+        tract_index (STRtree): tract index
+        data (pd.DataFrame): Tract data.
+        income_ranges (List[Tuple[int, int]]): income ranges
+        size_index_dict (dict): Size index dict
+        workers_index_dict (dict): Workers index dict
+        vehicle_weights (List[int]): Vehicle weights
+        worker_weights (List[int]): Worker weights.
+        store_tuples (List[Tuple[str, str, str]]): Store tuples
+        shapely_loader (Any): function to load WKT
 
-            # Create a new Shapely polygon with the transformed coordinates
-            house_4326 = geometry.Polygon(house_4326)
-            store_4326 = geometry.Polygon(store_4326)
-            origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
-            destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
+    Returns:
+        List[Tuple]: List of household tuples for insertion.
+    """
+    houses = []
+    house_tuples = []
+    total_count = 0
+    housing_areas_count = 0
 
-            # Get transport times to the closest store for each house
-            """walking_time = gmaps.directions(origin,
-                                                destination,
-                                                mode="walking",
-                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]"""
-            walking_time = 0
-            """biking_time = gmaps.directions(origin,
-                                                destination,
-                                                mode="bicycling",
-                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]"""
-            biking_time = 0
-            """transit_time = gmaps.directions(origin,
-                                                destination,
-                                                mode="transit",
-                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
-                                                """
-            transit_time = 0
-            #TODO Maybe add driving time if vehicles is > 0 
-            """driving_time = gmaps.directions(origin,
-                                                destination,
-                                                mode="driving",
-                                                departure_time=datetime.now())[0]["legs"][0]["duration"]["text"]
-                                                """
-            driving_time = 0
-            total_google_pulls += 1
-            house_tuples.append((total_count,str(house),income,household_size,vehicles,num_workers,walking_time,biking_time,transit_time,driving_time))
-            total_count+=1
+    for housing_area in housing_areas:
+        housing_areas_count += 1
+        print(f"{round(housing_areas_count/len(housing_areas)*100)}%")
+
+        exterior_coords = list(housing_area.exterior.coords)
+        edges = [LineString([exterior_coords[i], exterior_coords[i+1]])
+                 for i in range(len(exterior_coords) - 1)]
+
+        for edge in edges:
+            vector_direction = (edge.coords[1][0] - edge.coords[0][0], edge.coords[1][1] - edge.coords[0][1])
+            vector_magnitude = math.sqrt(vector_direction[0] ** 2 + vector_direction[1] ** 2)
+            normalized_vector = (
+                vector_direction[0] / vector_magnitude,
+                vector_direction[1] / vector_magnitude
+            ) if vector_magnitude else (0, 0)
+
+            for i in range(int(vector_magnitude / 20) + 1):
+                location = Point(
+                    edge.coords[0][0] + normalized_vector[0] * i * 30,
+                    edge.coords[0][1] + normalized_vector[1] * i * 30
+                )
+                house = create_house_polygon(location)
+                if not is_house_location_valid(house, map_elements_index, map_elements, houses_index):
+                    continue
+                houses.append(house)
+                houses_index.add(total_count, house.bounds)
+
+                tract = get_tract_for_house(house, tract_index, data)
+                if tract is None:
+                    continue
+
+                income, household_size, num_workers, vehicles = assign_household_attributes(
+                    tract, income_ranges, size_index_dict, workers_index_dict,
+                    vehicle_weights, worker_weights
+                )
+
+                nearest_store = get_nearest_store(house, store_tuples, shapely_loader)
+                if nearest_store is None:
+                    continue
+
+                house_4326 = transform_polygon_coords(house, "EPSG:3857", "EPSG:4326")
+                store_4326 = transform_polygon_coords(nearest_store, "EPSG:3857", "EPSG:4326")
+                origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
+                destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
+
+                # Placeholders for travel times 
+                walking_time = biking_time = transit_time = driving_time = 0
+
+                house_tuples.append((
+                    total_count, str(house), income, household_size, vehicles, num_workers,
+                    walking_time, biking_time, transit_time, driving_time
+                ))
+                total_count += 1
+    return house_tuples
+
+def insert_households(cursor, house_tuples: List[Tuple], household_query: str) -> None:
+    """
+    Bulk insert generated data into the database.
+
+    Args:
+        cursor: database cursor used for executing SQL commands
+        house_tuples (List[Tuple]): list of household tuples to be inserted
+        household_query (str): The SQL query template for inserting households
+
+    Raises:
+        Exception: If insertion fails, the exception is re-raised after printing the error.
+    """
+    try:
+        extras.execute_values(cursor, household_query, house_tuples)
+    except Exception as e:
+        print(f"Insertion error: {e}")
+        raise
+
 
 
 # Connect to the PostgreSQL database
@@ -643,3 +689,4 @@ extras.execute_values(cursor, household_query, house_tuples)
 connection.commit()
 cursor.close()
 connection.close()
+
