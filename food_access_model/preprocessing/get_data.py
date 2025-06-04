@@ -22,7 +22,7 @@ from io import BytesIO
 from household_constants import(
     households_variables_dict,
     households_key_list,
-    FIBSCODE,
+    FIPSCODE,
     YEAR,
     income_ranges,
     size_index_dict,
@@ -36,8 +36,8 @@ from household_constants import(
 
 place_name = "Franklin County, Ohio, USA"   # The geographic area of focus. 
 
-county_code = FIBSCODE[2:]                  # Extract county part of FIPS code
-state_code = FIBSCODE[:2]                   # Extract state part of FIPS code
+county_code = FIPSCODE[2:]                  # Extract county part of FIPS code
+state_code = FIPSCODE[:2]                   # Extract state part of FIPS code
 
 center_point = (39.938806, -82.972361)      # Central coordinate for pulling OSM data
 dist = 1000
@@ -690,3 +690,11 @@ connection.commit()
 cursor.close()
 connection.close()
 
+def main():
+    """
+    Main execution function 
+    """
+     # TODO: After creating functions call them in here
+
+if __name__ == "__main__":
+    main()
