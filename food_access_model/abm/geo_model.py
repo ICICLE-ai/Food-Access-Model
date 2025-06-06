@@ -118,7 +118,7 @@ class GeoModel(Model):
        )
         self.datacollector.collect(self)
         
-    def set_step_number(self, step_number):
+    def set_step_number(self, step_number: int):
         """
         Sets the number of steps the model has taken
 
@@ -138,18 +138,16 @@ class GeoModel(Model):
 
     def get_households(self):
         """
-        Gets data about the most recent N households and their variables
+        Gets data about the most recent N (len(self.households)) agents and their variables
 
         Returns:
-            pandas.Dataframe: A dataframe containing N households and their parameters
+            pandas.Dataframe: A dataframe containing agents and their parameters
         """
         print(len(self.datacollector.get_agent_vars_dataframe().tail(len(self.households))))
         return self.datacollector.get_agent_vars_dataframe().tail(len(self.households))
 
     def reset_stores(self) -> None:
-        """
-        Resets the list of stores and grabs stores from the database to repopulate the list of stores
-        """
+        """Resets the list of stores to the original starting state"""
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(
             host=HOST,
@@ -188,9 +186,7 @@ class GeoModel(Model):
         return None
     
     def step(self) -> None:
-        """
-        Runs one step of the GeoModel and collects data after each step
-        """
+        """Runs one step of the GeoModel and collects data after each step"""
         self.schedule.step() 
         self.datacollector.collect(self)
         
