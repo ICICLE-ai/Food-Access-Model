@@ -29,20 +29,14 @@ from household_constants import(
     workers_index_dict
 )
 
+place_name = "Franklin County, Ohio, USA"    
 
-# -----------------------------------------------------------------
-# Configuration and Setting of constants for later repitative usage.
-# -----------------------------------------------------------------
+county_code = FIPSCODE[2:]                  
+state_code = FIPSCODE[:2]                  
 
-place_name = "Franklin County, Ohio, USA"   # The geographic area of focus. 
-
-county_code = FIPSCODE[2:]                  # Extract county part of FIPS code
-state_code = FIPSCODE[:2]                   # Extract state part of FIPS code
-
-center_point = (39.938806, -82.972361)      # Central coordinate for pulling OSM data
+center_point = (39.938806, -82.972361)      
 dist = 1000
 
-# Load sensitive credentials from environment variables
 PASS = os.getenv("DB_PASS")
 APIKEY = os.getenv("APIKEY")
 USER = os.getenv("DB_USER")
@@ -50,14 +44,10 @@ NAME = os.getenv("DB_NAME")
 HOST = os.getenv("DB_HOST")
 PORT = os.getenv("DB_PORT")
 
-#Starts Census Data Retrieval.  
-# Create an empty DataFrame to hold all census data
 county_data = pd.DataFrame()
 
-# Since the Census API limits to 50 variables per call, we split the full household variable list into multiple batches of >50
 for count in range(int(len(households_key_list)/50)+1):
     variables = ""
-    # Create a comma-separated list of variables for the current batch
     if ((count+1)*50) > len(households_key_list):
         variables = ",".join(households_key_list[(50*count):])
     elif count == 0:
@@ -68,14 +58,11 @@ for count in range(int(len(households_key_list)/50)+1):
     else:
         variables = ",".join(households_key_list[(50*count):(50*(count+1)-1)])
 
-    #Pull data and add to dataframe with constructing the API request URL with the selected variables for this batch.
     url = f"https://api.census.gov/data/{YEAR}/acs/acs5?get=NAME,
     {variables}&for=tract:*&in=state:{state_code}&in=county:{county_code}&key={APIKEY}"
 
-    # Send the request to the Census API and get the response
     response = requests.request("GET", url)
     if len(county_data != 0):
-        # Merge the new response with the existing dataset on the 'NAME' field
         county_data = pd.merge(
             pd.DataFrame(response.json()[1:], 
             columns=response.json()[0]), 
@@ -86,15 +73,9 @@ for count in range(int(len(households_key_list)/50)+1):
          # If this is the first batch, initialize the dataset
         county_data = pd.DataFrame(response.json()[1:], columns=response.json()[0])
 
-# ------------------------------------------
-# Load Geographical Tract Data (Shapefiles)
-# ------------------------------------------
-
 tract_url = f"https://www2.census.gov/geo/tiger/TIGER{YEAR}/TRACT/tl_{YEAR}_{state_code}_tract.zip"
 response = requests.request("GET", tract_url)
-# Read the zipped shapefile directly from memory
 with ZipFile(BytesIO(response.content)) as zip_ref:
-    # Create a temporary directory to extract the zip file
     with tempfile.TemporaryDirectory() as tmpdirname:
         zip_ref.extractall(tmpdirname)
         
@@ -106,21 +87,12 @@ with ZipFile(BytesIO(response.content)) as zip_ref:
                     # Load shapefile/geojson into a GeoDataFrame and convert to EPSG:3857 projection
                     geodata = (geopandas.read_file(file_path)).to_crs("epsg:3857")
 
-# ---------------------------------------------------------------------------
-# Merge Geographical Dataframe (containing shapely ploygons) with Census Data
-# ---------------------------------------------------------------------------
 
-# Filter down to just the county-level geometries
 county_geodata = geodata[geodata['COUNTYFP'] == county_code]
-
-# Rename the tract code column so we can merge it later
 county_geodata = county_geodata.rename(columns={"TRACTCE":"tract_y"})
-
-# Convert tract codes to integer for a successful merge
 county_geodata["tract_y"] = county_geodata["tract_y"].astype(int)
 county_data["tract_y"] = county_data["tract_y"].astype(int)
 
-# Merge geographic and census data on 'tract_y' and # Rename the columns
 data = pd.merge(county_geodata, county_data, on = "tract_y", how="inner")
 data.rename(columns=households_variables_dict, inplace = True)
 
@@ -128,10 +100,6 @@ data.rename(columns=households_variables_dict, inplace = True)
 data = data.to_crs("epsg:3857")
 tract_index = STRtree(data["geometry"])
 
-
-# ---------------------------------
-# Setting up PostgreSQL Connection
-# ---------------------------------
 
 # Connect to the PostgreSQL database using credentials from environment variables
 connection = psycopg2.connect(
@@ -143,13 +111,9 @@ connection = psycopg2.connect(
 )
 cursor = connection.cursor()
 
-# Execute the drop table command for roads
 cursor.execute('DROP TABLE IF EXISTS roads;')
-
-# Execute the drop table command for stores
 cursor.execute('DROP TABLE IF EXISTS food_stores;')
 
-# Create SQL table to store road metadata and geometry
 create_roads_query = '''
 CREATE TABLE roads (
     name TEXT,
@@ -160,7 +124,6 @@ CREATE TABLE roads (
 );
 '''
 
-# Define SQL schema for the 'food_stores' table
 create_food_stores_query = '''
 CREATE TABLE food_stores (
     shop VARCHAR(15),
@@ -169,22 +132,13 @@ CREATE TABLE food_stores (
 );
 '''
 
-# Execute command to create the 'roads' table in the database
 cursor.execute(create_roads_query)
-
-# Execute command to create the 'food_stores' table in the database
 cursor.execute(create_food_stores_query)
 
-
-# --------------------------------
-# Extracting Road Network from OSM
-# --------------------------------
-
 place_name = "Franklin County, Ohio, USA"
-map_elements = list()  # Holds buffered geometries of interest for later spatial operations
-housing_areas = list() # Stores areas near residential roads to simulate housing zones. 
+map_elements = list()  
+housing_areas = list() 
 
-#Get road network from open street maps
 G = ox.graph_from_point(center_point,dist=dist, network_type='all',retain_all=True)
 # Convert the OSM road graph into GeoDataFrames: one for nodes, one for edges
 gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
@@ -192,7 +146,6 @@ gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
 # Convert the coordinate reference system to Web Mercator (meters)
 gdf_edges = gdf_edges.to_crs("epsg:3857")
 
-# Depending on available columns, select relevant fields
 if "service" in gdf_edges.columns:
     gdf_edges = gdf_edges[["name","highway","length","geometry","service"]]
 else:
@@ -217,18 +170,11 @@ for index,row in gdf_edges.iterrows():
     elif isinstance((row["geometry"]), LineString):
         map_elements.append((row["geometry"]))
 
-# Prepare road geometry and attributes for insertion into database
 gdf_edges["length"] = gdf_edges["length"].astype(int)
 gdf_edges["geometry"] = gdf_edges["geometry"].astype(str)
 roads_query = "INSERT INTO roads (name,highway,length,geometry,service) VALUES %s"
 data_tuples = list(gdf_edges.itertuples(index=False, name=None))
 
-
-# -------------------------------------
-# Extract Food Store Locations from OSM
-# -------------------------------------
-
-# Use OSM to fetch food-related retail locations (e.g., supermarkets, groceries)
 features = ox.features.features_from_point(
     center_point,
     dist=dist*3,
@@ -242,13 +188,9 @@ features = ox.features.features_from_point(
     "health_food",
     "grocery"]})
 
-# Convert coordinates to metric projection for spatial operations
 features = features.to_crs("epsg:3857")
-
-# Keep only relevant columns for database storage
 features = features[["shop","geometry","name"]]
 
-# Insert food stores into PostgreSQL database and prepare data for SQL insert
 store_tuples = list()
 food_stores_query = "INSERT INTO food_stores (shop,geometry,name) VALUES %s"
 
@@ -283,11 +225,6 @@ map_elements_index = STRtree(map_elements)
 # Insert all food store records into the database in bulk
 extras.execute_values(cursor, food_stores_query, store_tuples)
 
-# -----------------------------------
-# Create Households Table in Database
-# -----------------------------------
-
-# SQL query to create the 'households' table
 create_households_query = '''
 CREATE TABLE households (
     id NUMERIC,
@@ -303,10 +240,7 @@ CREATE TABLE households (
 );
 '''
 
-# Drop existing table to ensure a fresh start
 cursor.execute('DROP TABLE IF EXISTS households;')
-
-# Create the new households table
 cursor.execute(create_households_query)
 
 household_query = """
@@ -400,7 +334,6 @@ for housing_area in housing_areas:
             if len(list(intersecting_houses_indexes)) != 0:
                 continue
 
-            # If we got here, that means that this house placement is valid, so we add the house to our list
             houses.append(house)
             # This is a special index that makes it faster to query houses when we check if houses are on top of each other
             houses_index.add(total_count,house.bounds)
@@ -415,7 +348,6 @@ for housing_area in housing_areas:
             tract = data.loc[tract_row]
 
             #Iterate through each tract and create households
-            #Get amount of people in each tract at each income levels
             income_weights = np.array(tract["10k to 15k":"150k to 200k"]).astype(int)
             if sum(income_weights)==0:
                 continue
@@ -550,8 +482,15 @@ def get_nearest_store(house: Polygon, store_tuples : List[Tuple[str, str, str]],
     return nearest_store
 
 def transform_polygon_coords(polygon: Polygon, source_crs : str, target_crs : str,) -> Polygon:
-    """
-    Function to transform polygon coordinates to another CRS
+    """Transform a polygon's coordinates from one CRS to another.
+
+    Args:
+        polygon (Polygon): The polygon to transform.
+        source_crs (str): The source coordinate reference system (e.g., "EPSG:3857").
+        target_crs (str): The target coordinate reference system (e.g., "EPSG:4326").
+
+    Returns:
+        Polygon: A new Polygon with its coordinates in the target CRS.
     """
     transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
     coords = [transformer.transform(x, y) for x, y in polygon.exterior.coords]
