@@ -23,9 +23,9 @@ class GeoModel(Model):
     themselves and Store Agents.
     """
 
-    def __init__(self, households: List[Any], stores: List[Any]):
+    def __init__(self, households: List[Any], stores: List[Any]) -> None:
         """
-        Initialize the Model, intialize all agents and, add all agents to GeoSpace and Model.
+        Initialize the Model, initialize all agents and, add all agents to GeoSpace and Model.
 
         Parameters:
             stores: dataframe containing data for store agents
@@ -118,7 +118,7 @@ class GeoModel(Model):
        )
         self.datacollector.collect(self)
         
-    def set_step_number(self, step_number: int):
+    def set_step_number(self, step_number: int) -> None:
         """
         Sets the number of steps the model has taken
 
@@ -127,7 +127,7 @@ class GeoModel(Model):
         """
         self.raw_step_number = step_number
             
-    def get_stores(self):
+    def get_stores(self) -> list:
         """
         Gets all stores in the model
 
