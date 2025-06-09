@@ -6,14 +6,36 @@ from pyproj import Transformer
 import math
 
 
-class StoreInput(BaseModel): #used for adding a store
+class StoreInput(BaseModel):
+    """
+    Data model for adding a store.
+
+    Attributes:
+        name (str): The name of the store.
+        category (str): The category/type of the store (e.g., supermarket, grocery).
+        longitude (str): The longitude coordinate of the store location.
+        latitude (str): The latitude coordinate of the store location.
+    """   
     name: str
     category: str
     longitude: str 
     latitude: str
 
 def convert_centroid_to_polygon(latitude, longitude, type):
-    # Define the transformation from EPSG:4326 to EPSG:3857
+    """
+    Converts latitude and longitude into a polygon to display a store's area.
+    
+    Transforms coordinates from EPSG:4326 to EPSG:3857 and returns a polygon
+    shape according to the store type. 
+    
+    Args:
+        latitude (str): Store's latitude.
+        longitude (str): Store's longitude.
+        type (str): Store type (e.g., "supermarket", "grocery").
+
+    Returns:
+        str: Polygon in Well-Known Text format.
+    """
     transformer = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
 
     latitude = float(latitude)
