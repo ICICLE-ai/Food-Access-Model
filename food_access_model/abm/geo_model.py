@@ -138,7 +138,7 @@ class GeoModel(Model):
 
     def get_households(self):
         """
-        Gets data about the most recent N (len(self.households)) agents and their variables
+        Gets data about the most recent household agents and their variables
 
         Returns:
             pandas.Dataframe: A dataframe containing agents and their parameters
