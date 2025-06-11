@@ -252,6 +252,16 @@ async def get_household_stats(repository: DBRepository = Depends(get_db_reposito
     return {"avg_income": avg_income, "avg_vehicles": avg_vehicles}
 
 
+@router.get("/health")
+async def health_check(repository: DBRepository = Depends(get_db_repository)):
+    """Health check endpoint to verify the API is running properly"""
+    try:
+        # Basic check that we can access the model
+        model = repository.get_model()
+        return {"status": "healthy", "message": "API is operational"}
+    except Exception as e:
+        logging.error(f"Health check failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
 
 
 
