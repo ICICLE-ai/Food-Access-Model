@@ -159,6 +159,7 @@ Don't forget to give the project a star! Thanks again!
 [Ira](https://github.com/irahande22)
 [Shrivas](https://github.com/shrivasshankar)
 [Sophia](https://github.com/schen625)
+[Edric](https://github.com/MiniMiniFridge)
 
 
 <!-- LICENSE -->
