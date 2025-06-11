@@ -14,22 +14,22 @@ HOST = os.getenv("HOST")
 PORT = os.getenv("PORT")
 
 SEARCHRADIUS = 500
-CRS = "3857"
+CRS = "3857" #constant value (i.e.3857),used to map households on a flat earth display
 
 class GeoModel(Model):
     """
     Geographical model that extends the mesa Model base class. This class initializes the store and household agents
     and then places the agents in the mesa_geo GeoSpace, which allows the Household agents to calculate distances between
-    between themselves and Store Agents.
+    themselves and Store Agents.
     """
 
-    def __init__(self, households: List[Any], stores: List[Any]):
+    def __init__(self, households: List[Any], stores: List[Any]) -> None:
         """
-        Initialize the Model, intialize all agents and, add all agents to GeoSpace and Model.
+        Initialize the Model, initialize all agents and, add all agents to GeoSpace and Model.
 
-        Args:
-            - stores: dataframe containing data for store agents
-            - households: dataframe containing data for household agents
+        Parameters:
+            stores: dataframe containing data for store agents
+            households: dataframe containing data for household agents
         """
         super().__init__() 
 
@@ -118,15 +118,36 @@ class GeoModel(Model):
        )
         self.datacollector.collect(self)
         
-    def set_step_number(self, step_number):
+    def set_step_number(self, step_number: int) -> None:
+        """
+        Sets the number of steps the model has taken
+
+        Parameters:
+            step_number (int): A numerical value representing the step number
+        """
         self.raw_step_number = step_number
             
-    def get_stores(self):
+    def get_stores(self) -> list:
+        """
+        Gets all stores in the model
+
+        Returns:
+            list: A list of store objects
+        """
         return self.stores
+
     def get_households(self):
+        """
+        Gets data about the most recent household agents and their variables
+
+        Returns:
+            pandas.Dataframe: A dataframe containing agents and their parameters
+        """
         print(len(self.datacollector.get_agent_vars_dataframe().tail(len(self.households))))
         return self.datacollector.get_agent_vars_dataframe().tail(len(self.households))
-    def reset_stores(self):
+
+    def reset_stores(self) -> None:
+        """Resets the list of stores to the original starting state"""
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(
             host=HOST,
@@ -146,7 +167,7 @@ class GeoModel(Model):
         #cursor.close()
         connection.close()
 
-         # Initialize all store agents and add them to the GeoSpace
+        # Initialize all store agents and add them to the GeoSpace
         index_count = 0
         self.stores_list.clear()
         for store in self.stores:
@@ -165,10 +186,7 @@ class GeoModel(Model):
         return None
     
     def step(self) -> None:
-
-        """
-        Step function. Runs one step of the GeoModel.
-        """
+        """Runs one step of the GeoModel and collects data after each step"""
         self.schedule.step() 
         self.datacollector.collect(self)
         
