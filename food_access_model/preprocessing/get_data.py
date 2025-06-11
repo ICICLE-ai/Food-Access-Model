@@ -2,6 +2,8 @@ import osmnx as ox
 import psycopg2
 from shapely.geometry import Point, Polygon, LineString
 from shapely.strtree import STRtree
+from rtree.index import Index as RTreeIndex
+from psycopg2.extensions import connection as Connection, cursor as Cursor
 import rtree
 import math
 import pandas as pd
@@ -18,24 +20,24 @@ import random
 from psycopg2 import extras
 import shapely.geometry as geometry
 from pyproj import Transformer
+from typing import List, Tuple, Optional, Callable, Any
 from io import BytesIO
 from household_constants import(
+    YEAR, 
+    PLACE_NAME, 
+    CENTER_POINT, 
+    DIST, 
+    FIPSCODE, 
     households_variables_dict,
     households_key_list,
-    FIPSCODE,
-    YEAR,
+    household_values_list, 
     income_ranges,
     size_index_dict,
     workers_index_dict
-)
+)  
 
-place_name = "Franklin County, Ohio, USA"    
-
-county_code = FIPSCODE[2:]                  
-state_code = FIPSCODE[:2]                  
-
-center_point = (39.938806, -82.972361)      
-dist = 1000
+COUNTY_CODE = FIPSCODE[2:]                  
+STATE_CODE = FIPSCODE[:2]   
 
 PASS = os.getenv("DB_PASS")
 APIKEY = os.getenv("APIKEY")
@@ -44,427 +46,613 @@ NAME = os.getenv("DB_NAME")
 HOST = os.getenv("DB_HOST")
 PORT = os.getenv("DB_PORT")
 
-county_data = pd.DataFrame()
+def fetch_county_data(
+        household_keys: List[str], 
+        year: str, state_code: str, 
+        county_code: str, 
+        api_key: str) -> pd.DataFrame:
+    """
+    Fetch household data from the US Census API for a given county and state.
 
-for count in range(int(len(households_key_list)/50)+1):
-    variables = ""
-    if ((count+1)*50) > len(households_key_list):
-        variables = ",".join(households_key_list[(50*count):])
-    elif count == 0:
-        if (int(len(households_key_list)/50)+1) == 1:
-            variables = ",".join(households_key_list[:])
+    Args:
+        household_keys (List[str]): List of household variable keys.
+        year (str): The year for the dataset (e.g., '2021').
+        state_code (str): Two-digit FIPS state code.
+        county_code (str): Three-digit FIPS county code.
+        api_key (str): API key for the US Census API.
+
+    Returns:
+        pd.DataFrame: Merged DataFrame containing all retrieved household data.
+    """
+    county_data = pd.DataFrame()
+
+    for count in range((len(household_keys) // 50) + 1):
+        if (count + 1) * 50 > len(household_keys):
+            variables = ",".join(household_keys[(50 * count):])
+        elif count == 0:
+            if ((len(household_keys) // 50) + 1) == 1:
+                variables = ",".join(household_keys[:])
+            else:
+                variables = ",".join(household_keys[:(50 * (count + 1) - 1)])
         else:
-            variables = ",".join(households_key_list[:(50*(count+1)-1)])
-    else:
-        variables = ",".join(households_key_list[(50*count):(50*(count+1)-1)])
+            variables = ",".join(household_keys[(50 * count):(50 * (count + 1) - 1)])
 
-    url = f"https://api.census.gov/data/{YEAR}/acs/acs5?get=NAME,
-    {variables}&for=tract:*&in=state:{state_code}&in=county:{county_code}&key={APIKEY}"
+        url = (
+            f"https://api.census.gov/data/{year}/acs/acs5?"
+            f"get=NAME,{variables}&for=tract:*&in=state:{state_code}&in=county:{county_code}&key={api_key}"
+        )
+        response = requests.get(url)
 
-    response = requests.request("GET", url)
-    if len(county_data != 0):
-        county_data = pd.merge(
-            pd.DataFrame(response.json()[1:], 
-            columns=response.json()[0]), 
-            county_data, 
-            on='NAME', 
-            how='inner')
-    else:
-         # If this is the first batch, initialize the dataset
-        county_data = pd.DataFrame(response.json()[1:], columns=response.json()[0])
+        if not county_data.empty:
+            county_data = pd.merge(
+                pd.DataFrame(response.json()[1:], columns=response.json()[0]),
+                county_data,
+                on='NAME',
+                how='inner'
+            )
+        else:
+            county_data = pd.DataFrame(response.json()[1:], columns=response.json()[0])
+    return county_data
 
-tract_url = f"https://www2.census.gov/geo/tiger/TIGER{YEAR}/TRACT/tl_{YEAR}_{state_code}_tract.zip"
-response = requests.request("GET", tract_url)
-with ZipFile(BytesIO(response.content)) as zip_ref:
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        zip_ref.extractall(tmpdirname)
-        
-        # Loop through the extracted files to locate the .shp or .geojson
-        for root, dirs, files in os.walk(tmpdirname):
-            for file in files:
-                if file.endswith(".shp") or file.endswith(".geojson"):
-                    file_path = os.path.join(root, file)
-                    # Load shapefile/geojson into a GeoDataFrame and convert to EPSG:3857 projection
-                    geodata = (geopandas.read_file(file_path)).to_crs("epsg:3857")
+# Initialize county data using the function
+COUNTY_DATA = fetch_county_data(households_key_list, YEAR, STATE_CODE, COUNTY_CODE, APIKEY)
 
 
-county_geodata = geodata[geodata['COUNTYFP'] == county_code]
-county_geodata = county_geodata.rename(columns={"TRACTCE":"tract_y"})
-county_geodata["tract_y"] = county_geodata["tract_y"].astype(int)
-county_data["tract_y"] = county_data["tract_y"].astype(int)
+def load_and_merge_geodata(
+    year: str,
+    state_code: str,
+    county_code: str,
+    census_data: pd.DataFrame
+) -> geopandas.GeoDataFrame:
+    """
+    Download and merge census tract geometries with census data for a specific county.
 
-data = pd.merge(county_geodata, county_data, on = "tract_y", how="inner")
-data.rename(columns=households_variables_dict, inplace = True)
+    Args:
+        year (str): Year of the census data.
+        state_code (str): Two-digit FIPS code of the state.
+        county_code (str): Three-digit FIPS code of the county.
+        census_data (pd.DataFrame): Household census data.
 
-# Convert all geometries to EPSG:3857 projection (used for consistent spatial analysis)
-data = data.to_crs("epsg:3857")
+    Returns:
+        geopandas.GeoDataFrame: Merged geospatial dataframe for the specified county.
+    """
+    tract_url = f"https://www2.census.gov/geo/tiger/TIGER{year}/TRACT/tl_{year}_{state_code}_tract.zip"
+    response = requests.get(tract_url)
+
+    with ZipFile(BytesIO(response.content)) as zip_ref:
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            zip_ref.extractall(tmpdirname)
+
+            for root, files in os.walk(tmpdirname):
+                for file in files:
+                    if file.endswith(".shp") or file.endswith(".geojson"):
+                        file_path = os.path.join(root, file)
+                        geodata = geopandas.read_file(file_path).to_crs("epsg:3857")
+
+    county_geodata = geodata[geodata['COUNTYFP'] == county_code].copy()
+    county_geodata = county_geodata.rename(columns={"TRACTCE": "tract_y"})
+    county_geodata["tract_y"] = county_geodata["tract_y"].astype(int)
+    census_data["tract_y"] = census_data["tract_y"].astype(int)
+
+    merged_data = pd.merge(county_geodata, census_data, on="tract_y", how="inner")
+    merged_data.rename(columns=households_variables_dict, inplace=True)
+    merged_data = merged_data.to_crs("epsg:3857")
+
+    return merged_data
+
+# Run and create merged geospatial data
+data = load_and_merge_geodata(YEAR, STATE_CODE, COUNTY_CODE, COUNTY_DATA)
+
+# Create spatial index from geometry
 tract_index = STRtree(data["geometry"])
 
 
-# Connect to the PostgreSQL database using credentials from environment variables
-connection = psycopg2.connect(
-    host=HOST,
-    database=NAME,
-    user=USER,
-    password=PASS,
-    port=PORT
-)
-cursor = connection.cursor()
+def initialize_database_tables(
+    host: str,
+    database: str,
+    user: str,
+    password: str,
+    port: str
+) -> Tuple[psycopg2.extensions.connection, psycopg2.extensions.cursor]:
+    """
+    Connect to the PostgreSQL database and initialize required tables.
 
-cursor.execute('DROP TABLE IF EXISTS roads;')
-cursor.execute('DROP TABLE IF EXISTS food_stores;')
+    Args:
+        host (str): Database host address.
+        database (str): Name of the database.
+        user (str): Database username.
+        password (str): User's database password.
+        port (str): Port number for the database connection.
 
-create_roads_query = '''
-CREATE TABLE roads (
-    name TEXT,
-    highway VARCHAR(30),
-    length NUMERIC,
-    geometry TEXT,
-    service VARCHAR(30)
-);
-'''
+    Returns:
+        Tuple[psycopg2.extensions.connection, psycopg2.extensions.cursor]: 
+            A tuple containing the active connection and cursor objects.
+    """
+    connection = psycopg2.connect(
+        host=host,
+        database=database,
+        user=user,
+        password=password,
+        port=port
+    )
+    cursor = connection.cursor()
 
-create_food_stores_query = '''
-CREATE TABLE food_stores (
-    shop VARCHAR(15),
-    geometry TEXT,
-    name VARCHAR(50)
-);
-'''
+    # Drop tables if they already exist
+    cursor.execute('DROP TABLE IF EXISTS roads;')
+    cursor.execute('DROP TABLE IF EXISTS food_stores;')
 
-cursor.execute(create_roads_query)
-cursor.execute(create_food_stores_query)
+    # Create tables
+    create_roads_query = '''
+    CREATE TABLE roads (
+        name TEXT,
+        highway VARCHAR(30),
+        length NUMERIC,
+        geometry TEXT,
+        service VARCHAR(30)
+    );
+    '''
+    create_food_stores_query = '''
+    CREATE TABLE food_stores (
+        shop VARCHAR(15),
+        geometry TEXT,
+        name VARCHAR(50)
+    );
+    '''
+    cursor.execute(create_roads_query)
+    cursor.execute(create_food_stores_query)
 
-place_name = "Franklin County, Ohio, USA"
-map_elements = list()  
-housing_areas = list() 
+    return connection, cursor
 
-G = ox.graph_from_point(center_point,dist=dist, network_type='all',retain_all=True)
-# Convert the OSM road graph into GeoDataFrames: one for nodes, one for edges
-gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
+# Call the function to set up the database and get cursor
+connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT)
 
-# Convert the coordinate reference system to Web Mercator (meters)
-gdf_edges = gdf_edges.to_crs("epsg:3857")
 
-if "service" in gdf_edges.columns:
-    gdf_edges = gdf_edges[["name","highway","length","geometry","service"]]
-else:
-    gdf_edges = gdf_edges[["name","highway","length","geometry"]]
+def process_road_network(
+    center_point: Tuple[float, float],
+    dist: float
+) -> Tuple[List[geometry.base.BaseGeometry], List[geometry.base.BaseGeometry], List[Tuple]]:
+    """
+    Process road network from OpenStreetMap and prepare geometry buffers and SQL-ready tuples.
 
-# Loop through each road segment to categorize and apply appropriate buffer sizes
-for index,row in gdf_edges.iterrows():
-    if (row["highway"] == "residential") or (row["highway"] == "living_street"):
-        housing_areas.append(row["geometry"].buffer(30))    # Wider buffer to simulate houses
-        map_elements.append((row["geometry"]).buffer(3))    # Narrow buffer to store the road outline
-    elif ("service" in gdf_edges.columns) and ((row["service"])=="alley"):
-        housing_areas.append(row["geometry"].buffer(30))
-        map_elements.append((row["geometry"]).buffer(3))
-    elif (row["highway"] == "motorway"):
-        map_elements.append((row["geometry"]).buffer(100))
-    elif (row["highway"] == "trunk"):
-        map_elements.append((row["geometry"]).buffer(30))
-    elif (row["highway"] == "primary"):
-        map_elements.append((row["geometry"]).buffer(10))
-    elif (row["highway"] == "secondary"):
-        map_elements.append((row["geometry"]).buffer(10))
-    elif isinstance((row["geometry"]), LineString):
-        map_elements.append((row["geometry"]))
+    Args:
+        center_point (Tuple[float, float]): Latitude and longitude of the center location.
+        dist (float): Distance in meters to define the radius of the map from the center point.
 
-gdf_edges["length"] = gdf_edges["length"].astype(int)
-gdf_edges["geometry"] = gdf_edges["geometry"].astype(str)
-roads_query = "INSERT INTO roads (name,highway,length,geometry,service) VALUES %s"
-data_tuples = list(gdf_edges.itertuples(index=False, name=None))
+    Returns:
+        Tuple[
+            List[geometry.base.BaseGeometry], 
+            List[geometry.base.BaseGeometry], 
+            List[Tuple]
+        ]: A tuple containing:
+            - List of buffered geometries for map rendering
+            - List of buffered geometries for housing area estimation
+            - List of road attribute tuples ready for SQL insertion
+    """
+    map_elements: List[geometry.base.BaseGeometry] = []
+    housing_areas: List[geometry.base.BaseGeometry] = []
 
-features = ox.features.features_from_point(
-    center_point,
-    dist=dist*3,
-    tags = {"shop":[
-        "convenience",
-    'supermarket',
-    "butcher",
-    "wholesale",
-    "farm",
-    "greengrocer",
-    "health_food",
-    "grocery"]})
+    G = ox.graph_from_point(center_point, dist=dist, network_type='all', retain_all=True)
+    gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
+    gdf_edges = gdf_edges.to_crs("epsg:3857")
 
-features = features.to_crs("epsg:3857")
-features = features[["shop","geometry","name"]]
-
-store_tuples = list()
-food_stores_query = "INSERT INTO food_stores (shop,geometry,name) VALUES %s"
-
-# Loop through each store and create a polygon representation for its location
-for index, row in features.iterrows():
-    # Use the centroid if geometry is not a simple point
-    point = row["geometry"].centroid if not isinstance(row["geometry"], Point) else row["geometry"]
-
-    if row["shop"] in ["supermarket", "grocery", "greengrocer"]:
-        # Generate a hexagonal polygon for large stores like supermarkets
-        polygon = Polygon([
-            (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
-            for angle in range(0, 360, 60)
-        ])
+    if "service" in gdf_edges.columns:
+        gdf_edges = gdf_edges[["name", "highway", "length", "geometry", "service"]]
     else:
-        # Generate a triangular-style shape for small shops
-        polygon = Polygon([
-            (point.x, point.y + 20),
-            (point.x + 25, point.y - 30),
-            (point.x - 25, point.y - 30)
-        ])
+        gdf_edges["service"] = None  # ensure consistent schema
+        gdf_edges = gdf_edges[["name", "highway", "length", "geometry", "service"]]
 
-    # Buffer the polygon and add it to the spatial map elements
-    map_elements.append(polygon.buffer(20))
+    for _, row in gdf_edges.iterrows():
+        if row["highway"] in ["residential", "living_street"]:
+            housing_areas.append(row["geometry"].buffer(30))
+            map_elements.append(row["geometry"].buffer(3))
+        elif row["service"] == "alley":
+            housing_areas.append(row["geometry"].buffer(30))
+            map_elements.append(row["geometry"].buffer(3))
+        elif row["highway"] == "motorway":
+            map_elements.append(row["geometry"].buffer(100))
+        elif row["highway"] == "trunk":
+            map_elements.append(row["geometry"].buffer(30))
+        elif row["highway"] == "primary":
+            map_elements.append(row["geometry"].buffer(10))
+        elif row["highway"] == "secondary":
+            map_elements.append(row["geometry"].buffer(10))
+        elif isinstance(row["geometry"], LineString):
+            map_elements.append(row["geometry"])
 
-    # Add the store's details to the list for database insertion
-    store_tuples.append((str(row["shop"]), str(polygon), str(row["name"])))
+    gdf_edges["length"] = gdf_edges["length"].astype(int)
+    gdf_edges["geometry"] = gdf_edges["geometry"].astype(str)
 
-# Build a spatial index for fast lookup of all mapped elements
-map_elements_index = STRtree(map_elements)
+    data_tuples = list(gdf_edges.itertuples(index=False, name=None))
 
-# Insert all food store records into the database in bulk
-extras.execute_values(cursor, food_stores_query, store_tuples)
+    return map_elements, housing_areas, data_tuples
 
-create_households_query = '''
-CREATE TABLE households (
-    id NUMERIC,
-    polygon TEXT,
-    income NUMERIC,
-    household_size NUMERIC,
-    vehicles NUMERIC,
-    number_of_workers NUMERIC,
-    walking_time TEXT,
-    biking_time TEXT,
-    transit_time TEXT,
-    driving_time TEXT
-);
-'''
 
-cursor.execute('DROP TABLE IF EXISTS households;')
-cursor.execute(create_households_query)
+# Run the road network processor
+map_elements, housing_areas, data_tuples = process_road_network(CENTER_POINT, DIST)
 
-household_query = """
-INSERT INTO households 
-(id,
-polygon,
-income,
-household_size,
-vehicles,
-number_of_workers,
-walking_time,
-biking_time,
-transit_time,
-driving_time) VALUES %s"
-"""
+# Prepare the SQL insertion query
+roads_query = "INSERT INTO roads (name, highway, length, geometry, service) VALUES %s"
 
-# Commit changes and close DB connection
-connection.commit()
-cursor.close()
-connection.close()
 
-# This whole thing creates houses and assigns attributes to them, and then stores the households in a SQL DB
-houses = list()
-houses_index = rtree.index.Index()
-total_count = 0
-total_google_pulls = 0
-house_tuples = list()
-housing_areas_count = 0
-#Iterate through each road and place houses next to the road (housing area means aread around a residential road)
-for housing_area in housing_areas:
-    housing_areas_count+=1
-    print(str(round(housing_areas_count/len(housing_areas)*100)) + "%")
-    #print(total_google_pulls)
-    count = 0
-    # Get the exterior coordinates of the polygon
+def process_food_stores(
+    center_point: Tuple[float, float],
+    dist: float,
+    map_elements: List[geometry.base.BaseGeometry],
+    cursor: psycopg2.extensions.cursor
+) -> STRtree:
+    """
+    Retrieve and process food store locations from OpenStreetMap, convert them into geometric shapes,
+    and insert them into the database.
+
+    Args:
+        center_point (Tuple[float, float]): Latitude and longitude for the area of interest.
+        dist (float): Distance in meters for the search radius (3x for food stores).
+        map_elements (List[BaseGeometry]): List to append buffered polygons representing stores.
+        cursor (psycopg2.extensions.cursor): Cursor for executing database insert queries.
+
+    Returns:
+        STRtree: Spatial index of all geometric elements including food stores.
+    """
+    features = ox.features.features_from_point(
+        center_point,
+        dist=dist * 3,
+        tags={"shop": [
+            "convenience", "supermarket", "butcher", "wholesale",
+            "farm", "greengrocer", "health_food", "grocery"
+        ]}
+    )
+
+    features = features.to_crs("epsg:3857")
+    features = features[["shop", "geometry", "name"]]
+
+    store_tuples: List[Tuple[str, str, str]] = []
+    food_stores_query = "INSERT INTO food_stores (shop, geometry, name) VALUES %s"
+
+    for _, row in features.iterrows():
+        point = row["geometry"].centroid if not isinstance(row["geometry"], Point) else row["geometry"]
+
+        if row["shop"] in ["supermarket", "grocery", "greengrocer"]:
+            polygon = Polygon([
+                (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
+                for angle in range(0, 360, 60)
+            ])
+        else:
+            polygon = Polygon([
+                (point.x, point.y + 20),
+                (point.x + 25, point.y - 30),
+                (point.x - 25, point.y - 30)
+            ])
+
+        map_elements.append(polygon.buffer(20))
+        store_tuples.append((str(row["shop"]), str(polygon), str(row["name"])))
+
+    extras.execute_values(cursor, food_stores_query, store_tuples)
+
+    return STRtree(map_elements)
+
+
+# Call the function and get the spatial index of mapped elements
+map_elements_index = process_food_stores(CENTER_POINT, DIST, map_elements, cursor)
+
+
+def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
+    """
+    Create the 'households' table in the database after dropping it if it already exists.
+
+    Args:
+        cursor (psycopg2.extensions.cursor): Active database cursor.
+
+    Returns:
+        str: Prepared SQL insert query string for inserting household data.
+    """
+    create_households_query = '''
+    CREATE TABLE households (
+        id NUMERIC,
+        polygon TEXT,
+        income NUMERIC,
+        household_size NUMERIC,
+        vehicles NUMERIC,
+        number_of_workers NUMERIC,
+        walking_time TEXT,
+        biking_time TEXT,
+        transit_time TEXT,
+        driving_time TEXT
+    );
+    '''
+
+    cursor.execute('DROP TABLE IF EXISTS households;')
+    cursor.execute(create_households_query)
+
+    household_query = """
+    INSERT INTO households 
+    (id,
+     polygon,
+     income,
+     household_size,
+     vehicles,
+     number_of_workers,
+     walking_time,
+     biking_time,
+     transit_time,
+     driving_time) 
+    VALUES %s
+    """
+    return household_query
+
+
+def close_db_connection(connection: psycopg2.extensions.connection, cursor: psycopg2.extensions.cursor) -> None:
+    """
+    Commit any pending transactions and close the database connection and cursor.
+
+    Args:
+        connection (psycopg2.extensions.connection): The active database connection.
+        cursor (psycopg2.extensions.cursor): The active database cursor.
+    """
+    connection.commit()
+    cursor.close()
+    connection.close()
+
+
+def create_house_polygon(location: Point) -> Polygon:
+    """
+    Create a synthetic house polygon at a given location.
+
+    Args:
+        location (Point): Center point of the house.
+
+    Returns:
+        Polygon: A polygon representing the house footprint.
+    """
+    return Polygon([
+        (location.x + 10, location.y + 10),
+        (location.x, location.y + 20),
+        (location.x - 10, location.y + 10),
+        (location.x - 10, location.y - 5),
+        (location.x - 3, location.y - 5),
+        (location.x - 3, location.y + 3),
+        (location.x + 3, location.y + 3),
+        (location.x + 3, location.y - 5),
+        (location.x + 10, location.y - 5),
+        (location.x + 10, location.y + 10)  
+    ])
+
+
+
+def place_houses_in_area(housing_area: Polygon, spacing: float = 30.0) -> List[Polygon]:
+    """
+    Place house-shaped polygons around the edges of a housing area polygon.
+
+    Args:
+        housing_area (Polygon): A polygon representing the buffer around a residential road.
+        spacing (float): Distance between each house along the edge.
+
+    Returns:
+        List[Polygon]: List of synthetic house polygons.
+    """
+    houses: List[Polygon] = []
     exterior_coords = list(housing_area.exterior.coords)
-    # Create LineStrings for each edge
-    edges = [LineString([exterior_coords[i], exterior_coords[i+1]]) 
-            for i in range(len(exterior_coords) - 1)]
-        
-    # Basically, draw a polygon around each road and then place houses on the edges of that rectangle
+    edges = [LineString([exterior_coords[i], exterior_coords[i + 1]])
+             for i in range(len(exterior_coords) - 1)]
+
     for edge in edges:
-        # Calculate the vector representation of each edge of the polygon
         length = edge.length
-        coord1 = edge.coords[0]
-        coord2 = edge.coords[1]
+        coord1, coord2 = edge.coords[0], edge.coords[1]
         vector_direction = (coord2[0] - coord1[0], coord2[1] - coord1[1])
-        temp = (vector_direction[0])*(vector_direction[0]) + (vector_direction[1])*(vector_direction[1])
-        vector_magnitude = math.sqrt(temp)
-        normalized_vector = (0,0)
-        if vector_magnitude != 0:
-            normalized_vector = (vector_direction[0]/vector_magnitude,vector_direction[1]/vector_magnitude)
-        
-        #place houses on the vector, each 20 meters away from each other until the vector ends
-        for i in range(int(vector_magnitude/20)+1):
-            location = Point(coord1[0]+normalized_vector[0]*i*30,coord1[1]+normalized_vector[1]*i*30)
+        magnitude = (vector_direction[0] ** 2 + vector_direction[1] ** 2) ** 0.5
 
-            house = Polygon(((location.x+10, location.y+10),
-                            (location.x, location.y+20),
-                            (location.x-10, location.y+10),
-                            (location.x+10, location.y+10),
-                            (location.x-10, location.y+10),
-                            (location.x-10, location.y-5),
-                            (location.x-3, location.y-5),
-                            (location.x-3, location.y+3),
-                            (location.x+3, location.y+3),
-                            (location.x+3, location.y-5),
-                            (location.x-3, location.y-5),
-                            (location.x+10, location.y-5)))
-            
-            
-            valid = True
+        if magnitude == 0:
+            continue
 
-            # Get all nearby elements in map to check that house is not on top of anything
-            intersecting_map_elements_indexes = map_elements_index.query(Polygon(((location.x+10, location.y+20),
-                                                                        (location.x-10, location.y+20),
-                                                                        (location.x-10, location.y-5),
-                                                                        (location.x+10, location.y-5))))
-            
-            # Check if house is on an element
-            if len(intersecting_map_elements_indexes) != 0:
-                for index in intersecting_map_elements_indexes:
-                    if map_elements[index].intersects(house):
-                        valid=False
-                        continue
-            if not valid:
-                continue
+        norm_vector = (vector_direction[0] / magnitude, vector_direction[1] / magnitude)
 
-            # Check if house is touching another house
-            intersecting_houses_indexes = houses_index.intersection(house.bounds)
-            if len(list(intersecting_houses_indexes)) != 0:
-                continue
+        for i in range(int(magnitude // spacing) + 1):
+            location = Point(coord1[0] + norm_vector[0] * i * spacing,
+                             coord1[1] + norm_vector[1] * i * spacing)
+
+            house = create_house_polygon(location)
 
             houses.append(house)
-            # This is a special index that makes it faster to query houses when we check if houses are on top of each other
-            houses_index.add(total_count,house.bounds)
-            
-            # Get the tract that the house is in
-            tract_row_numbers = tract_index.query(house.centroid)
-            tract_row = 0
-            for row_number in tract_row_numbers:
-                if (data.loc[row_number,"geometry"]).contains(house.centroid):
-                    tract_row = row_number
-                    break
-            tract = data.loc[tract_row]
 
-            #Iterate through each tract and create households
-            income_weights = np.array(tract["10k to 15k":"150k to 200k"]).astype(int)
-            if sum(income_weights)==0:
-                continue
+    return houses
 
-            # Make a list of incomes to distribute to households
-            total_households = int(tract["total households in tract"])
-            distributed_incomes = []
-            for i in range(14):
-                uniform_list = []
-                if i != 14:
-                    uniform_list = np.random.uniform(income_ranges[i][0],income_ranges[i][1],income_weights[i])
-                else:
-                    uniform_list = np.random.uniform(200000,200000,income_weights[i])
-                distributed_incomes.extend(uniform_list.astype(int))
+def is_valid_house(
+    house: Polygon,
+    map_elements_index: STRtree,
+    houses_index: rtree.index.Index,
+    map_elements: List[Polygon]
+) -> bool:
+    """
+    Check whether a house polygon is valid by verifying it does not intersect
+    with roads or existing houses.
 
-            vehicle_weights = [
-                                int(tract["1 Person(s) 0 Vehicle(s)"]),
-                                int(tract["1 Person(s) 1 Vehicle(s)"]),
-                                int(tract["1 Person(s) 2 Vehicle(s)"]),
-                                int(tract["1 Person(s) 3 Vehicle(s)"]),
-                                int(tract["1 Person(s) 4+ Vehicle(s)"]),
-                                int(tract["2 Person(s) 0 Vehicle(s)"]),
-                                int(tract["2 Person(s) 1 Vehicle(s)"]),
-                                int(tract["2 Person(s) 2 Vehicle(s)"]),
-                                int(tract["2 Person(s) 3 Vehicle(s)"]),
-                                int(tract["2 Person(s) 4+ Vehicle(s)"]),
-                                int(tract["3 Person(s) 0 Vehicle(s)"]),
-                                int(tract["3 Person(s) 1 Vehicle(s)"]),
-                                int(tract["3 Person(s) 2 Vehicle(s)"]),
-                                int(tract["3 Person(s) 3 Vehicle(s)"]),
-                                int(tract["3 Person(s) 4+ Vehicle(s)"]),
-                                int(tract["4+ Person(s) 0 Vehicle(s)"]),
-                                int(tract["4+ Person(s) 1 Vehicle(s)"]),
-                                int(tract["4+ Person(s) 2 Vehicle(s)"]),
-                                int(tract["4+ Person(s) 3 Vehicle(s)"]),
-                                int(tract["4+ Person(s) 4+ Vehicle(s)"]),
-                                int(tract["0 Worker(s) 0 Vehicle(s)"]),
-                                int(tract["0 Worker(s) 1 Vehicle(s)"]),
-                                int(tract["0 Worker(s) 2 Vehicle(s)"]),
-                                int(tract["0 Worker(s) 3 Vehicle(s)"]),
-                                int(tract["0 Worker(s) 4+ Vehicle(s)"]),
-                                int(tract["1 Worker(s) 0 Vehicle(s)"]),
-                                int(tract["1 Worker(s) 1 Vehicle(s)"]),
-                                int(tract["1 Worker(s) 2 Vehicle(s)"]),
-                                int(tract["1 Worker(s) 3 Vehicle(s)"]),
-                                int(tract["1 Worker(s) 4+ Vehicle(s)"]),
-                                int(tract["2 Worker(s) 0 Vehicle(s)"]),
-                                int(tract["2 Worker(s) 1 Vehicle(s)"]),
-                                int(tract["2 Worker(s) 2 Vehicle(s)"]),
-                                int(tract["2 Worker(s) 3 Vehicle(s)"]),
-                                int(tract["2 Worker(s) 4+ Vehicle(s)"]),
-                                int(tract["3+ Worker(s) 0 Vehicle(s)"]),
-                                int(tract["3+ Worker(s) 1 Vehicle(s)"]),
-                                int(tract["3+ Worker(s) 2 Vehicle(s)"]),
-                                int(tract["3+ Worker(s) 3 Vehicle(s)"]),
-                                int(tract["3+ Worker(s) 4+ Vehicle(s)"])
-                            ]
-            vehicle_weights = [0 if item == -666666666 else item for item in vehicle_weights]
+    Args:
+        house (Polygon): The house polygon to check.
+        map_elements_index (STRtree): Spatial index for roads and store areas.
+        houses_index (rtree.index.Index): R-tree index of all placed houses.
+        map_elements (List[Polygon]): The list of buffered roads and stores.
 
-            worker_weights = [
-                                int(tract["1 Person(s) 0 Worker(s)"]),
-                                int(tract["1 Person(s) 1 Worker(s)"]),
-                                int(tract["2 Person(s) 0 Worker(s)"]),
-                                int(tract["2 Person(s) 1 Worker(s)"]),
-                                int(tract["2 Person(s) 2 Worker(s)"]),
-                                int(tract["3 Person(s) 0 Worker(s)"]),
-                                int(tract["3 Person(s) 1 Worker(s)"]),
-                                int(tract["3 Person(s) 2 Worker(s)"]),
-                                int(tract["3 Person(s) 3 Worker(s)"]),
-                                int(tract["4+ Person(s) 0 Worker(s)"]),
-                                int(tract["4+ Person(s) 1 Worker(s)"]),
-                                int(tract["4+ Person(s) 2 Worker(s)"]),
-                                int(tract["4+ Person(s) 3+ Worker(s)"]),
-                            ]
-            worker_weights = [0 if item == -666666666 else item for item in worker_weights]
+    Returns:
+        bool: True if house is valid; False if it intersects with other features.
+    """
+    # Check collision with road/store polygons
+    search_area = Polygon([
+        (house.centroid.x + 10, house.centroid.y + 20),
+        (house.centroid.x - 10, house.centroid.y + 20),
+        (house.centroid.x - 10, house.centroid.y - 5),
+        (house.centroid.x + 10, house.centroid.y - 5)
+    ])
 
-            household_size_weights = [
-                                int(tract["Median Income for 1 Person(s)"]),
-                                int(tract["Median Income for 2 Person(s)"]),
-                                int(tract["Median Income for 3 Person(s)"]),
-                                int(tract["Median Income for 4 Person(s)"]),
-                                int(tract["Median Income for 5 Person(s)"]),
-                                int(tract["Median Income for 6 Person(s)"]),
-                                int(tract["Median Income for 7+ Person(s)"])
-                            ]
-            household_size_weights = [0 if item == -666666666 else item for item in household_size_weights]
-            income_range = random.choices(income_ranges,weights = income_weights)
-            income = random.randint(int(income_range[0][0]/1000),int(income_range[0][1]/1000))*1000
+    for index in map_elements_index.query(search_area):
+        if map_elements[index].intersects(house):
+            return False
 
+    # Check collision with other houses
+    if list(houses_index.intersection(house.bounds)):
+        return False
+
+    return True
+
+def assign_household_attributes(
+    tract: pd.Series,
+    income_ranges: List[Tuple[int, int]],
+    size_index_dict: dict,
+    workers_index_dict: dict
+) -> Tuple[int, int, int, int]:
+    """
+    Assign synthetic household attributes using demographic weights from a census tract.
+
+    Args:
+        tract (pd.Series): A row from the census dataframe.
+        income_ranges (List[Tuple[int, int]]): Income ranges for households.
+        size_index_dict (dict): Mapping of household size to vehicle weight index range.
+        workers_index_dict (dict): Mapping of worker count to vehicle weight index range.
+
+    Returns:
+        Tuple[int, int, int, int]: income, household_size, number_of_workers, vehicles
+    """
+
+    # Income assignment
+    income_weights = np.array(tract["10k to 15k":"150k to 200k"]).astype(int)
+    if income_weights.sum() == 0:
+        raise ValueError("Income weights in tract are all zero.")
+
+    income_range = random.choices(income_ranges, weights=income_weights)[0]
+    income = random.randint(income_range[0] // 1000, income_range[1] // 1000) * 1000
+
+    # Household size
     household_size = random.choices([1, 2, 3, 4, 5, 6, 7], weights=[1, 1, 1, 1, 0, 0, 0])[0]
-    if household_size == 1:
-        num_workers = random.choices([0, 1], weights=worker_weights[:2], k=1)[0]
-    elif household_size == 2:
-        num_workers = random.choices([0, 1, 2], weights=worker_weights[2:5], k=1)[0]
-    elif household_size == 3:
-        num_workers = random.choices([0, 1, 2, 3], weights=worker_weights[5:9], k=1)[0]
-    else:
-        num_workers = random.choices([0, 1, 2, 3], weights=worker_weights[9:], k=1)[0]
 
-    size_indexes = size_index_dict[min(household_size, 4)]
+    # Worker assignment
+    worker_weights = [
+        int(tract.get(col, 0)) if int(tract.get(col, 0)) != -666666666 else 0
+        for col in [
+            "1 Person(s) 0 Worker(s)", "1 Person(s) 1 Worker(s)",
+            "2 Person(s) 0 Worker(s)", "2 Person(s) 1 Worker(s)", "2 Person(s) 2 Worker(s)",
+            "3 Person(s) 0 Worker(s)", "3 Person(s) 1 Worker(s)", "3 Person(s) 2 Worker(s)", "3 Person(s) 3 Worker(s)",
+            "4+ Person(s) 0 Worker(s)", "4+ Person(s) 1 Worker(s)", "4+ Person(s) 2 Worker(s)", "4+ Person(s) 3+ Worker(s)"
+        ]
+    ]
+
+    if household_size == 1:
+        num_workers = random.choices([0, 1], weights=worker_weights[:2])[0]
+    elif household_size == 2:
+        num_workers = random.choices([0, 1, 2], weights=worker_weights[2:5])[0]
+    elif household_size == 3:
+        num_workers = random.choices([0, 1, 2, 3], weights=worker_weights[5:9])[0]
+    else:
+        num_workers = random.choices([0, 1, 2, 3], weights=worker_weights[9:])[0]
+
+    # Vehicle assignment
+    vehicle_weights = [int(tract.get(col, 0)) if int(tract.get(col, 0)) != -666666666 else 0
+                       for col in tract.index if "Vehicle(s)" in col]
+
+    size_indexes = size_index_dict.get(min(household_size, 4), (0, 0))
     workers_indexes = workers_index_dict.get(num_workers, (0, 0))
+
     if workers_indexes[1] > workers_indexes[0]:
-        vehicle_combined_weights = (
-            np.array(vehicle_weights[size_indexes[0]:size_indexes[1]])
-            + np.array(vehicle_weights[workers_indexes[0]:workers_indexes[1]])
+        combined_weights = (
+            np.array(vehicle_weights[size_indexes[0]:size_indexes[1]]) +
+            np.array(vehicle_weights[workers_indexes[0]:workers_indexes[1]])
         )
     else:
-        vehicle_combined_weights = np.array(vehicle_weights[size_indexes[0]:size_indexes[1]])
-    vehicles = random.choices([0, 1, 2, 3, 4], weights=vehicle_combined_weights)[0]
+        combined_weights = np.array(vehicle_weights[size_indexes[0]:size_indexes[1]])
+
+    vehicles = random.choices([0, 1, 2, 3, 4], weights=combined_weights)[0]
+
     return income, household_size, num_workers, vehicles
 
-def get_nearest_store(house: Polygon, store_tuples : List[Tuple[str, str, str]], shapely_loader: Any) -> Optional[Polygon]:
+
+
+def generate_houses_from_housing_areas(
+    housing_areas: List[Polygon],
+    map_elements: List[Polygon],
+    map_elements_index: STRtree,
+    tract_index: STRtree,
+    data: gpd.GeoDataFrame,
+    income_ranges: List[Tuple[int, int]],
+    size_index_dict: dict,
+    workers_index_dict: dict
+) -> List[Tuple]:
+    """
+    Generate synthetic household records based on housing areas and census data.
+
+    Args:
+        housing_areas (List[Polygon]): List of buffered areas along residential roads.
+        map_elements (List[Polygon]): List of roads and food store geometries.
+        map_elements_index (STRtree): Spatial index for map elements.
+        tract_index (STRtree): Spatial index of tract geometries.
+        data (gpd.GeoDataFrame): GeoDataFrame of census tracts with household data.
+        income_ranges (List[Tuple[int, int]]): Income range brackets.
+        size_index_dict (dict): Index mapping from household size to vehicle bins.
+        workers_index_dict (dict): Index mapping from worker count to vehicle bins.
+
+    Returns:
+        List[Tuple]: List of tuples ready for SQL insert into households table.
+    """
+    houses_index = rtree.index.Index()
+    house_tuples: List[Tuple] = []
+    total_count = 0
+
+    for idx, housing_area in enumerate(housing_areas):
+        print(f"{round((idx + 1) / len(housing_areas) * 100)}%")
+
+        candidate_houses = place_houses_in_area(housing_area)
+
+        for house in candidate_houses:
+            if not is_valid_house(house, map_elements_index, houses_index, map_elements):
+                continue
+
+            # Add to index for spatial collision checks
+            houses_index.add(total_count, house.bounds)
+
+            # Find matching tract for the house centroid
+            tract_row = None
+            for row_id in tract_index.query(house.centroid):
+                if data.loc[row_id, "geometry"].contains(house.centroid):
+                    tract_row = data.loc[row_id]
+                    break
+
+            if tract_row is None:
+                continue  # Skip house if not inside any tract
+
+            try:
+                income, size, workers, vehicles = assign_household_attributes(
+                    tract_row, income_ranges, size_index_dict, workers_index_dict
+                )
+            except Exception:
+                continue  # skip malformed or invalid tract rows
+
+            # Dummy travel times for now
+            walking_time = biking_time = transit_time = driving_time = "NA"
+
+            house_tuples.append((
+                total_count,
+                str(house),
+                income,
+                size,
+                vehicles,
+                workers,
+                walking_time,
+                biking_time,
+                transit_time,
+                driving_time
+            ))
+
+            total_count += 1
+
+    return house_tuples
+
+
+def get_nearest_store(
+        house: Polygon, 
+        store_tuples : List[Tuple[str, str, str]], 
+        shapely_loader: Callable[[str], Polygon]
+        )-> Optional[Polygon]:
     """
     Find the nearest store polygon to house. 
 
     Args:
-        house (polygon): The house polygon to check
+        house (Polygon): The house polygon to check
         store_tuples: (List[Tuple[str, str, str]]): List of tuples (shop type, WKT polygon, name) for stores.
         shapely_loader (Any): Function to convert WKT string to Shapely geometry.
     
@@ -473,15 +661,19 @@ def get_nearest_store(house: Polygon, store_tuples : List[Tuple[str, str, str]],
     """
     nearest_store = None
     store_distance = float('inf')
+
     for store in store_tuples:
         store_poly = shapely_loader(store[1])
         dist = store_poly.distance(house)
+
         if dist <= store_distance:
             nearest_store = store_poly
-            store_distance = dist
+            store_distance = DIST
+
     return nearest_store
 
-def transform_polygon_coords(polygon: Polygon, source_crs : str, target_crs : str,) -> Polygon:
+
+def transform_polygon_coords(polygon: Polygon, source_crs : str, target_crs : str) -> Polygon:
     """Transform a polygon's coordinates from one CRS to another.
 
     Args:
@@ -496,11 +688,32 @@ def transform_polygon_coords(polygon: Polygon, source_crs : str, target_crs : st
     coords = [transformer.transform(x, y) for x, y in polygon.exterior.coords]
     return Polygon(coords)
 
+def get_tract_for_house(
+    house: Polygon,
+    tract_index: STRtree,
+    data: pd.DataFrame
+) -> Optional[pd.Series]:
+    """
+    Find the census tract containing the house centroid.
+
+    Args:
+        house (Polygon): The house polygon.
+        tract_index (STRtree): Spatial index of tract geometries.
+        data (pd.DataFrame): Census data including geometries.
+
+    Returns:
+        Optional[pd.Series]: The tract row containing the house, or None.
+    """
+    for row_id in tract_index.query(house.centroid):
+        if data.loc[row_id, "geometry"].contains(house.centroid):
+            return data.loc[row_id]
+    return None
+
 def process_housing_areas(
-        housing_areas: List[Polygon],
+    housing_areas: List[Polygon],
     map_elements_index: STRtree,
     map_elements: List[Polygon],
-    houses_index: Index,
+    houses_index: RTreeIndex,
     tract_index: STRtree,
     data: pd.DataFrame,
     income_ranges: List[Tuple[int, int]],
@@ -512,66 +725,66 @@ def process_housing_areas(
     shapely_loader: Any
 ) -> List[Tuple]:
     """
-    Process housing areas and generate household tuples. Make sure the Args/data are defined somewhere!
+    Process a list of housing area polygons, generate synthetic houses along their borders,
+    assign attributes using tract data, and return ready-to-insert household tuples.
 
     Args:
-        housing_areas (List[Polygon]): housing area polygons
-        map_elements_index (STRtree): Map elements spatial index
-        map_elements (List[Polygon]): Map element polygons
-        houses_index (Index): R-tree for houses
-        tract_index (STRtree): tract index
-        data (pd.DataFrame): Tract data.
-        income_ranges (List[Tuple[int, int]]): income ranges
-        size_index_dict (dict): Size index dict
-        workers_index_dict (dict): Workers index dict
-        vehicle_weights (List[int]): Vehicle weights
-        worker_weights (List[int]): Worker weights.
-        store_tuples (List[Tuple[str, str, str]]): Store tuples
-        shapely_loader (Any): function to load WKT
+        housing_areas (List[Polygon]): Polygons representing areas around residential roads.
+        map_elements_index (STRtree): STRtree index for nearby road/store geometries.
+        map_elements (List[Polygon]): Buffered geometries (roads, stores) for intersection checking.
+        houses_index (RTreeIndex): R-tree index to check house overlap.
+        tract_index (STRtree): STRtree index of tract geometries.
+        data (pd.DataFrame): Census tract data with attributes.
+        income_ranges (List[Tuple[int, int]]): Bracketed income ranges for sampling.
+        size_index_dict (dict): Dict for mapping household sizes to vehicle weight indices.
+        workers_index_dict (dict): Dict for mapping worker counts to vehicle weight indices.
+        vehicle_weights (List[int]): Vehicle weights from census.
+        worker_weights (List[int]): Worker weights from census.
+        store_tuples (List[Tuple[str, str, str]]): Store (shop type, WKT, name).
+        shapely_loader (Any): Function to load WKT strings into Polygons.
 
     Returns:
-        List[Tuple]: List of household tuples for insertion.
+        List[Tuple]: Tuples of household data ready for DB insertion.
     """
-    houses = []
-    house_tuples = []
+    house_tuples: List[Tuple] = []
     total_count = 0
-    housing_areas_count = 0
 
-    for housing_area in housing_areas:
-        housing_areas_count += 1
-        print(f"{round(housing_areas_count/len(housing_areas)*100)}%")
+    for i, housing_area in enumerate(housing_areas):
+        print(f"{round((i + 1) / len(housing_areas) * 100)}%")
 
         exterior_coords = list(housing_area.exterior.coords)
-        edges = [LineString([exterior_coords[i], exterior_coords[i+1]])
+        edges = [LineString([exterior_coords[i], exterior_coords[i + 1]])
                  for i in range(len(exterior_coords) - 1)]
 
         for edge in edges:
-            vector_direction = (edge.coords[1][0] - edge.coords[0][0], edge.coords[1][1] - edge.coords[0][1])
-            vector_magnitude = math.sqrt(vector_direction[0] ** 2 + vector_direction[1] ** 2)
-            normalized_vector = (
-                vector_direction[0] / vector_magnitude,
-                vector_direction[1] / vector_magnitude
-            ) if vector_magnitude else (0, 0)
+            direction = (edge.coords[1][0] - edge.coords[0][0], edge.coords[1][1] - edge.coords[0][1])
+            magnitude = math.hypot(*direction)
+            norm_vector = (direction[0] / magnitude, direction[1] / magnitude) if magnitude else (0, 0)
 
-            for i in range(int(vector_magnitude / 20) + 1):
+            for j in range(int(magnitude // 30) + 1):
                 location = Point(
-                    edge.coords[0][0] + normalized_vector[0] * i * 30,
-                    edge.coords[0][1] + normalized_vector[1] * i * 30
+                    edge.coords[0][0] + norm_vector[0] * j * 30,
+                    edge.coords[0][1] + norm_vector[1] * j * 30
                 )
+
                 house = create_house_polygon(location)
-                if not is_house_location_valid(house, map_elements_index, map_elements, houses_index):
+
+                if not is_valid_house(house, map_elements_index, houses_index, map_elements):
                     continue
-                houses.append(house)
+
                 houses_index.add(total_count, house.bounds)
 
                 tract = get_tract_for_house(house, tract_index, data)
                 if tract is None:
                     continue
 
-                income, household_size, num_workers, vehicles = assign_household_attributes(
-                    tract, income_ranges, size_index_dict, workers_index_dict,
-                    vehicle_weights, worker_weights
-                )
+                try:
+                    income, size, workers, vehicles = assign_household_attributes(
+                        tract, income_ranges, size_index_dict, workers_index_dict,
+                        vehicle_weights, worker_weights
+                    )
+                except Exception:
+                    continue
 
                 nearest_store = get_nearest_store(house, store_tuples, shapely_loader)
                 if nearest_store is None:
@@ -582,15 +795,26 @@ def process_housing_areas(
                 origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
                 destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
 
-                # Placeholders for travel times 
+                # Placeholder travel times (to be replaced with real data if available)
                 walking_time = biking_time = transit_time = driving_time = 0
 
                 house_tuples.append((
-                    total_count, str(house), income, household_size, vehicles, num_workers,
-                    walking_time, biking_time, transit_time, driving_time
+                    total_count,
+                    str(house),
+                    income,
+                    size,
+                    vehicles,
+                    workers,
+                    walking_time,
+                    biking_time,
+                    transit_time,
+                    driving_time
                 ))
+
                 total_count += 1
+
     return house_tuples
+
 
 def insert_households(cursor, house_tuples: List[Tuple], household_query: str) -> None:
     """
@@ -611,23 +835,34 @@ def insert_households(cursor, house_tuples: List[Tuple], household_query: str) -
         raise
 
 
+def connect_to_db(
+    host: str,
+    database: str,
+    user: str,
+    password: str,
+    port: str
+) -> Tuple[Connection, Cursor]:
+    """
+    Establish connection to the PostgreSQL database.
 
-# Connect to the PostgreSQL database
-connection = psycopg2.connect(
-    host=HOST,
-    database=NAME,
-    user=USER,
-    # password=PASS,
-    port=PORT
-)
-cursor = connection.cursor()
+    Args:
+        host (str): Database host.
+        database (str): Database name.
+        user (str): Username.
+        password (str): Password.
+        port (str): Port number.
 
-extras.execute_values(cursor, household_query, house_tuples)
-
-# Close the cursor and connection
-connection.commit()
-cursor.close()
-connection.close()
+    Returns:
+        Tuple[Connection, Cursor]: The DB connection and cursor.
+    """
+    conn = psycopg2.connect(
+        host=host,
+        database=database,
+        user=user,
+        password=password,
+        port=port
+    )
+    return conn, conn.cursor()
 
 def main():
     """
