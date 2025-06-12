@@ -864,11 +864,56 @@ def connect_to_db(
     )
     return conn, conn.cursor()
 
-def main():
+def main() -> None:
     """
-    Main execution function 
+    Main function to execute the full data processing and insertion pipeline.
     """
-     # TODO: After creating functions call them in here
+    print("Fetching household census data...")
+    county_data = fetch_county_data(households_key_list, YEAR, STATE_CODE, COUNTY_CODE, APIKEY)
+
+    print("Loading and merging tract shapefile with census data...")
+    tract_data = load_and_merge_geodata(YEAR, STATE_CODE, COUNTY_CODE, county_data)
+
+    print("Initializing database and creating tables...")
+    connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT)
+    household_query = create_households_table(cursor)
+
+    print("Processing road network...")
+    map_elements, housing_areas, road_tuples = process_road_network(CENTER_POINT, DIST)
+
+    print("Processing food stores...")
+    store_index = process_food_stores(CENTER_POINT, DIST, map_elements, cursor)
+
+    print("Generating household records...")
+    tract_index = STRtree(tract_data["geometry"])
+    houses_index = RTreeIndex()
+    store_tuples = list(cursor.execute("SELECT shop, geometry, name FROM food_stores;"))  # fallback in case needed
+
+    house_tuples = process_housing_areas(
+        housing_areas,
+        store_index,
+        map_elements,
+        houses_index,
+        tract_index,
+        tract_data,
+        income_ranges,
+        size_index_dict,
+        workers_index_dict,
+        [],  # vehicle_weights are computed inside assign function
+        [],  # worker_weights too
+        store_tuples,
+        shapely.wkt.loads
+    )
+
+    print("Inserting households into the database...")
+    insert_households(cursor, house_tuples, household_query)
+
+    print("Finalizing and closing connection...")
+    connection.commit()
+    cursor.close()
+    connection.close()
+    print("Done.")
+
 
 if __name__ == "__main__":
     main()
