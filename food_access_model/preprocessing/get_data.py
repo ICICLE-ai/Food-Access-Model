@@ -568,7 +568,7 @@ def generate_houses_from_housing_areas(
     map_elements: List[Polygon],
     map_elements_index: STRtree,
     tract_index: STRtree,
-    data: gpd.GeoDataFrame,
+    data: geopandas.GeoDataFrame,
     income_ranges: List[Tuple[int, int]],
     size_index_dict: dict,
     workers_index_dict: dict
