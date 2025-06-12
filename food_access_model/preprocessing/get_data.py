@@ -22,6 +22,7 @@ import shapely.geometry as geometry
 from pyproj import Transformer
 from typing import List, Tuple, Optional, Callable, Any
 from io import BytesIO
+import logging
 from household_constants import(
     YEAR, 
     PLACE_NAME, 
@@ -40,11 +41,29 @@ COUNTY_CODE = FIPSCODE[2:]
 STATE_CODE = FIPSCODE[:2]   
 
 PASS = os.getenv("DB_PASS")
+if not PASS:
+    logging.critical("DB_PASS environment variable not set.")
+    raise ValueError("DB_PASS is required.")     
 APIKEY = os.getenv("APIKEY")
+if not APIKEY:
+    logging.critical("APIKEY environment variable not set.")
+    raise ValueError("APIKEY is required.")   
 USER = os.getenv("DB_USER")
+if not USER:
+    logging.critical("DB_USER environment variable not set.")
+    raise ValueError("DB_USER is required.") 
 NAME = os.getenv("DB_NAME")
+if not NAME:
+    logging.critical("DB_NAME environment variable not set.")
+    raise ValueError("DB_NAME is required.") 
 HOST = os.getenv("DB_HOST")
+if not HOST:
+    logging.critical("DB_HOST environment variable not set.")
+    raise ValueError("DB_HOST is required.") 
 PORT = os.getenv("DB_PORT")
+if not PORT:
+    logging.critical("DB_PORT environment variable not set.")
+    raise ValueError("DB_PORT is required.") 
 
 def fetch_county_data(
         household_keys: List[str], 
@@ -64,6 +83,22 @@ def fetch_county_data(
     Returns:
         pd.DataFrame: Merged DataFrame containing all retrieved household data.
     """
+    if not household_keys or not isinstance(household_keys, list):
+        logging.error("household_keys must be a non-empty list.")
+        return pd.DataFrame()
+    if not year or not isinstance(year, str):
+        logging.error("year must be a non-empty string.")
+        return pd.DataFrame()
+    if not state_code or not isinstance(state_code, str) or len(state_code) != 2:
+        logging.error("state_code must be a 2-digit string.")
+        return pd.DataFrame()
+    if not county_code or not isinstance(county_code, str) or len(county_code) != 3:
+        logging.error("county_code must be a 3-digit string.")
+        return pd.DataFrame()
+    if not api_key or not isinstance(api_key, str):
+        logging.error("api_key must be provided and a string.")
+        return pd.DataFrame()
+        
     county_data = pd.DataFrame()
 
     for count in range((len(household_keys) // 50) + 1):
@@ -81,17 +116,31 @@ def fetch_county_data(
             f"https://api.census.gov/data/{year}/acs/acs5?"
             f"get=NAME,{variables}&for=tract:*&in=state:{state_code}&in=county:{county_code}&key={api_key}"
         )
-        response = requests.get(url)
+        try:
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            try:
+                data = response.json()
+            except ValueError as e:
+                logging.error(f"JSON decode error for Census API: {e} | URL: {url}")
+                continue
+            # checks for header and data rows
+            if not data or len(data) < 2:
+                logging.error(f"Empty or malformed Census API response: {url}")
+                continue
+        except requests.RequestException as e:
+            logging.error(f"HTTP request failed for Census API: {e} | URL: {url}")
+            continue
 
         if not county_data.empty:
             county_data = pd.merge(
-                pd.DataFrame(response.json()[1:], columns=response.json()[0]),
+                pd.DataFrame(data[1:], columns=data[0]),
                 county_data,
                 on='NAME',
                 how='inner'
             )
         else:
-            county_data = pd.DataFrame(response.json()[1:], columns=response.json()[0])
+            county_data = pd.DataFrame(data[1:], columns= data[0])
     return county_data
 
 # Initialize county data using the function
@@ -116,14 +165,37 @@ def load_and_merge_geodata(
     Returns:
         geopandas.GeoDataFrame: Merged geospatial dataframe for the specified county.
     """
+    if not year or not isinstance(year, str):
+        logging.error("year must be a non-empty string.")
+        return None
+    if not state_code or not isinstance(state_code, str) or len(state_code) != 2:
+        logging.error("state_code must be a 2-digit string.")
+        return None
+    if not county_code or not isinstance(county_code, str) or len(county_code) != 3:
+        logging.error("county_code must be a 3-digit string.")
+        return None
+    if census_data is None or not isinstance(census_data, pd.DataFrame) or census_data.empty:
+        logging.error("census_data must be a non-empty DataFrame.")
+        return None
+        
     tract_url = f"https://www2.census.gov/geo/tiger/TIGER{year}/TRACT/tl_{year}_{state_code}_tract.zip"
-    response = requests.get(tract_url)
 
-    with ZipFile(BytesIO(response.content)) as zip_ref:
+    try:
+        response = requests.get(tract_url, timeout=30)
+        response.raise_for_status()
+        zip_bytes = BytesIO(response.content)
+    except requests.RequestException as e:
+        logging.error(f"HTTP request failed for shapefile: {e} | URL: {tract_url}")
+        return None
+    except Exception as e:
+        logging.error(f"Unexpected error downloading shapefile: {e} | URL: {tract_url}")
+        return None
+
+    with ZipFile(zip_bytes) as zip_ref:
         with tempfile.TemporaryDirectory() as tmpdirname:
             zip_ref.extractall(tmpdirname)
 
-            for root, files in os.walk(tmpdirname):
+            for root, dirs, files in os.walk(tmpdirname):
                 for file in files:
                     if file.endswith(".shp") or file.endswith(".geojson"):
                         file_path = os.path.join(root, file)
@@ -134,7 +206,11 @@ def load_and_merge_geodata(
     county_geodata["tract_y"] = county_geodata["tract_y"].astype(int)
     census_data["tract_y"] = census_data["tract_y"].astype(int)
 
-    merged_data = pd.merge(county_geodata, census_data, on="tract_y", how="inner")
+    try:
+         merged_data = pd.merge(county_geodata, census_data, on="tract_y", how="inner")
+    except Exception as e:
+        logging.error(f"Failed to merge DataFrames: {e}")
+        return None
     merged_data.rename(columns=households_variables_dict, inplace=True)
     merged_data = merged_data.to_crs("epsg:3857")
 
@@ -168,18 +244,28 @@ def initialize_database_tables(
         Tuple[psycopg2.extensions.connection, psycopg2.extensions.cursor]: 
             A tuple containing the active connection and cursor objects.
     """
-    connection = psycopg2.connect(
-        host=host,
-        database=database,
-        user=user,
-        password=password,
-        port=port
-    )
-    cursor = connection.cursor()
+    try:
+        connection = psycopg2.connect(
+            host=host,
+            database=database,
+            user=user,
+            password=password,
+            port=port
+        )
+        cursor = connection.cursor()
+    except psycopg2.Error as e:
+        logging.error(f"Failed to connect to the database: {e}")
+        return None, None
+    
 
     # Drop tables if they already exist
-    cursor.execute('DROP TABLE IF EXISTS roads;')
-    cursor.execute('DROP TABLE IF EXISTS food_stores;')
+    try:
+        cursor.execute('DROP TABLE IF EXISTS roads;')
+        cursor.execute('DROP TABLE IF EXISTS food_stores;')
+    except psycopg2.Error as e:
+        logging.error(f"Database table operation failed: {e}")
+        connection.rollback()
+        return None, None
 
     # Create tables
     create_roads_query = '''
@@ -325,8 +411,12 @@ def process_food_stores(
 
         map_elements.append(polygon.buffer(20))
         store_tuples.append((str(row["shop"]), str(polygon), str(row["name"])))
-
-    extras.execute_values(cursor, food_stores_query, store_tuples)
+    try:
+        extras.execute_values(cursor, food_stores_query, store_tuples)
+    except psycopg2.Error as e:
+        logging.error(f"Databse insertion failed: {e}")
+        connection.rollback()
+        raise
 
     return STRtree(map_elements)
 
@@ -594,7 +684,7 @@ def generate_houses_from_housing_areas(
     total_count = 0
 
     for idx, housing_area in enumerate(housing_areas):
-        print(f"{round((idx + 1) / len(housing_areas) * 100)}%")
+        logging.info(f"{round((idx + 1) / len(housing_areas) * 100)}%")
 
         candidate_houses = place_houses_in_area(housing_area)
 
@@ -750,7 +840,7 @@ def process_housing_areas(
     total_count = 0
 
     for i, housing_area in enumerate(housing_areas):
-        print(f"{round((i + 1) / len(housing_areas) * 100)}%")
+        logging.info(f"{round((i + 1) / len(housing_areas) * 100)}%")
 
         exterior_coords = list(housing_area.exterior.coords)
         edges = [LineString([exterior_coords[i], exterior_coords[i + 1]])
@@ -826,12 +916,12 @@ def insert_households(cursor, house_tuples: List[Tuple], household_query: str) -
         household_query (str): The SQL query template for inserting households
 
     Raises:
-        Exception: If insertion fails, the exception is re-raised after printing the error.
+        Exception: If insertion fails, the exception is re-raised after logging.infoing the error.
     """
     try:
         extras.execute_values(cursor, household_query, house_tuples)
     except Exception as e:
-        print(f"Insertion error: {e}")
+        logging.info(f"Insertion error: {e}")
         raise
 
 
@@ -868,23 +958,23 @@ def main() -> None:
     """
     Main function to execute the full data processing and insertion pipeline.
     """
-    print("Fetching household census data...")
+    logging.info("Fetching household census data...")
     county_data = fetch_county_data(households_key_list, YEAR, STATE_CODE, COUNTY_CODE, APIKEY)
 
-    print("Loading and merging tract shapefile with census data...")
+    logging.info("Loading and merging tract shapefile with census data...")
     tract_data = load_and_merge_geodata(YEAR, STATE_CODE, COUNTY_CODE, county_data)
 
-    print("Initializing database and creating tables...")
+    logging.info("Initializing database and creating tables...")
     connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT)
     household_query = create_households_table(cursor)
 
-    print("Processing road network...")
+    logging.info("Processing road network...")
     map_elements, housing_areas, road_tuples = process_road_network(CENTER_POINT, DIST)
 
-    print("Processing food stores...")
+    logging.info("Processing food stores...")
     store_index = process_food_stores(CENTER_POINT, DIST, map_elements, cursor)
 
-    print("Generating household records...")
+    logging.info("Generating household records...")
     tract_index = STRtree(tract_data["geometry"])
     houses_index = RTreeIndex()
     store_tuples = list(cursor.execute("SELECT shop, geometry, name FROM food_stores;"))  # fallback in case needed
@@ -905,15 +995,18 @@ def main() -> None:
         shapely.wkt.loads
     )
 
-    print("Inserting households into the database...")
+    logging.info("Inserting households into the database...")
     insert_households(cursor, house_tuples, household_query)
 
-    print("Finalizing and closing connection...")
+    logging.info("Finalizing and closing connection...")
     connection.commit()
     cursor.close()
     connection.close()
-    print("Done.")
-
+    logging.info("Done.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logging.critical(F"Fatal error in pipeline: {e}", exc_info=True)
+        sys.exit(1)
