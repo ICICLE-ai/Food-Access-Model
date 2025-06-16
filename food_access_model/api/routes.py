@@ -9,20 +9,19 @@ from food_access_model.repository.db_repository import DBRepository, get_db_repo
 from food_access_model.abm.geo_model import GeoModel
 from typing import List, Dict, Union, Any
 
-
 router = APIRouter(prefix="/api", tags=["ABM"])
 #FRONT_URL = os.environ.get("FRONT_URL", "http://localhost:5173")
-
 @router.get("/stores")
-async def get_stores(repository: DBRepository = Depends(get_db_repository))-> Dict[str, Any]:
+async def get_stores(repository: DBRepository = Depends(get_db_repository))-> Dict[str, list]:
     """
     Gets all stores from the model
 
     Parameters:
-        repository (DBRepository): The repository of store models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores,
+        and other data required to initialize the simulation
     
     Returns:
-        dict: A dictionary of stores in the model with 'stores_json' as the key
+        dict: A dictionary with a key 'stores_json' which has a list of unspecified type
     """
     model = repository.get_model()
     stores = model.get_stores()
@@ -30,15 +29,16 @@ async def get_stores(repository: DBRepository = Depends(get_db_repository))-> Di
 
 
 @router.get("/agents")
-async def get_agents(repository: DBRepository = Depends(get_db_repository))->Dict[str, Any]:
+async def get_agents(repository: DBRepository = Depends(get_db_repository))->Dict[str, list]:
     """
     Gets all agents from the model
     
     Parameters:
-        repository (DBRepository): The repository of store models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
+        and other data required to initialize the simulation
  
     Returns:
-     dict: A dictionary of agents in the model with 'agents_json' as the key
+     dict: A dictionary of agents in the model with 'agents_json' as the key which has a list of unspecified type
     """
     model = repository.get_model()
     agents = model.agents
@@ -46,15 +46,16 @@ async def get_agents(repository: DBRepository = Depends(get_db_repository))->Dic
 
 
 @router.get("/households")
-async def get_households(repository: DBRepository = Depends(get_db_repository))->Dict[str, Any]:
+async def get_households(repository: DBRepository = Depends(get_db_repository))->Dict[str, list]:
     """
     Gets all households from the model
     
     Parameters:
-        repository (DBRepository): The repository of households models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
+        and other data required to initialize the simulation
  
     Returns:
-        dict: A dictionary of households in the model with 'households_json' as the key
+        dict: A dictionary of households in the model with 'households_json' as the key which has a list of unspecified type
     """
     model = repository.get_model()
     households = model.get_households().astype(str)
@@ -64,13 +65,14 @@ async def get_households(repository: DBRepository = Depends(get_db_repository))-
 
 
 @router.delete("/remove-store")
-async def remove_store(store_name: str = Body(...), repository: DBRepository = Depends(get_db_repository))->Dict[str, Any]:
+async def remove_store(store_name: str = Body(...), repository: DBRepository = Depends(get_db_repository))->Dict[str, list]:
     """
     Removes a store from a model given a name
     
     Parameters:
         store_name (str): The name of the store to be removed
-        repository (DBRepository): The repository of store models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
+        and other data required to initialize the simulation
  
     Returns:
         dict: A dictionary of the updated stores in the model as well as the removed store
@@ -101,12 +103,13 @@ async def remove_store(store_name: str = Body(...), repository: DBRepository = D
 
 
 @router.put("/reset")
-async def reset_all(repository: DBRepository = Depends(get_db_repository))->Dict[str, Any]:
+async def reset_all(repository: DBRepository = Depends(get_db_repository))->Dict[str, list]:
     """
     Resets the stores in the model
  
     Parameters:
-        repository (DBRepository): The repository of store models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
+        and other data required to initialize the simulation
  
     Returns:
         dict: An empty dictionary (of stores)
@@ -118,13 +121,14 @@ async def reset_all(repository: DBRepository = Depends(get_db_repository))->Dict
 
 
 @router.post("/add-store")
-async def add_store(store: StoreInput, repository: DBRepository = Depends(get_db_repository))->Dict[str, Any]:
+async def add_store(store: StoreInput, repository: DBRepository = Depends(get_db_repository))->Dict[str, list]:
     """
     Adds a store to the model
  
     Parameters:
         store (StoreInput): The store object being inputted consisting of name, category, latitude, and longitude
-        repository (DBRepository): The repository of store models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
+        and other data required to initialize the simulation
  
     Returns:
         dict: A dictionary of stores in the model with the new added store
@@ -175,7 +179,8 @@ async def get_step_number(repository: DBRepository = Depends(get_db_repository))
     Gets the current step number the model is at
     
     Parameters:
-        repository (DBRepository): The repository of store models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
+        and other data required to initialize the simulation
  
     Returns:
         dict: A dictionary with the current step number
@@ -215,10 +220,11 @@ def _run_model_step(repository: DBRepository)->int:
     Runs one step of the model
         
     Parameters:
-        repository (DBRepository): The repository of store models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
+        and other data required to initialize the simulation
         
     Returns:
-        int: The number of steps taken so far after the simulation updates
+        int: The current time step in the simulation
     """
     stores = repository.get_food_stores()
     households = repository.get_households()    
@@ -275,7 +281,8 @@ async def step(repository: DBRepository = Depends(get_db_repository))->Dict[str,
     Runs one step of the model
         
     Parameters:
-        repository (DBRepository): The repository of store models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
+        and other data required to initialize the simulation
         
     Returns:
         dict: Dictionary with the total number of steps taken
@@ -293,7 +300,8 @@ async def get_num_households(repository: DBRepository = Depends(get_db_repositor
     Gets the number of households in the model
         
     Parameters:
-        repository (DBRepository): The repository of store models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
+        and other data required to initialize the simulation
         
     Returns:
         dict: Dictionary with the number of households in the model
@@ -309,7 +317,8 @@ async def get_num_stores(repository: DBRepository = Depends(get_db_repository))-
     Gets the number of stores in the model
         
     Parameters:
-        repository (DBRepository): The repository of store models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
+        and other data required to initialize the simulation
         
     Returns:
         dict: Dictionaries with the number of stores, number of supermarket stores, and number of non-supermarket stores
@@ -339,7 +348,8 @@ async def get_household_stats(repository: DBRepository = Depends(get_db_reposito
     Gets household stats
         
     Parameters:
-        repository (DBRepository): The repository of store models
+        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
+        and other data required to initialize the simulation
         
     Returns:
         dict: Dictionaries with average income of the households and average vehicles per household
