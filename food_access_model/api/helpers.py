@@ -14,14 +14,14 @@ class StoreInput(BaseModel):
         name (str): The name of the store.
         category (str): The category/type of the store (e.g., supermarket, grocery).
         longitude (str): The longitude coordinate of the store location.
-        latitude (str): The latitude coordinate of the store location.
+        latitude (str): The latitude coordinate of the store location.A
     """   
     name: str
     category: str
     longitude: str 
     latitude: str
 
-def convert_centroid_to_polygon(latitude, longitude, type):
+def convert_centroid_to_polygon(latitude: str, longitude: str, type: str) -> str:
     """
     Converts latitude and longitude into a polygon to display a store's area.
     
