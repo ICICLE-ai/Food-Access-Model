@@ -157,13 +157,13 @@ Don't forget to give the project a star! Thanks again!
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Contributors
-[Steve](https://github.com/blue442)
-[Abanish] (https://github.com/abanishkhatry) 
-[Oscar Almaraz](https://github.com/OscarA974)
-[Ira](https://github.com/irahande22)
-[Shrivas](https://github.com/shrivasshankar)
-[Sophia](https://github.com/schen625)
-[Edric](https://github.com/MiniMiniFridge)
+- [Steve](https://github.com/blue442)
+- [Abanish](https://github.com/abanishkhatry) 
+- [Oscar Almaraz](https://github.com/OscarA974)
+- [Ira](https://github.com/irahande22)
+- [Shrivas](https://github.com/shrivasshankar)
+- [Sophia](https://github.com/schen625)
+- [Edric](https://github.com/MiniMiniFridge)
 
 
 <!-- LICENSE -->
@@ -205,6 +205,3 @@ Don't forget to give the project a star! Thanks again!
 [JQuery.com]: https://img.shields.io/badge/jQuery-0769AD?style=for-the-badge&logo=jquery&logoColor=white
 [JQuery-url]: https://jquery.com 
 
-## Contributors
-
-- [Oscar Almaraz](https://github.com/OscarA974)
