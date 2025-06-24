@@ -287,11 +287,6 @@ def initialize_database_tables(
     cursor.execute(create_roads_query)
     cursor.execute(create_food_stores_query)
 
-    return connection, cursor
-
-# Call the function to set up the database and get cursor
-connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT)
-
 
 def process_road_network(
     center_point: Tuple[float, float],
@@ -302,7 +297,7 @@ def process_road_network(
 
     Args:
         center_point (Tuple[float, float]): Latitude and longitude of the center location.
-        dist (float): Distance in meters to define the radius of the map from the center point.
+        dist (float): Distance in 1000 meters to define the radius of the map from the center point.
 
     Returns:
         Tuple[
@@ -327,7 +322,7 @@ def process_road_network(
         gdf_edges["service"] = None  # ensure consistent schema
         gdf_edges = gdf_edges[["name", "highway", "length", "geometry", "service"]]
 
-    for _, row in gdf_edges.iterrows():
+    for _, row in gdf_edges.itertuples():
         if row["highway"] in ["residential", "living_street"]:
             housing_areas.append(row["geometry"].buffer(30))
             map_elements.append(row["geometry"].buffer(3))
@@ -394,7 +389,7 @@ def process_food_stores(
     store_tuples: List[Tuple[str, str, str]] = []
     food_stores_query = "INSERT INTO food_stores (shop, geometry, name) VALUES %s"
 
-    for _, row in features.iterrows():
+    for _, row in features.itertuples():
         point = row["geometry"].centroid if not isinstance(row["geometry"], Point) else row["geometry"]
 
         if row["shop"] in ["supermarket", "grocery", "greengrocer"]:
@@ -882,8 +877,8 @@ def process_housing_areas(
 
                 house_4326 = transform_polygon_coords(house, "EPSG:3857", "EPSG:4326")
                 store_4326 = transform_polygon_coords(nearest_store, "EPSG:3857", "EPSG:4326")
-                origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
-                destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
+                ##origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
+                ##destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
 
                 # Placeholder travel times (to be replaced with real data if available)
                 walking_time = biking_time = transit_time = driving_time = 0
