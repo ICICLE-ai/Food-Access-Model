@@ -65,7 +65,7 @@ jobs:
       
       - name: Test container starts successfully
         run: |
-            docker run -d -p 8000:8000 --name test-container ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag_name.outputs.tag_name }}
+            docker run -d -p 8080:8080 --name test-container ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag_name.outputs.tag_name }}
             timeout=60
             interval=5
             elapsed=0
