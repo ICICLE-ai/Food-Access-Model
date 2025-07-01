@@ -1,5 +1,9 @@
-FIBSCODE = "39049"
+
 YEAR = 2022
+PLACE_NAME  = "Franklin County, Ohio, USA"
+CENTER_POINT = (39.938806, -82.972361)   
+DIST = 1000
+FIPSCODE = "39049"
 
 #Dictionary to describe homedata Variables
 households_variables_dict = {
@@ -188,7 +192,7 @@ households_key_list = [
     "B19019_008E"
 ]
 
-household_values_list = list = [
+household_values_list = [
     "total households in tract",
     "under 10k",
     "10k to 15k",
