@@ -1,41 +1,49 @@
+# Standard Library Imports
+import logging
+import math
+import os
+import random
+import tempfile
+from datetime import datetime
+from io import BytesIO
+from typing import List, Tuple, Optional, Callable, Any
+from zipfile import ZipFile
+
+#  Third-Party Library Imports (External packages you install with pip):
+import numpy as np
+import pandas as pd
+import geopandas
+import requests
+import rtree
+import shapely
+import shapely.geometry as geometry
 import osmnx as ox
 import psycopg2
-from shapely.geometry import Point, Polygon, LineString
-from shapely.strtree import STRtree
+# import googlemaps
+from psycopg2 import extras
 from rtree.index import Index as RTreeIndex
 from psycopg2.extensions import connection as Connection, cursor as Cursor
-import rtree
-import math
-import pandas as pd
-import requests
-from zipfile import ZipFile
-import tempfile
-import shapely
-#import googlemaps
-from datetime import datetime
-import os
-import numpy as np
-import geopandas
-import random
-from psycopg2 import extras
-import shapely.geometry as geometry
+from shapely.geometry import Point, Polygon, LineString
+from shapely.strtree import STRtree
 from pyproj import Transformer
-from typing import List, Tuple, Optional, Callable, Any
-from io import BytesIO
-import logging
-from household_constants import(
+from dotenv import load_dotenv 
+
+
+# Local Application Imports
+from household_constants import (
     YEAR, 
-    PLACE_NAME, 
     CENTER_POINT, 
     DIST, 
     FIPSCODE, 
     households_variables_dict,
     households_key_list,
-    household_values_list, 
     income_ranges,
     size_index_dict,
     workers_index_dict
-)  
+)
+
+
+load_dotenv()
 
 COUNTY_CODE = FIPSCODE[2:]                  
 STATE_CODE = FIPSCODE[:2]   
@@ -316,11 +324,10 @@ def process_road_network(
     gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
     gdf_edges = gdf_edges.to_crs("epsg:3857")
 
-    if "service" in gdf_edges.columns:
-        gdf_edges = gdf_edges[["name", "highway", "length", "geometry", "service"]]
-    else:
-        gdf_edges["service"] = None  # ensure consistent schema
-        gdf_edges = gdf_edges[["name", "highway", "length", "geometry", "service"]]
+    if "service" not in gdf_edges.columns:
+        gdf_edges["service"] = None
+    gdf_edges = gdf_edges[["name", "highway", "length", "geometry", "service"]]
+
 
     for _, row in gdf_edges.itertuples():
         if row["highway"] in ["residential", "living_street"]:
@@ -360,7 +367,7 @@ def process_food_stores(
     dist: float,
     map_elements: List[geometry.base.BaseGeometry],
     cursor: psycopg2.extensions.cursor
-) -> STRtree:
+) -> Tuple[STRtree, List] : 
     """
     Retrieve and process food store locations from OpenStreetMap, convert them into geometric shapes,
     and insert them into the database.
@@ -386,7 +393,9 @@ def process_food_stores(
     features = features.to_crs("epsg:3857")
     features = features[["shop", "geometry", "name"]]
 
-    store_tuples: List[Tuple[str, str, str]] = []
+    store_tuples_strPoly: List[Tuple[str, str, str]] = []
+    store_tuples_Poly: List[Tuple[str, str, str]] = []
+
     food_stores_query = "INSERT INTO food_stores (shop, geometry, name) VALUES %s"
 
     for _, row in features.itertuples():
@@ -405,15 +414,16 @@ def process_food_stores(
             ])
 
         map_elements.append(polygon.buffer(20))
-        store_tuples.append((str(row["shop"]), str(polygon), str(row["name"])))
+        store_tuples_strPoly.append((str(row["shop"]), str(polygon), str(row["name"])))
+        store_tuples_Poly.append((str(row["shop"]), polygon, str(row["name"])))
     try:
-        extras.execute_values(cursor, food_stores_query, store_tuples)
+        extras.execute_values(cursor, food_stores_query, store_tuples_strPoly)
     except psycopg2.Error as e:
         logging.error(f"Databse insertion failed: {e}")
         connection.rollback()
         raise
-
-    return STRtree(map_elements)
+    
+    return (STRtree(map_elements),store_tuples_Poly) , 
 
 
 # Call the function and get the spatial index of mapped elements
@@ -798,16 +808,8 @@ def process_housing_areas(
     housing_areas: List[Polygon],
     map_elements_index: STRtree,
     map_elements: List[Polygon],
-    houses_index: RTreeIndex,
-    tract_index: STRtree,
     data: pd.DataFrame,
-    income_ranges: List[Tuple[int, int]],
-    size_index_dict: dict,
-    workers_index_dict: dict,
-    vehicle_weights: List[int],
-    worker_weights: List[int],
     store_tuples: List[Tuple[str, str, str]],
-    shapely_loader: Any
 ) -> List[Tuple]:
     """
     Process a list of housing area polygons, generate synthetic houses along their borders,
@@ -817,16 +819,8 @@ def process_housing_areas(
         housing_areas (List[Polygon]): Polygons representing areas around residential roads.
         map_elements_index (STRtree): STRtree index for nearby road/store geometries.
         map_elements (List[Polygon]): Buffered geometries (roads, stores) for intersection checking.
-        houses_index (RTreeIndex): R-tree index to check house overlap.
-        tract_index (STRtree): STRtree index of tract geometries.
         data (pd.DataFrame): Census tract data with attributes.
-        income_ranges (List[Tuple[int, int]]): Bracketed income ranges for sampling.
-        size_index_dict (dict): Dict for mapping household sizes to vehicle weight indices.
-        workers_index_dict (dict): Dict for mapping worker counts to vehicle weight indices.
-        vehicle_weights (List[int]): Vehicle weights from census.
-        worker_weights (List[int]): Worker weights from census.
         store_tuples (List[Tuple[str, str, str]]): Store (shop type, WKT, name).
-        shapely_loader (Any): Function to load WKT strings into Polygons.
 
     Returns:
         List[Tuple]: Tuples of household data ready for DB insertion.
@@ -834,6 +828,14 @@ def process_housing_areas(
     house_tuples: List[Tuple] = []
     total_count = 0
 
+    # R-tree index to check house overlap
+    houses_index = RTreeIndex()
+    # STRtree index of tract geometries.
+    tract_index = STRtree(data["geometry"])
+
+    vehicle_weights = List[int]
+    worker_weights = List[int]
+    
     for i, housing_area in enumerate(housing_areas):
         logging.info(f"{round((i + 1) / len(housing_areas) * 100)}%")
 
@@ -871,7 +873,7 @@ def process_housing_areas(
                 except Exception:
                     continue
 
-                nearest_store = get_nearest_store(house, store_tuples, shapely_loader)
+                nearest_store = get_nearest_store(house, store_tuples, shapely.wkt.loads)
                 if nearest_store is None:
                     continue
 
@@ -929,7 +931,7 @@ def connect_to_db(
 ) -> Tuple[Connection, Cursor]:
     """
     Establish connection to the PostgreSQL database.
-
+    
     Args:
         host (str): Database host.
         database (str): Database name.
@@ -970,24 +972,16 @@ def main() -> None:
     store_index = process_food_stores(CENTER_POINT, DIST, map_elements, cursor)
 
     logging.info("Generating household records...")
-    tract_index = STRtree(tract_data["geometry"])
-    houses_index = RTreeIndex()
-    store_tuples = list(cursor.execute("SELECT shop, geometry, name FROM food_stores;"))  # fallback in case needed
+
+    # yeslai return wala banam, through process_food_stores()
+    store_tuples =  store_index[1] 
 
     house_tuples = process_housing_areas(
         housing_areas,
         store_index,
         map_elements,
-        houses_index,
-        tract_index,
         tract_data,
-        income_ranges,
-        size_index_dict,
-        workers_index_dict,
-        [],  # vehicle_weights are computed inside assign function
-        [],  # worker_weights too
         store_tuples,
-        shapely.wkt.loads
     )
 
     logging.info("Inserting households into the database...")
@@ -996,6 +990,7 @@ def main() -> None:
     logging.info("Finalizing and closing connection...")
     connection.commit()
     cursor.close()
+
     connection.close()
     logging.info("Done.")
 
