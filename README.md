@@ -22,7 +22,7 @@ The Food Access and Strategy Simulation tool is a powerful resource for analyzin
 *National Science Foundation (NSF) funded AI institute for Intelligent Cyberinfrastructure with Computational Learning in the Environment (ICICLE) (OAC 2112606)*
 
 
-# Comprehensive User Guide
+# Tutorials
 
 ## Introduction
 
@@ -67,7 +67,7 @@ at the census tract level.
     - Average household income
     - Average number of household vehicles
 
-## How to Use the Tool
+# How To Guide
 
 Step 1: Adding a Store
 
