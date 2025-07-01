@@ -168,6 +168,10 @@ using data within the database.
 <!-- CONTRIBUTING -->
 ## Contributing
 
+CONTRIBUTORS:
+
+[Tanish Upakare](https://github.com/tanishhh2077)
+
 Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
 If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
@@ -182,12 +186,14 @@ Don't forget to give the project a star! Thanks again!
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Contributors
-[Steve](https://github.com/blue442)
-[Abanish](https://github.com/abanishkhatry) 
-[Oscar Almaraz](https://github.com/OscarA974)
-[Ira](https://github.com/irahande22)
-[Shrivas](https://github.com/shrivasshankar)
-[Sophia](https://github.com/schen625)
+- [Steve](https://github.com/blue442)
+- [Abanish](https://github.com/abanishkhatry) 
+- [Oscar Almaraz](https://github.com/OscarA974)
+- [Ira](https://github.com/irahande22)
+- [Shrivas](https://github.com/shrivasshankar)
+- [Sophia](https://github.com/schen625)
+- [Edric](https://github.com/MiniMiniFridge)
+
 
 
 
@@ -224,5 +230,3 @@ Don't forget to give the project a star! Thanks again!
 [Bootstrap-url]: https://getbootstrap.com
 [JQuery.com]: https://img.shields.io/badge/jQuery-0769AD?style=for-the-badge&logo=jquery&logoColor=white
 [JQuery-url]: https://jquery.com 
-
-
