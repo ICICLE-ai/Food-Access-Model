@@ -164,7 +164,7 @@ Don't forget to give the project a star! Thanks again!
 - [Shrivas](https://github.com/shrivasshankar)
 - [Sophia](https://github.com/schen625)
 - [Edric](https://github.com/MiniMiniFridge)
-
+- [Cornell](https://github.com/cornell-s)
 
 <!-- LICENSE -->
 ## License
