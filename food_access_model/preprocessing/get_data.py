@@ -19,6 +19,7 @@ import shapely
 import shapely.geometry as geometry
 import osmnx as ox
 import psycopg2
+import sys
 # import googlemaps
 from psycopg2 import extras
 from rtree.index import Index as RTreeIndex
@@ -28,9 +29,11 @@ from shapely.strtree import STRtree
 from pyproj import Transformer
 from dotenv import load_dotenv 
 
+from . import household_constants #import whole module
+
 
 # Local Application Imports
-from household_constants import (
+from .household_constants import (
     YEAR, 
     CENTER_POINT, 
     DIST, 
@@ -42,17 +45,21 @@ from household_constants import (
     workers_index_dict
 )
 
-
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
+if not os.getenv('DB_USER'):
+    raise ValueError("DB_PASS is required.")
+else: 
+    print("at 49")
 
 COUNTY_CODE = FIPSCODE[2:]                  
 STATE_CODE = FIPSCODE[:2]   
 
-PASS = os.getenv("DB_PASS")
+PASS = os.getenv('DB_PASS', 'default_password')
 if not PASS:
     logging.critical("DB_PASS environment variable not set.")
     raise ValueError("DB_PASS is required.")     
 APIKEY = os.getenv("APIKEY")
+print(APIKEY)
 if not APIKEY:
     logging.critical("APIKEY environment variable not set.")
     raise ValueError("APIKEY is required.")   
@@ -94,8 +101,8 @@ def fetch_county_data(
     if not household_keys or not isinstance(household_keys, list):
         logging.error("household_keys must be a non-empty list.")
         return pd.DataFrame()
-    if not year or not isinstance(year, str):
-        logging.error("year must be a non-empty string.")
+    if not year:
+        logging.error("year must be non-empty.")
         return pd.DataFrame()
     if not state_code or not isinstance(state_code, str) or len(state_code) != 2:
         logging.error("state_code must be a 2-digit string.")
@@ -125,7 +132,7 @@ def fetch_county_data(
             f"get=NAME,{variables}&for=tract:*&in=state:{state_code}&in=county:{county_code}&key={api_key}"
         )
         try:
-            response = requests.get(url, timeout=30)
+            response = requests.get(url, timeout=30, verify=False)
             response.raise_for_status()
             try:
                 data = response.json()
@@ -151,9 +158,6 @@ def fetch_county_data(
             county_data = pd.DataFrame(data[1:], columns= data[0])
     return county_data
 
-# Initialize county data using the function
-COUNTY_DATA = fetch_county_data(households_key_list, YEAR, STATE_CODE, COUNTY_CODE, APIKEY)
-
 
 def load_and_merge_geodata(
     year: str,
@@ -173,8 +177,8 @@ def load_and_merge_geodata(
     Returns:
         geopandas.GeoDataFrame: Merged geospatial dataframe for the specified county.
     """
-    if not year or not isinstance(year, str):
-        logging.error("year must be a non-empty string.")
+    if not year:
+        logging.error("year must be non-empty.")
         return None
     if not state_code or not isinstance(state_code, str) or len(state_code) != 2:
         logging.error("state_code must be a 2-digit string.")
@@ -224,12 +228,6 @@ def load_and_merge_geodata(
 
     return merged_data
 
-# Run and create merged geospatial data
-data = load_and_merge_geodata(YEAR, STATE_CODE, COUNTY_CODE, COUNTY_DATA)
-
-# Create spatial index from geometry
-tract_index = STRtree(data["geometry"])
-
 
 def initialize_database_tables(
     host: str,
@@ -260,40 +258,37 @@ def initialize_database_tables(
             password=password,
             port=port
         )
+        connection.autocommit = True
         cursor = connection.cursor()
-    except psycopg2.Error as e:
-        logging.error(f"Failed to connect to the database: {e}")
-        return None, None
-    
-
-    # Drop tables if they already exist
-    try:
         cursor.execute('DROP TABLE IF EXISTS roads;')
         cursor.execute('DROP TABLE IF EXISTS food_stores;')
+
+        # Create tables
+        create_roads_query = '''
+        CREATE TABLE roads (
+            name TEXT,
+            highway VARCHAR(30),
+            length NUMERIC,
+            geometry TEXT,
+            service VARCHAR(30)
+        );
+        '''
+        create_food_stores_query = '''
+        CREATE TABLE food_stores (
+            shop VARCHAR(15),
+            geometry TEXT,
+            name VARCHAR(50)
+        );
+        '''
+        logging.debug('creating roads table')
+        cursor.execute(create_roads_query)
+        logging.debug('creating food stores table')
+        cursor.execute(create_food_stores_query)
+        return connection, cursor
     except psycopg2.Error as e:
-        logging.error(f"Database table operation failed: {e}")
+        logging.error(f"Database error: {e}")
         connection.rollback()
         return None, None
-
-    # Create tables
-    create_roads_query = '''
-    CREATE TABLE roads (
-        name TEXT,
-        highway VARCHAR(30),
-        length NUMERIC,
-        geometry TEXT,
-        service VARCHAR(30)
-    );
-    '''
-    create_food_stores_query = '''
-    CREATE TABLE food_stores (
-        shop VARCHAR(15),
-        geometry TEXT,
-        name VARCHAR(50)
-    );
-    '''
-    cursor.execute(create_roads_query)
-    cursor.execute(create_food_stores_query)
 
 
 def process_road_network(
@@ -329,23 +324,23 @@ def process_road_network(
     gdf_edges = gdf_edges[["name", "highway", "length", "geometry", "service"]]
 
 
-    for _, row in gdf_edges.itertuples():
-        if row["highway"] in ["residential", "living_street"]:
-            housing_areas.append(row["geometry"].buffer(30))
-            map_elements.append(row["geometry"].buffer(3))
-        elif row["service"] == "alley":
-            housing_areas.append(row["geometry"].buffer(30))
-            map_elements.append(row["geometry"].buffer(3))
-        elif row["highway"] == "motorway":
-            map_elements.append(row["geometry"].buffer(100))
-        elif row["highway"] == "trunk":
-            map_elements.append(row["geometry"].buffer(30))
-        elif row["highway"] == "primary":
-            map_elements.append(row["geometry"].buffer(10))
-        elif row["highway"] == "secondary":
-            map_elements.append(row["geometry"].buffer(10))
-        elif isinstance(row["geometry"], LineString):
-            map_elements.append(row["geometry"])
+    for row in gdf_edges.itertuples():
+        if row.highway in ["residential", "living_street"]:
+            housing_areas.append(row.geometry.buffer(30))
+            map_elements.append(row.geometry.buffer(3))
+        elif row.service == "alley":
+            housing_areas.append(row.geometry.buffer(30))
+            map_elements.append(row.geometry.buffer(3))
+        elif row.highway == "motorway":
+            map_elements.append(row.geometry.buffer(100))
+        elif row.highway == "trunk":
+            map_elements.append(row.geometry.buffer(30))
+        elif row.highway == "primary":
+            map_elements.append(row.geometry.buffer(10))
+        elif row.highway == "secondary":
+            map_elements.append(row.geometry.buffer(10))
+        elif isinstance(row.geometry, LineString):
+            map_elements.append(row.geometry)
 
     gdf_edges["length"] = gdf_edges["length"].astype(int)
     gdf_edges["geometry"] = gdf_edges["geometry"].astype(str)
@@ -398,10 +393,10 @@ def process_food_stores(
 
     food_stores_query = "INSERT INTO food_stores (shop, geometry, name) VALUES %s"
 
-    for _, row in features.itertuples():
-        point = row["geometry"].centroid if not isinstance(row["geometry"], Point) else row["geometry"]
+    for row in features.itertuples():
+        point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
 
-        if row["shop"] in ["supermarket", "grocery", "greengrocer"]:
+        if row.shop in ["supermarket", "grocery", "greengrocer"]:
             polygon = Polygon([
                 (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
                 for angle in range(0, 360, 60)
@@ -414,8 +409,8 @@ def process_food_stores(
             ])
 
         map_elements.append(polygon.buffer(20))
-        store_tuples_strPoly.append((str(row["shop"]), str(polygon), str(row["name"])))
-        store_tuples_Poly.append((str(row["shop"]), polygon, str(row["name"])))
+        store_tuples_strPoly.append((str(row.shop), str(polygon), str(row.name)))
+        store_tuples_Poly.append((str(row.shop), polygon, str(row.name)))
     try:
         extras.execute_values(cursor, food_stores_query, store_tuples_strPoly)
     except psycopg2.Error as e:
@@ -423,11 +418,11 @@ def process_food_stores(
         connection.rollback()
         raise
     
-    return (STRtree(map_elements),store_tuples_Poly) , 
+    return (STRtree(map_elements),store_tuples_Poly) 
 
 
-# Call the function and get the spatial index of mapped elements
-map_elements_index = process_food_stores(CENTER_POINT, DIST, map_elements, cursor)
+# Call the function and get the spatial index of mapped elements, but this can already be dealt with in main
+# map_elements_index = process_food_stores(CENTER_POINT, DIST, map_elements, cursor)
 
 
 def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
@@ -974,7 +969,7 @@ def main() -> None:
     logging.info("Generating household records...")
 
     # yeslai return wala banam, through process_food_stores()
-    store_tuples =  store_index[1] 
+    store_tuples = store_index[1] 
 
     house_tuples = process_housing_areas(
         housing_areas,
@@ -996,6 +991,8 @@ def main() -> None:
 
 if __name__ == "__main__":
     try:
+        load_dotenv()
+        logging.info(os.getenv('DB_USER'))
         main()
     except Exception as e:
         logging.critical(F"Fatal error in pipeline: {e}", exc_info=True)
