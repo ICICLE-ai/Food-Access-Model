@@ -22,7 +22,19 @@ The Food Access and Strategy Simulation tool is a powerful resource for analyzin
 *National Science Foundation (NSF) funded AI institute for Intelligent Cyberinfrastructure with Computational Learning in the Environment (ICICLE) (OAC 2112606)*
 
 
-# Tutorials
+# Tutorial
+
+## Example Use Case
+
+1. Add a Store: Place a new supermarket in an underserved area—for example, add
+    "Charlie’s Market" to a park location.
+2. Simulate: Step through multiple months to observe how the addition improves food
+    access, particularly for households without vehicles.
+3. Remove a Store: Remove "Charlie’s Market" and/or surrounding stores and examine
+    how food access challenges re-emerge in the affected area.
+
+
+# Explanation
 
 ## Introduction
 
@@ -69,6 +81,7 @@ at the census tract level.
 
 # How To Guide
 
+## How To Use The Tool
 Step 1: Adding a Store
 
 1. Navigate to the Features Tab.
@@ -96,18 +109,7 @@ Step 3: Removing a Store
 3. Confirm the removal. The store will disappear from the map.
 4. Use the Step Function to evaluate the effects of this change on household food access.
 
-## Example Use Case
-
-1. Add a Store: Place a new supermarket in an underserved area—for example, add
-    "Charlie’s Market" to a park location.
-2. Simulate: Step through multiple months to observe how the addition improves food
-    access, particularly for households without vehicles.
-3. Remove a Store: Remove "Charlie’s Market" and/or surrounding stores and examine
-    how food access challenges re-emerge in the affected area.
-
 ## Tips for Effective Use
-
-
 
 - Analyze Community Needs: Before making changes, review community-level data to
 target areas with low food access.
@@ -170,8 +172,6 @@ using data within the database.
 
 CONTRIBUTORS:
 
-[Tanish Upakare](https://github.com/tanishhh2077)
-
 Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
 If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
@@ -193,6 +193,7 @@ Don't forget to give the project a star! Thanks again!
 - [Shrivas](https://github.com/shrivasshankar)
 - [Sophia](https://github.com/schen625)
 - [Edric](https://github.com/MiniMiniFridge)
+- [Tanish Upakare](https://github.com/tanishhh2077)
 
 
 
