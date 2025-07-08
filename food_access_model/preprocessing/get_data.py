@@ -193,7 +193,7 @@ def load_and_merge_geodata(
     tract_url = f"https://www2.census.gov/geo/tiger/TIGER{year}/TRACT/tl_{year}_{state_code}_tract.zip"
 
     try:
-        response = requests.get(tract_url, timeout=30)
+        response = requests.get(tract_url, timeout=30, verify=False)
         response.raise_for_status()
         zip_bytes = BytesIO(response.content)
     except requests.RequestException as e:
@@ -965,20 +965,21 @@ def main() -> None:
 
     logging.info("Processing food stores...")
     store_index = process_food_stores(CENTER_POINT, DIST, map_elements, cursor)
-
-    logging.info("Generating household records...")
-
     # yeslai return wala banam, through process_food_stores()
     store_tuples = store_index[1] 
 
+    logging.info("Generating household records...")
+    household_query = create_households_table(cursor)
+
+    import pdb; pdb.set_trace()
     house_tuples = process_housing_areas(
         housing_areas,
-        store_index,
+        store_index[0],
         map_elements,
         tract_data,
         store_tuples,
     )
-
+    import pdb; pdb.set_trace()
     logging.info("Inserting households into the database...")
     insert_households(cursor, house_tuples, household_query)
 
