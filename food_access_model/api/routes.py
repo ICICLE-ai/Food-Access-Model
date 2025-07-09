@@ -36,7 +36,7 @@ async def get_agents(repository: DBRepository = Depends(get_db_repository))->Dic
     Parameters:
         repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
         and other data required to initialize the simulation
- 
+
     Returns:
      dict: A dictionary of agents in the model with 'agents_json' as the key which has a list of unspecified type
     """
@@ -46,14 +46,14 @@ async def get_agents(repository: DBRepository = Depends(get_db_repository))->Dic
 
 
 @router.get("/households")
-async def get_households(repository: DBRepository = Depends(get_db_repository))->Dict[str, list]:
+async def get_households(repository: DBRepository = Depends(get_db_repository)):#  -> Dict[str, list]:
     """
     Gets all households from the model
-    
+
     Parameters:
         repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
         and other data required to initialize the simulation
- 
+
     Returns:
         dict: A dictionary of households in the model with 'households_json' as the key which has a list of unspecified type
     """
@@ -68,12 +68,12 @@ async def get_households(repository: DBRepository = Depends(get_db_repository))-
 async def remove_store(store_name: str = Body(...), repository: DBRepository = Depends(get_db_repository))->Dict[str, list]:
     """
     Removes a store from a model given a name
-    
+
     Parameters:
         store_name (str): The name of the store to be removed
         repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
         and other data required to initialize the simulation
- 
+
     Returns:
         dict: A dictionary of the updated stores in the model as well as the removed store
     """
