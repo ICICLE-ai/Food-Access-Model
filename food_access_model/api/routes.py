@@ -19,7 +19,7 @@ async def get_stores(repository: DBRepository = Depends(get_db_repository))-> Di
     Parameters:
         repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores,
         and other data required to initialize the simulation
-    
+
     Returns:
         dict: A dictionary with a key 'stores_json' which has a list of unspecified type
     """
@@ -32,7 +32,7 @@ async def get_stores(repository: DBRepository = Depends(get_db_repository))-> Di
 async def get_agents(repository: DBRepository = Depends(get_db_repository))->Dict[str, list]:
     """
     Gets all agents from the model
-    
+
     Parameters:
         repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
         and other data required to initialize the simulation
@@ -59,7 +59,8 @@ async def get_households(repository: DBRepository = Depends(get_db_repository)):
     """
     model = repository.get_model()
     households = model.get_households().astype(str)
-    households_json = households.to_dict(orient="records")
+    min_info = households[["Geometry"]].reset_index()
+    households_json = min_info[['AgentID', 'Geometry']].to_json(orient="records")
     # Return as JSON response
     return {"households_json": households_json}
 

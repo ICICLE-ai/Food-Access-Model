@@ -26,7 +26,7 @@ class CustomEncoder(json.JSONEncoder):
 
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(override=True)
 
 setup_logger()
 logger = logging.getLogger(__name__)

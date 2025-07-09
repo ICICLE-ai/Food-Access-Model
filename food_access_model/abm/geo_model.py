@@ -1,11 +1,14 @@
+import os
+
 from mesa import Model, DataCollector #Base class for GeoModel
 from mesa.time import RandomActivation #Used to specify that agents are run randomly within each step
 from mesa_geo import GeoSpace #GeoSpace that houses agents
+import psycopg2
+from typing import List, Any
+
 from food_access_model.abm.store import Store # Store agent class
 from food_access_model.abm.household import Household # Household agent class
-from typing import List, Any
-import psycopg2
-import os
+
 
 PASS = os.getenv("PASS")
 USER = os.getenv("USER")
@@ -72,16 +75,16 @@ class GeoModel(Model):
         for house in self.households:
             agent = Household(
                 self, 
-                house[0], #id
-                house[1], #polygon
-                house[2], #income
-                house[3], #household_size
-                house[4], #vehicles
-                house[5], #number of workers
-                house[6], #walking_time
-                house[7], #biking_time
-                house[8], #transit_time
-                house[9], #driving_time
+                house[0],  #id
+                house[1],  #polygon
+                house[2],  #income
+                house[3],  #household_size
+                house[4],  #vehicles
+                house[5],  #number of workers
+                house[6],  #walking_time
+                house[7],  #biking_time
+                house[8],  #transit_time
+                house[9],  #driving_time
                 SEARCHRADIUS,
                 CRS,
                 house[10] if len(house) > 10 else 0, #distance_to_closest_store (Coming from a previous model's step execution)
