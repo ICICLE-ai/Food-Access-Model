@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 import json
 
 from food_access_model.api.routes import router as api_router
@@ -10,6 +11,9 @@ class CustomEncoder(json.JSONEncoder):
         if not isinstance(obj, str):
             return str(obj)  # Or use str(obj) if you prefer strings
         return super().default(obj)
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = FastAPI()
 

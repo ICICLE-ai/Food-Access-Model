@@ -144,9 +144,15 @@ You will need python to run this application.
    uv install
    ```
 3. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html). This is only neccessary if you want to create new data. The current database will hold brown county data.
+
 4. create a file `.env` at the root and enter your API in `config.py`
    ```py
-   API_KEY = 'ENTER YOUR API';
+   API_KEY=[CENSUS API KEY (optional)]
+   DB_NAME=[NAME OF DATABASE]
+   DB_USER=[DATABASE USER NAME]
+   DB_PASS=[DATABASE PASSWORD]
+   DB_HOST=[DATABASE HOST]
+   DB_PORT=[DATABASE PORT FOR DATABASE]
    ```
    
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

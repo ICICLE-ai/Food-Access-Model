@@ -6,12 +6,12 @@ from typing import Dict, List, Any, Optional
 #from geo_model import GeoModel
 from food_access_model.abm.geo_model import GeoModel
 
-PASS = os.getenv("PASS")
+PASS = os.getenv("DB_PASS")
 APIKEY = os.getenv("APIKEY")
-USER = os.getenv("USER")
-NAME = os.getenv("NAME")
-HOST = os.getenv("HOST")
-PORT = os.getenv("PORT")
+USER = os.getenv("DB_USER")
+NAME = os.getenv("DB_NAME")
+HOST = os.getenv("DB_HOST")
+PORT = os.getenv("DB_PORT")
 
 class DBRepository:
     """Singleton repository for database access and caching."""
@@ -43,6 +43,7 @@ class DBRepository:
         connection = psycopg2.connect(host=HOST, database=NAME, user=USER, password=PASS, port=PORT)
 
         with connection.cursor() as cursor:
+            import pdb; pdb.set_trace()
             cursor.execute("SELECT * FROM food_stores;")
             stores = cursor.fetchall()
             self.food_stores = stores
