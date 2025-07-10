@@ -21,6 +21,9 @@ The Food Access and Strategy Simulation tool is a powerful resource for analyzin
    
 *National Science Foundation (NSF) funded AI institute for Intelligent Cyberinfrastructure with Computational Learning in the Environment (ICICLE) (OAC 2112606)*
 
+*We also acknowledge the support of a contract with Brown County WI, the Kaufman Lab fund and the Farm2Facts fund of the University of Wisconsin Foundation, and the Wisconsin Alumni Research Foundation award MSN282325.*
+
+
 
 # Tutorial
 
