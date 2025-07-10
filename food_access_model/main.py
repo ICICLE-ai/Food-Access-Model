@@ -36,7 +36,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://fass.pods.icicleai.tapis.io"],  # React dev server
+    allow_origins=["https://fass.pods.icicleai.tapis.io", "http://localhost:5173"],  # React dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
