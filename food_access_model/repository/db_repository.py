@@ -54,7 +54,7 @@ class DBRepository:
             self.food_stores = stores
             logging.debug(f"Fetched {len(stores)} food stores")
             # cursor.execute("SELECT * FROM households;")
-            cursor.execute("SELECT id, centroid_wkt, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households;")
+            cursor.execute("SELECT id, centroid_wkt, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households LIMIT 20000;")
             households = cursor.fetchall()
             self.households = households
             logging.debug(f"Fetched {len(households)} households")
