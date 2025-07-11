@@ -59,8 +59,9 @@ async def get_households(repository: DBRepository = Depends(get_db_repository)):
     """
     model = repository.get_model()
     households = model.get_households().astype(str)
-    min_info = households[["Geometry"]].reset_index()
-    households_json = min_info[['AgentID', 'Geometry']].to_json(orient="records")
+    households['Type']="household"
+    min_info = households[["Type", "Geometry", "Color"]].reset_index()
+    households_json = min_info[['Type', 'AgentID', 'Geometry', 'Color']].to_dict(orient="records")
     # Return as JSON response
     return {"households_json": households_json}
 
