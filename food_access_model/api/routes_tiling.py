@@ -1,8 +1,7 @@
 import logging
 
-from fastapi import APIRouter, Body, HTTPException, Depends, Request, Query
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Body, HTTPException, Depends, Query
+
 #from ..abm.geo_model import GeoModel
 
 #from .helpers import StoreInput, convert_centroid_to_polygon
@@ -18,18 +17,9 @@ from food_access_model.abm.store import Store
 from food_access_model.repository.db_repository import DBRepository, get_db_repository
 from food_access_model.abm.geo_model import GeoModel
 
-from food_access_model.utils.draw_map import generate_map_html
-
-import logging
-
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-# Template setup
-templates = Jinja2Templates(directory="food_access_model/templates")
-
+from shapely import wkt
+from shapely.ops import transform
+import pyproj
 router = APIRouter(prefix="/api", tags=["ABM"])
 
 #model = GeoModel()
@@ -51,47 +41,67 @@ async def get_agents(repository: DBRepository = Depends(get_db_repository)):
     agents = model.agents
     return {"agents_json": agents}
 
-@router.get("/agents-view", response_class=HTMLResponse)
-async def get_agents_view(request: Request, repository: DBRepository = Depends(get_db_repository)):
-    model = repository.get_model()
-    households = model.get_households().to_dict(orient="records")
-    stores = model.get_stores()
-    logger.info(f"Loaded {len(households)} households")
-    logger.info(f"Loaded {len(stores)} stores")
-    map_html = generate_map_html(households, stores )
-    return templates.TemplateResponse("agents.html", {"request": request, "map_html": map_html})
 
-
-""" @router.get("/agents-view",  response_class=HTMLResponse)
-async def get_agents_view(request: Request,
-    north: float = Query(None),
-    south: float = Query(None),
-    east: float = Query(None),
-    west: float = Query(None), repository: DBRepository = Depends(get_db_repository)):
-    model = repository.get_model()
-    households = model.get_households().to_dict(orient="records")
-    stores = model.get_stores()
-    logger.info(f"GOT IN    ")
-    if None not in (north, south, east, west):
-        bounds_polygon = geometry.box(west, south, east, north)
-        households = [
-            h for h in households
-            if wkt.loads(h["Geometry"]).intersects(bounds_polygon)
-        ]
-        logger.info(f"Filtered to {len(households)} households within bounds")
-
-    logger.info(f"Loaded {len(stores)} stores")
-    map_html = generate_map_html(households, stores )
-    return templates.TemplateResponse("agents.html", {"request": request, "map_html": map_html})
- """
-
-@router.get("/households")
+""" @router.get("/households")
 async def get_households(repository: DBRepository = Depends(get_db_repository)):
     model = repository.get_model()
     households = model.get_households().astype(str)
     households_json = households.to_dict(orient="records")
     # Return as JSON response
+    return {"households_json": households_json} """
+
+
+
+
+@router.get("/households")
+async def get_households(
+    north: float = Query(None),
+    south: float = Query(None),
+    east: float = Query(None),
+    west: float = Query(None),
+    repository: DBRepository = Depends(get_db_repository)
+):
+
+    print("[DEBUG] Calling elements from database:", flush=True)
+    model = repository.get_model()
+    df = model.get_households()
+    print("[DEBUG] Elements obtained from database:", flush=True)
+
+    project = pyproj.Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True).transform
+
+
+    print(f"\n[DEBUG] Received bounds: N={north}, S={south}, E={east}, W={west}", flush=True)
+    print(f"[DEBUG] Total households: {len(df)}", flush=True)
+  
+    if None not in (north, south, east, west):
+        def polygon_intersects_view(wkt_str):
+            try:
+                poly = wkt.loads(wkt_str)
+                poly4326 = transform(project, poly)  # reproject to EPSG:4326
+                minx, miny, maxx, maxy = poly4326.bounds
+
+                overlaps = not (maxy < south or miny > north or maxx < west or minx > east)
+                  # Print debug info instead of writing to file
+                print("\n[POLYGON DEBUG]")
+                print(f"WKT: {wkt_str}")
+                print(f"Poly: {poly}")
+                print(f"Bounds: {poly.bounds}")
+                print(f"Transform Polygon: MINX={minx}, MINY={miny}, MAXX={maxx}, MAXY={maxy}")
+                print(f"View: N={north}, S={south}, E={east}, W={west}")
+                print(f"Overlaps: {overlaps}\n")
+                if overlaps:
+                    print(f"[MATCH] polygon bounds: {poly.bounds}", flush=True)
+                return overlaps
+            except Exception as e:
+                print(f"[ERROR] {e}")
+                return False
+
+        df = df[df["Geometry"].apply(polygon_intersects_view)]
+
+    print(f"[DEBUG] Matched households: {len(df)}\n", flush=True)
+    households_json = df.astype(str).to_dict(orient="records")
     return {"households_json": households_json}
+
 
 
 @router.delete("/remove-store")

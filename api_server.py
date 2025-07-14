@@ -67,7 +67,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://fassfrontstage.pods.icicleai.tapis.io"],  # React dev server. Used * for dev purposes
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

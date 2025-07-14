@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --partition=standard
+#SBATCH --partition=large-mem
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=60
@@ -28,4 +28,4 @@ export PORT=443
 
 
 echo "RUNNING"
-uv run gunicorn api_server:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout=7200
+uv run gunicorn food_access_model.main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout=7200
