@@ -1,4 +1,5 @@
 import logging
+import json
 
 from fastapi import APIRouter, Body, HTTPException, Depends
 from food_access_model.api.helpers import StoreInput, convert_centroid_to_polygon
@@ -59,11 +60,15 @@ async def get_households(repository: DBRepository = Depends(get_db_repository)):
     """
     model = repository.get_model()
     households = model.get_households().astype(str)
+    return {"households_json": households.to_dict(orient="records") }
+
+    '''
+    # return a subset of fields
     households['Type']="household"
     min_info = households[["Type", "Geometry", "Color"]].reset_index()
     households_json = min_info[['Type', 'AgentID', 'Geometry', 'Color']].to_dict(orient="records")
-    # Return as JSON response
     return {"households_json": households_json}
+    '''
 
 
 @router.delete("/remove-store")
