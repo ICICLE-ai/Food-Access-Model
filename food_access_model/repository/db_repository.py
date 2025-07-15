@@ -22,6 +22,10 @@ class DBRepository:
     """Singleton repository for database access and caching."""
     _instance = None
 
+    # max_households = 20000
+    # max_households = 100000
+    # max_households = 300000
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(DBRepository, cls).__new__(cls)
@@ -53,8 +57,12 @@ class DBRepository:
             stores = cursor.fetchall()
             self.food_stores = stores
             logging.debug(f"Fetched {len(stores)} food stores")
-            # cursor.execute("SELECT * FROM households;")
-            cursor.execute("SELECT id, centroid_wkt, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households LIMIT 20000;")
+
+            if hasattr(DBRepository, 'max_households'):
+                cursor.execute("SELECT id, centroid_wkt, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households LIMIT " + str(DBRepository.max_households) + ";")
+            else:
+                cursor.execute("SELECT id, centroid_wkt, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households;")
+
             households = cursor.fetchall()
             self.households = households
             logging.debug(f"Fetched {len(households)} households")
