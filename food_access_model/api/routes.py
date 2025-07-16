@@ -1,17 +1,59 @@
 import logging
 import json
+import os
 
-from fastapi import APIRouter, Body, HTTPException, Depends
+from fastapi.responses import StreamingResponse
+import orjson
+import asyncio
+import databases
+
+from fastapi import APIRouter, Body, HTTPException, Depends, Query
 from food_access_model.api.helpers import StoreInput, convert_centroid_to_polygon
 from food_access_model.abm.geo_model import GeoModel
 from food_access_model.model_multi_processing.batch_running import batch_run
 from food_access_model.abm.store import Store
 from food_access_model.repository.db_repository import DBRepository, get_db_repository
 from food_access_model.abm.geo_model import GeoModel
-from typing import List, Dict, Union, Any
+from typing import List, Dict, Union, Any, Optional
+
+DATABASE_URL = f"postgresql+asyncpg://{os.getenv('DB_USER')}:{os.getenv('DB_PASS')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+
+HOUSEHOLD_QUERY = """
+                     SELECT 
+                     'household' AS "Type",
+                     centroid_wkt AS "Geometry",
+                     income AS "Income",
+                     household_size AS "Household Size",
+                     vehicles AS "Vehicles",
+                     number_of_workers AS "Number of Workers",
+                     NULL AS "Stores within 1 Mile",
+                     NULL AS "Closest Store (Miles)",
+                     NULL AS "Rating for Distance to Closest Store",
+                     NULL AS "Rating for Number of Stores within 1.0 Miles",
+                     NULL AS "Ratings Based on Num of Vehicle",
+                     transit_time AS "Transit time",
+                     walking_time AS "Walking time",
+                     biking_time AS "Biking time",
+                     driving_time AS "Driving time",
+                     NULL AS "Food Access Score",
+                     NULL AS "Color"
+                     FROM households
+                     WHERE step = :step;
+                     """
+
+database = databases.Database(DATABASE_URL)
 
 router = APIRouter(prefix="/api", tags=["ABM"])
 #FRONT_URL = os.environ.get("FRONT_URL", "http://localhost:5173")
+
+@router.on_event("startup")
+async def startup():
+    await database.connect()
+
+@router.on_event("shutdown")
+async def shutdown():
+    await database.disconnect()
+
 @router.get("/stores")
 async def get_stores(repository: DBRepository = Depends(get_db_repository))-> Dict[str, list]:
     """
@@ -46,7 +88,52 @@ async def get_agents(repository: DBRepository = Depends(get_db_repository))->Dic
     return {"agents_json": agents}
 
 
+# new and improved batched households endpoint
+from fastapi.responses import ORJSONResponse
+
 @router.get("/households")
+async def get_all_households(step: Optional[int] = Query(0, description="Optional step filter")):
+    query = "SELECT id, centroid_wkt as geom, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households where step = :step"
+    async with database.connection() as conn:
+        rows = await conn.fetch_all(HOUSEHOLD_QUERY, values={"step": step})
+
+    # Convert rows to a list of dictionaries
+    households_data = [dict(row) for row in rows]
+
+    return ORJSONResponse({"households_json": households_data})
+
+# Streaming endpoint for households - works here, but frontend needs to be updated to handle streaming
+async def stream_households(step: int):
+    """
+    Streams households data as a JSON array.
+    Parameters:
+        step (int): Optional step filter to limit the households returned.
+    Yields:
+        bytes: JSON-encoded households data.
+    """
+
+    yield b"["
+    first = True
+    query = "SELECT id, centroid_wkt as geom, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households where step = :step"
+    async with database.connection() as conn:
+        async for row in conn.iterate(query, values={"step": step}):
+            item_json = orjson.dumps(dict(row))
+            if first:
+                yield item_json
+                first = False
+            else:
+                yield b"," + item_json
+            await asyncio.sleep(0)
+    yield b"]"
+
+
+@router.get("/households/stream")
+async def stream_json(step: Optional[int] = Query(0, description="Optional step filter")):
+    return StreamingResponse(stream_households(step), media_type="application/json")
+
+
+# Original route definition for households
+@router.get("/households_old")
 async def get_households(repository: DBRepository = Depends(get_db_repository)):#  -> Dict[str, list]:
     """
     Gets all households from the model
@@ -113,11 +200,11 @@ async def remove_store(store_name: str = Body(...), repository: DBRepository = D
 async def reset_all(repository: DBRepository = Depends(get_db_repository))->Dict[str, list]:
     """
     Resets the stores in the model
- 
+
     Parameters:
         repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
         and other data required to initialize the simulation
- 
+
     Returns:
         dict: An empty dictionary (of stores)
     """
@@ -131,12 +218,12 @@ async def reset_all(repository: DBRepository = Depends(get_db_repository))->Dict
 async def add_store(store: StoreInput, repository: DBRepository = Depends(get_db_repository))->Dict[str, list]:
     """
     Adds a store to the model
- 
+
     Parameters:
         store (StoreInput): The store object being inputted consisting of name, category, latitude, and longitude
         repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
         and other data required to initialize the simulation
- 
+
     Returns:
         dict: A dictionary of stores in the model with the new added store
     """
