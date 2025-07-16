@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --partition=large-mem
+#SBATCH --partition=xlarge-mem
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=60
@@ -27,6 +27,8 @@ export USER="fassdb"
 export PASS="aKDl99utTr5DJ8FxrsgZtbOSHy7YVr"
 export HOST="fassdb.pods.icicleai.tapis.io"
 export PORT=443
+export MAX_CORES=60
+#export MAX_CORES=4
 
 
 echo "RUNNING"

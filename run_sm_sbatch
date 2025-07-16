@@ -1,12 +1,10 @@
 #!/bin/sh
-#SBATCH --partition=large-mem
+#SBATCH --partition=standard
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=60
-#SBATCH --time=07:00:00
+#SBATCH --cpus-per-task=4
 #SBATCH --output=sm-par-fass-backend.log
 #SBATCH --job-name=sm-par-fass
-#SBATCH --exclusive
 
 
 echo "STARTING"
@@ -28,4 +26,4 @@ export PORT=443
 
 
 echo "RUNNING"
-uv run gunicorn food_access_model.main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout=7200
+uv run gunicorn food_access_model.main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8090 --timeout=7200

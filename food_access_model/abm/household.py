@@ -30,8 +30,13 @@ class Household(GeoAgent):
         self.raw_geometry = polygon 
         
         polygon = shapely.wkt.loads(polygon)
+        self.centroid = polygon.centroid
+        # For location purposes
+        # lat, lon = transformer.transform(centroid.x, centroid.y)[::-1]
+
         # Setting argument values to the passed parameteric values.
         super().__init__(id,model,polygon,crs)
+        self.id = id
         self.income = income
         self.search_radius = search_radius
         self.household_size = household_size

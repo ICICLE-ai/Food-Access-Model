@@ -114,6 +114,7 @@ class GeoModel(Model):
                 "Driving time":  "driving_time",
                 "Food Access Score" :  "mfai",
                 "Color": "color",
+                "Centroid": "centroid"
             }
        )
         self.datacollector.collect(self)

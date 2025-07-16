@@ -22,7 +22,10 @@ class Store(GeoAgent):
         """
         polygon = shapely.wkt.loads(geometry)
         #polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
+        # TODO: CHECK CRS IS NOT BEING USED HERE
         super().__init__(id,model,polygon,"epsg:3857") # epsg:3857 is the mercator projection
+        self.id = id
         self.type = type
         self.name = name
         self.raw_geometry = geometry
+        self.centroid = polygon.centroid
