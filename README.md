@@ -10,7 +10,7 @@ The Food Access and Strategy Simulation tool is a powerful resource for analyzin
 * React.js
 
 ### License
-<!-- TODO: link to relavant licenses  -->
+- [BSD-3-Clause License](https://opensource.org/license/bsd-3-clause)
 
 ## References
 <!-- TODO: e.g., libraries, tools) or external documentation.
