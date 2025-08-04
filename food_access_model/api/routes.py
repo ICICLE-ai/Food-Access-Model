@@ -46,13 +46,13 @@ database = databases.Database(DATABASE_URL)
 router = APIRouter(prefix="/api", tags=["ABM"])
 #FRONT_URL = os.environ.get("FRONT_URL", "http://localhost:5173")
 
-@router.on_event("startup")
-async def startup():
-    await database.connect()
-
-@router.on_event("shutdown")
-async def shutdown():
-    await database.disconnect()
+# @router.on_event("startup")
+# async def startup():
+#     await database.connect()
+#
+# @router.on_event("shutdown")
+# async def shutdown():
+#     await database.disconnect()
 
 @router.get("/stores")
 async def get_stores(repository: DBRepository = Depends(get_db_repository))-> Dict[str, list]:
