@@ -4,7 +4,7 @@ from food_access_model.database.database import Base
 from food_access_model.database.mixin import CRUDMixin
 class FoodStore(Base, CRUDMixin):
     __tablename__ = 'food_stores'
-
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(primary_key=True)
     shop: Mapped[str] = mapped_column(nullable=False)
     geometry: Mapped[str] = mapped_column(nullable=False)
@@ -12,7 +12,7 @@ class FoodStore(Base, CRUDMixin):
 class Household(Base, CRUDMixin):
     __tablename__ = 'households'
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     polygon: Mapped[str] = mapped_column(nullable=False)
     income: Mapped[int] = mapped_column(nullable=False)
     household_size: Mapped[int] = mapped_column(nullable=False)
@@ -25,7 +25,7 @@ class Household(Base, CRUDMixin):
 
 class Roads(Base, CRUDMixin):
     __tablename__ = 'roads'
-
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(primary_key=True)
     highway: Mapped[str] = mapped_column(nullable=False)
     length: Mapped[int] = mapped_column(nullable=False)

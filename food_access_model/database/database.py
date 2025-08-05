@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-from provenience.config import config
+from food_access_model.settings import settings
 
 
 class Base(DeclarativeBase, AsyncAttrs):
@@ -74,9 +74,9 @@ engine_kwargs = {
 }
 
 postgres_uri = (
-    config.POSTGRES_URI
-    if config.POSTGRES_URI
-    else f"postgresql+asyncpg://{config.POSTGRES_USER}:{config.POSTGRES_PASSWORD}@{config.POSTGRES_HOST}:{config.POSTGRES_PORT}/{config.POSTGRES_DB}"
+    settings.POSTGRES_URI
+    if settings.POSTGRES_URI
+    else f"postgresql+asyncpg://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
 )
 sessionmanager = AsyncDatabaseSessionManager(
     host=postgres_uri, engine_kwargs=engine_kwargs

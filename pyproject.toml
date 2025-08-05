@@ -16,4 +16,5 @@ dependencies = [
     "pandas-stubs==2.3.0.250703",
     "alembic>=1.16.4",
     "sqlalchemy[asyncio]>=2.0.42",
+    "pydantic-settings>=2.10.1",
 ]
