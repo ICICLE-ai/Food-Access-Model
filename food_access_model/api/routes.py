@@ -1,20 +1,24 @@
-import logging
-import json
 import os
-
-from fastapi.responses import StreamingResponse
-import orjson
+import json
+import logging
 import asyncio
+import uuid
+from datetime import datetime
+
+from typing import List, Dict, Union, Any, Optional
+from names_generator import generate_name
 import databases
+import orjson
 
 from fastapi import APIRouter, Body, HTTPException, Depends, Query
+from fastapi.responses import StreamingResponse, ORJSONResponse
+
 from food_access_model.api.helpers import StoreInput, convert_centroid_to_polygon
 from food_access_model.abm.geo_model import GeoModel
-from food_access_model.model_multi_processing.batch_running import batch_run
 from food_access_model.abm.store import Store
 from food_access_model.repository.db_repository import DBRepository, get_db_repository
-from food_access_model.abm.geo_model import GeoModel
-from typing import List, Dict, Union, Any, Optional
+from food_access_model.model_multi_processing.batch_running import batch_run
+
 
 DATABASE_URL = f"postgresql+asyncpg://{os.getenv('DB_USER')}:{os.getenv('DB_PASS')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
 
@@ -38,7 +42,8 @@ HOUSEHOLD_QUERY = """
                      NULL AS "Food Access Score",
                      NULL AS "Color"
                      FROM households
-                     WHERE step = :step;
+                     WHERE simulation_instance = :instance
+                     AND step = :step;
                      """
 
 database = databases.Database(DATABASE_URL)
@@ -46,13 +51,53 @@ database = databases.Database(DATABASE_URL)
 router = APIRouter(prefix="/api", tags=["ABM"])
 #FRONT_URL = os.environ.get("FRONT_URL", "http://localhost:5173")
 
+
 @router.on_event("startup")
 async def startup():
     await database.connect()
 
+
 @router.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
+
+
+@router.get("/simulation-instances")
+async def get_simulation_instances():
+    query = "SELECT id, name, description, created_at FROM simulation_instances ORDER BY created_at DESC;"
+    async with database.connection() as conn:
+        rows = await conn.fetch_all(query)
+    instances = [dict(row) for row in rows]
+    return ORJSONResponse({"simulation_instances": instances})
+
+
+@router.get("/simulation-instances/{instance_id}")
+async def get_simulation_instance(instance_id: str):
+    query = "SELECT id, name, description, created_at FROM simulation_instances WHERE id = :id;"
+    values = {"id": instance_id}
+    async with database.connection() as conn:
+        row = await conn.fetch_one(query, values)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Simulation instance not found")
+    instance = dict(row)
+    return ORJSONResponse({"simulation_instance": instance})
+
+
+@router.post("/simulation-instances")
+async def create_simulation_instance(
+    name: Optional[str] = Body(None, embed=True),
+    description: Optional[str] = Body(None, embed=True)
+):
+    # Generate a name if not provided
+    if not name:
+        name = generate_name()
+    query = "INSERT INTO simulation_instances (name, description) VALUES (:name, :description) RETURNING id, name, description, created_at;"
+    values = {"name": name, "description": description}
+    async with database.connection() as conn:
+        row = await conn.fetch_one(query, values)
+    instance = dict(row)
+    return ORJSONResponse({"simulation_instance": instance})
+
 
 @router.get("/stores")
 async def get_stores(repository: DBRepository = Depends(get_db_repository))-> Dict[str, list]:
@@ -88,19 +133,16 @@ async def get_agents(repository: DBRepository = Depends(get_db_repository))->Dic
     return {"agents_json": agents}
 
 
-# new and improved batched households endpoint
-from fastapi.responses import ORJSONResponse
-
 @router.get("/households")
-async def get_all_households(step: Optional[int] = Query(0, description="Optional step filter")):
-    query = "SELECT id, centroid_wkt as geom, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households where step = :step"
+async def get_all_households(simulation_instance: int,step: Optional[int] = Query(0, description="Optional step filter")):
     async with database.connection() as conn:
-        rows = await conn.fetch_all(HOUSEHOLD_QUERY, values={"step": step})
+        rows = await conn.fetch_all(HOUSEHOLD_QUERY, values={"instance": simulation_instance, "step": step})
 
     # Convert rows to a list of dictionaries
     households_data = [dict(row) for row in rows]
 
     return ORJSONResponse({"households_json": households_data})
+
 
 # Streaming endpoint for households - works here, but frontend needs to be updated to handle streaming
 async def stream_households(step: int):
@@ -114,9 +156,8 @@ async def stream_households(step: int):
 
     yield b"["
     first = True
-    query = "SELECT id, centroid_wkt as geom, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households where step = :step"
     async with database.connection() as conn:
-        async for row in conn.iterate(query, values={"step": step}):
+        async for row in conn.iterate(HOUSEHOLD_QUERY, values={"step": step}):
             item_json = orjson.dumps(dict(row))
             if first:
                 yield item_json
