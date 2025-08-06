@@ -3,7 +3,7 @@ import os
 from mesa import Model, DataCollector #Base class for GeoModel
 from mesa.time import RandomActivation #Used to specify that agents are run randomly within each step
 from mesa_geo import GeoSpace #GeoSpace that houses agents
-import psycopg2
+import asyncpg
 from typing import List, Any
 
 from food_access_model.abm.store import Store # Store agent class
@@ -149,10 +149,10 @@ class GeoModel(Model):
         print(len(self.datacollector.get_agent_vars_dataframe().tail(len(self.households))))
         return self.datacollector.get_agent_vars_dataframe().tail(len(self.households))
 
-    def reset_stores(self) -> None:
+    async def reset_stores(self) -> None:
         """Resets the list of stores to the original starting state"""
         # Connect to the PostgreSQL database
-        connection = psycopg2.connect(
+        connection = await asyncpg.connect(
             host=HOST,
             database=NAME,
             user=USER,
@@ -162,13 +162,10 @@ class GeoModel(Model):
         cursor = connection.cursor()
 
         # Execute the SQL query
-        cursor.execute("SELECT * FROM food_stores;")
-
-        # Fetch all rows from the executed query
-        self.stores = cursor.fetchall()
+        self.stores = await cursor.fetch("SELECT * FROM food_stores;")
 
         #cursor.close()
-        connection.close()
+        await connection.close()
 
         # Initialize all store agents and add them to the GeoSpace
         index_count = 0

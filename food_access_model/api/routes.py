@@ -146,7 +146,7 @@ async def get_households(repository: DBRepository = Depends(get_db_repository)):
         dict: A dictionary of households in the model with 'households_json' as the key which has a list of unspecified type
     """
     model = repository.get_model()
-    households = model.get_households().astype(str)
+    households = await model.get_households().astype(str)
     return {"households_json": households.to_dict(orient="records") }
 
     '''
@@ -309,7 +309,7 @@ def filter_unique_by_runid(results)->Dict[str, Any]:
                         unique_results[run_id] = sub_item
     return list(unique_results.values())
 
-def _run_model_step(repository: DBRepository)->int:
+async def _run_model_step(repository: DBRepository)->int:
     """
     Runs one step of the model
         
@@ -320,8 +320,8 @@ def _run_model_step(repository: DBRepository)->int:
     Returns:
         int: The current time step in the simulation
     """
-    stores = repository.get_food_stores()
-    households = repository.get_households()    
+    stores = await repository.get_food_stores()
+    households = await repository.get_households()
 
     print(f"Model begining", flush=True)
     
@@ -364,7 +364,7 @@ def _run_model_step(repository: DBRepository)->int:
     allStores =  finalResults[0].get("stores", [])
 
 
-    repository.update_model(all_households, allStores)
+    await repository.update_model(all_households, allStores)
     #print("Model update completed", flush=True)
     step_number = repository.get_model().raw_step_number
     return step_number
@@ -383,7 +383,7 @@ async def step(repository: DBRepository = Depends(get_db_repository))->Dict[str,
     """
 
     """ step_number = await _run_model_step(repository) """
-    step_number =  _run_model_step(repository)
+    step_number =  await _run_model_step(repository)
 
     return {"step_number": step_number}
 
