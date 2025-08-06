@@ -64,16 +64,16 @@ async def shutdown():
 
 @router.get("/simulation-instances")
 async def get_simulation_instances():
-    query = "SELECT id, name, description, created_at FROM simulation_instances ORDER BY created_at DESC;"
+    query = "SELECT id::text AS id, name, description, created_at FROM simulation_instances ORDER BY created_at DESC;"
     async with database.connection() as conn:
         rows = await conn.fetch_all(query)
-    instances = [dict(row) for row in rows]
-    return ORJSONResponse({"simulation_instances": instances})
+    simulation_instances = [dict(row) for row in rows]
+    return ORJSONResponse({"simulation_instances": simulation_instances})
 
 
 @router.get("/simulation-instances/{instance_id}")
 async def get_simulation_instance(instance_id: str):
-    query = "SELECT id, name, description, created_at FROM simulation_instances WHERE id = :id;"
+    query = "SELECT id::text AS id, name, description, created_at FROM simulation_instances WHERE id = :id;"
     values = {"id": instance_id}
     async with database.connection() as conn:
         row = await conn.fetch_one(query, values)
@@ -93,9 +93,14 @@ async def create_simulation_instance(
         name = generate_name()
     query = "INSERT INTO simulation_instances (name, description) VALUES (:name, :description) RETURNING id, name, description, created_at;"
     values = {"name": name, "description": description}
+
     async with database.connection() as conn:
         row = await conn.fetch_one(query, values)
     instance = dict(row)
+
+    generate_household_instances_for_simulation(instance['id'])
+    generate_stores_for_simulation(instance['id'])
+
     return ORJSONResponse({"simulation_instance": instance})
 
 
@@ -134,7 +139,7 @@ async def get_agents(repository: DBRepository = Depends(get_db_repository))->Dic
 
 
 @router.get("/households")
-async def get_all_households(simulation_instance: int,step: Optional[int] = Query(0, description="Optional step filter")):
+async def get_all_households(simulation_instance: str, step: Optional[int] = Query(0, description="Optional step filter")):
     async with database.connection() as conn:
         rows = await conn.fetch_all(HOUSEHOLD_QUERY, values={"instance": simulation_instance, "step": step})
 
@@ -513,6 +518,55 @@ async def health_check(repository: DBRepository = Depends(get_db_repository)):
         logging.error(f"Health check failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
 
+
+async def generate_household_instances_for_simulation(instance_id: str):
+    """
+    Generates household instances for a given simulation instance.
+    
+    Parameters:
+        instance_id (str): The ID of the simulation instance to generate households for.
+    """
+    # Placeholder for actual implementation
+    # This function should create household instances in the database for the given simulation instance
+    # TODO: for now we'll just copy the households from the default simulation instance and step = 0
+    query = """
+    INSERT INTO households (simulation_instance, step, centroid_wkt, income, household_size, vehicles, number_of_workers, transit_time, walking_time, biking_time, driving_time)
+    SELECT :instance_id, 0, centroid_wkt, income, household_size, vehicles, number_of_workers, transit_time, walking_time, biking_time, driving_time
+    FROM households
+    WHERE simulation_instance = 'default' AND step = 0;
+    """
+    values = {"instance_id": instance_id}
+    async with database.connection() as conn:
+        await conn.execute(query, values)
+
+
+async def generate_stores_for_simulation(instance_id: str):
+    """
+    Generates store instances for a given simulation instance.
+    
+    Parameters:
+        instance_id (str): The ID of the simulation instance to generate stores for.
+    """
+    # Placeholder for actual implementation
+    # This function should create store instances in the database for the given simulation instance
+    # Get the simulation_instance id for the default simulation
+    get_default_instance_id_query = "SELECT id FROM simulation_instances WHERE name = 'default_simulation';"
+    async with database.connection() as conn:
+        default_instance_row = await conn.fetch_one(get_default_instance_id_query)
+        if default_instance_row is None:
+            raise HTTPException(status_code=404, detail="Default simulation instance not found")
+        default_instance_id = default_instance_row["id"]
+
+    query = """
+    INSERT INTO stores (simulation_instance, step, name, category, latitude, longitude)
+    SELECT :instance_id, 0, name, category, latitude, longitude
+    FROM stores
+    WHERE simulation_instance = :default_instance_id AND step = 0;
+    """
+    values = {"instance_id": instance_id, "default_instance_id": default_instance_id}
+    values = {"instance_id": instance_id}
+    async with database.connection() as conn:
+        await conn.execute(query, values)
 
 
 """ @router.get("/stores")
