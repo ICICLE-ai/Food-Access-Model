@@ -13,6 +13,19 @@ The Food Access and Strategy Simulation tool is a powerful resource for analyzin
 - [BSD-3-Clause License](https://opensource.org/license/bsd-3-clause)
 
 ## References
+
+1. **Agent-Based Modeling of Food Accessibility: Insights for Policy and Decision-Making**  
+   [📄 PDF](references/ABMDOC.pdf)  
+   Alfonso Morales (2024). *Agent-Based Modeling of Food Accessibility: Insights for Policy and Decision-Making*. Extended abstract submitted to the 12th Triennial Symposium on Transportation Analysis (TRISTAN XII), Okinawa, Japan.
+
+2. **Agent-Based Models for Quantifying Food Security: Insights for Policy and Decision Making**  
+   [📄 PDF](references/ABM_TechFestPoster.pdf)  
+   Rosemarie Santa González, Alan Zhong, Charlie Haight, Nolan Hegge, Carlos Guzman, Alfonso Morales (2024). *Agent-Based Models for Quantifying Food Security: Insights for Policy and Decision Making*. Tech Fest Poster.
+
+3. **Designing an Agent-Based Model Using Group Model Building**  
+   [📄 PDF](references/KohRenoHyderABM.pdf)  
+   Koh K., Reno R., Hyder A. (2018). *Designing an Agent-Based Model Using Group Model Building: Application to Food Insecurity Patterns in a U.S. Midwestern Metropolitan City*. *Journal of Urban Health*.
+
 <!-- TODO: e.g., libraries, tools) or external documentation.
 - Definitions of key terms and concepts used in the project.  -->
 
