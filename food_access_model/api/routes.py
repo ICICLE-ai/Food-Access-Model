@@ -139,14 +139,9 @@ async def get_agents(repository: DBRepository = Depends(get_db_repository))->Dic
 
 
 @router.get("/households")
-async def get_all_households(simulation_instance: str, step: Optional[int] = Query(0, description="Optional step filter")):
-    async with database.connection() as conn:
-        rows = await conn.fetch_all(HOUSEHOLD_QUERY, values={"instance": simulation_instance, "step": step})
-
-    # Convert rows to a list of dictionaries
-    households_data = [dict(row) for row in rows]
-
-    return ORJSONResponse({"households_json": households_data})
+async def get_all_households(simulation_instance: str = Query(..., description="Simulation instance ID"), simulation_step: Optional[int] = Query(0, description="Optional step filter")) -> Dict[str, list]:
+    household_data = await query_households(simulation_instance_id=simulation_instance, simulation_step=simulation_step)
+    return ORJSONResponse({"households_json": household_data})
 
 
 # Streaming endpoint for households - works here, but frontend needs to be updated to handle streaming
@@ -355,83 +350,102 @@ def filter_unique_by_runid(results)->Dict[str, Any]:
                         unique_results[run_id] = sub_item
     return list(unique_results.values())
 
-def _run_model_step(repository: DBRepository)->int:
+async def _run_model_step(simulation_instance_id)->None:
     """
     Runs one step of the model
-        
+
     Parameters:
-        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
-        and other data required to initialize the simulation
-        
-    Returns:
-        int: The current time step in the simulation
+        simulation_instance_id (str): The ID of the simulation instance to run the step for
     """
-    stores = repository.get_food_stores()
-    households = repository.get_households()    
-
-    print(f"Model begining", flush=True)
-    
-    results = batch_run(
-        GeoModel,
-        parameters={
-            "households": households,
-            "stores": stores,
-        },
-        max_steps=1,
-        data_collection_period=1,
-        display_progress=True,
-        number_processes=60,
-    )
-    
-    print(f"Model Step Completed", flush=True)
-        
-    print("Running model update", flush=True)
-    
-    #Implementation Miguel r
-    all_households = []
-    finalResults = filter_unique_by_runid(results)
-    
-    
-    for res in results:
-        # If res is a dictionary, extract data directly.
-        if isinstance(res, dict):
-            #all_stores.extend(res.get("stores", []))
-            all_households.extend(res.get("households", []))
-            
-    
-        elif isinstance(res, list):
-             for item in res:
-                 if isinstance(item, dict):
-                     all_households.extend(item.get("households", []))
-                     
-
-    # print(f" Total Households Before: {len(repository.get_households())}", flush=True)
-    # print(f" Total stores Before: {len(repository.get_food_stores())}", flush=True)
-    allStores =  finalResults[0].get("stores", [])
+    current_step = await query_current_simulation_step(simulation_instance_id)
+    households = await query_households(simulation_instance_id=simulation_instance_id, simulation_step=current_step)
+    food_stores = await query_food_stores(simulation_instance_id=simulation_instance_id, simulation_step=current_step)
+    model = GeoModel(households=households, stores=food_stores)
+    model.step()
+    return_step_results_to_database(model=model, simulation_instance_id=simulation_instance_id, step=current_step + 1)
 
 
-    repository.update_model(all_households, allStores)
-    #print("Model update completed", flush=True)
-    step_number = repository.get_model().raw_step_number
-    return step_number
+async def query_current_simulation_step(simulation_instance_id: str) -> int:
+    """
+    Queries the current simulation step for a specific simulation instance.
+
+    Parameters:
+        simulation_instance_id (str): The ID of the simulation instance to query.
+
+    Returns:
+        int: The current step number.
+    """
+    async with database.connection() as conn:
+        row = await conn.fetch_one(
+            "SELECT MAX(step) AS current_step FROM households WHERE simulation_instance = :instance",
+            values={"instance": simulation_instance_id}
+        )
+    if row is None or row["current_step"] is None:
+        return 0
+    return row["current_step"]
+
+
+async def query_households(simulation_instance_id: str, simulation_step: int = 0) -> List[Any]:
+    """
+    Queries the households for a specific simulation instance and step.
+
+    Parameters:
+        simulation_instance_id (str): The ID of the simulation instance to query.
+        simulation_step (int, optional): The simulation step to query. Defaults to 0.
+
+    Returns:
+        List[Any]: A list of household data.
+    """
+    async with database.connection() as conn:
+        rows = await conn.fetch_all(HOUSEHOLD_QUERY, values={"instance": simulation_instance_id, "step": simulation_step})
+
+    # Convert rows to a list of dictionaries
+    households_data = [dict(row) for row in rows]
+    return households_data
+
+
+async def query_food_stores(simulation_instance_id: str, simulation_step: int = 0) -> List[Any]:
+    """
+    Queries the food stores for a specific simulation instance and step.
+
+    Parameters:
+        simulation_instance_id (str): The ID of the simulation instance to query.
+        simulation_step (int, optional): The simulation step to query. Defaults to 0.
+
+    Returns:
+        List[Any]: A list of food store data.
+    """
+    async with database.connection() as conn:
+        rows = await conn.fetch_all(FOOD_STORE_QUERY, values={"instance": simulation_instance_id, "step": step})
+
+    # Convert rows to a list of dictionaries
+    food_stores_data = [dict(row) for row in rows]
+    return food_stores_data
+
+
+# async def return_step_results_to_database(model: GeoModel, simulation_instance_id: str, step: int) -> None:
+#     """
+#     Updates the agents in the database for a specific simulation instance and step.
+#     """
+#     stores = model.get_food_stores()
+#     households = model.get_households()
+#     
+#     async with database.connection() as conn:
+
 
 @router.put("/step")
-async def step(repository: DBRepository = Depends(get_db_repository))->Dict[str, int]:
+async def step(simulation_instance_id: str):
     """
     Runs one step of the model
         
     Parameters:
-        repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
-        and other data required to initialize the simulation
-        
+        simulation_instance_id (str): The ID of the simulation instance to run the step for
+
     Returns:
-        dict: Dictionary with the total number of steps taken
+        None
     """
 
-    """ step_number = await _run_model_step(repository) """
-    step_number =  _run_model_step(repository)
-
-    return {"step_number": step_number}
+    await _run_model_step(simulation_instance_id)
 
 
 @router.get("/get-num-households")
@@ -486,15 +500,15 @@ async def get_num_stores(repository: DBRepository = Depends(get_db_repository))-
 async def get_household_stats(repository: DBRepository = Depends(get_db_repository))->Dict[str, float]:
     """
     Gets household stats
-        
+
     Parameters:
         repository (DBRepository): A singleton interface to the simulation model that gives access to the households, stores, 
         and other data required to initialize the simulation
-        
+
     Returns:
         dict: Dictionaries with average income of the households and average vehicles per household
 """
-    
+
     model = repository.get_model()
     households = model.households
     income = 0
@@ -522,7 +536,7 @@ async def health_check(repository: DBRepository = Depends(get_db_repository)):
 async def generate_household_instances_for_simulation(instance_id: str):
     """
     Generates household instances for a given simulation instance.
-    
+
     Parameters:
         instance_id (str): The ID of the simulation instance to generate households for.
     """
@@ -543,7 +557,7 @@ async def generate_household_instances_for_simulation(instance_id: str):
 async def generate_stores_for_simulation(instance_id: str):
     """
     Generates store instances for a given simulation instance.
-    
+
     Parameters:
         instance_id (str): The ID of the simulation instance to generate stores for.
     """
