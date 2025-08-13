@@ -23,9 +23,9 @@ class Household(GeoAgent):
             - search_radius (int): how far to search for stores (default 500)
             - crs (string): constant value (i.e.3857),used to map households on a flat earth display
         """
-        
+
         self.raw_geometry = polygon 
-        
+
         polygon = shapely.wkt.loads(polygon)
         # Setting argument values to the passed parameteric values.
         super().__init__(id,model,polygon,crs)
@@ -39,13 +39,12 @@ class Household(GeoAgent):
         self.transit_time = transit_time
         self.driving_time = driving_time
         self.type="household"
-        
+
         #f,f,self.distance_to_closest_store,f = self.closest_cspm_and_spm()
         self.rating_num_store_within_mile = "A"
         self.rating_distance_to_closest_store = "A"
         self.rating_based_on_num_vehicles = "A"
-        
-        
+
         self.distances_map =None
         self.distance_to_closest_store = distance_to_closest_store
         self.num_store_within_mile = num_store_within_mile
@@ -87,7 +86,7 @@ class Household(GeoAgent):
             red = int(top_range * (2 - 2 * normalized))
             green = top_range
             blue = 0
-        
+
         gray = 128
         desaturation_factor = .25
 
@@ -98,9 +97,8 @@ class Household(GeoAgent):
 
         # Convert RGB to hexadecimal
         hex_color = f"#{red:02x}{green:02x}{blue:02x}"
-        
-        return hex_color
 
+        return hex_color
 
     def rating_evaluation(self, total: int) -> None:
         """
@@ -126,7 +124,7 @@ class Household(GeoAgent):
             self.rating_based_on_num_vehicles = "C"   
         if self.vehicles < self.number_of_workers and self.vehicles > 0: 
             self.rating_based_on_num_vehicles = "B"     
-        
+
     def stores_with_1_miles (self) -> int:
         """
         Calculates the number of stores within a mile of the household
@@ -145,7 +143,7 @@ class Household(GeoAgent):
           total += 1 
         self.rating_evaluation(total)
         return total 
-    
+
     def closest_cspm_and_spm(self) -> tuple:
         """
         Finds the closest supermarket and the closest market of the other types (convenience, wholesale, etc).
@@ -174,7 +172,7 @@ class Household(GeoAgent):
                     cspm = store
                     cspm_distance = distance
         return cspm, spm, spm_distance, cspm_distance
-    
+
     def get_mfai(self,cspm: object, spm: object) -> int:
         """
         Calculates the MFAI (monthly food access index)
@@ -211,7 +209,7 @@ class Household(GeoAgent):
             food_avail.append(fsa)
 
         return int(sum(food_avail)/MAX_TOTAL_FSA*100)
-    
+
     def calculate_distances(self)-> None:
         """
         Creates dictionary with key (indicating the store) and value (indicating the distance from the household to
@@ -235,5 +233,5 @@ class Household(GeoAgent):
         self.num_store_within_mile = self.stores_with_1_miles()
         self.mfai = self.get_mfai(cspm, spm)
         self.color = self.get_color()
-        
+
         return None
