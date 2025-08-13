@@ -484,12 +484,18 @@ async def get_household_stats(simulation_instance_id: str = Query(..., descripti
                 "avg_food_access_score": 0.0,
                 "avg_closest_store_miles": 0.0,
                 "avg_stores_within_1_mile": 0.0}
+    
+    avg_income = row['avg_income'] if row['avg_income'] is not None else 0.0
+    avg_vehicles = row['avg_vehicles'] if row['avg_vehicles'] is not None else 0.0
+    avg_food_access_score = row['avg_food_access_score'] if row['avg_food_access_score'] is not None else 0.0
+    avg_closest_store_miles = row['avg_closest_store_miles'] if row['avg_closest_store_miles'] is not None else 0.0
+    avg_stores_within_1_mile = row['avg_stores_within_1_mile'] if row['avg_stores_within_1_mile'] is not None else 0.0
 
-    return {"avg_income": float(row['avg_income']),
-            "avg_vehicles": float(row['avg_vehicles']),
-            "avg_food_access_score": float(row['avg_food_access_score']),
-            "avg_closest_store_miles": float(row['avg_closest_store_miles']),
-            "avg_stores_within_1_mile": float(row['avg_stores_within_1_mile'])}
+    return {"avg_income": float(avg_income),
+            "avg_vehicles": float(avg_vehicles),
+            "avg_food_access_score": float(avg_food_access_score),
+            "avg_closest_store_miles": float(avg_closest_store_miles),
+            "avg_stores_within_1_mile": float(avg_stores_within_1_mile)}
 
 
 @router.get("/health")
