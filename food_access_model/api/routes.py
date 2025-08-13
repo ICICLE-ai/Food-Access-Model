@@ -484,7 +484,7 @@ async def get_household_stats(simulation_instance_id: str = Query(..., descripti
                 "avg_food_access_score": 0.0,
                 "avg_closest_store_miles": 0.0,
                 "avg_stores_within_1_mile": 0.0}
-    
+
     avg_income = row['avg_income'] if row['avg_income'] is not None else 0.0
     avg_vehicles = row['avg_vehicles'] if row['avg_vehicles'] is not None else 0.0
     avg_food_access_score = row['avg_food_access_score'] if row['avg_food_access_score'] is not None else 0.0
@@ -775,17 +775,30 @@ async def generate_household_instances_for_simulation(instance_id: str, househol
         instance_id (str): The ID of the simulation instance to generate households for.
     """
 
-    query = """
-        INSERT INTO households (
-            simulation_instance, simulation_step, id, centroid_wkt, income, household_size,
-            vehicles, number_of_workers, transit_time, walking_time, biking_time, driving_time
-        )
-        SELECT $1, 0, id, centroid_wkt, income, household_size, vehicles, number_of_workers,
-            transit_time, walking_time, biking_time, driving_time
-        FROM households
-        WHERE simulation_instance = $2 AND simulation_step = 0
-        LIMIT $3;
-    """
+    # Prepare query depending on whether household_limit is provided
+    if household_limit is not None:
+        query = """
+            INSERT INTO households (
+                simulation_instance, simulation_step, id, centroid_wkt, income, household_size,
+                vehicles, number_of_workers, transit_time, walking_time, biking_time, driving_time
+            )
+            SELECT $1, 0, id, centroid_wkt, income, household_size, vehicles, number_of_workers,
+                transit_time, walking_time, biking_time, driving_time
+            FROM households
+            WHERE simulation_instance = $2 AND simulation_step = 0
+            LIMIT $3;
+        """
+    else:
+        query = """
+            INSERT INTO households (
+                simulation_instance, simulation_step, id, centroid_wkt, income, household_size,
+                vehicles, number_of_workers, transit_time, walking_time, biking_time, driving_time
+            )
+            SELECT $1, 0, id, centroid_wkt, income, household_size, vehicles, number_of_workers,
+                transit_time, walking_time, biking_time, driving_time
+            FROM households
+            WHERE simulation_instance = $2 AND simulation_step = 0;
+        """
 
     # Assuming you already have an asyncpg connection object
     get_default_instance_id_query = """SELECT id FROM simulation_instances WHERE name = 'default_simulation';"""
@@ -797,9 +810,10 @@ async def generate_household_instances_for_simulation(instance_id: str, househol
 
         default_instance_id = default_instance_row["id"]
 
-        limit=household_limit if household_limit is not None else 'ALL'
-
-        await conn.execute(query, instance_id, default_instance_id, limit)
+        if household_limit is not None:
+            await conn.execute(query, instance_id, default_instance_id, household_limit)
+        else:
+            await conn.execute(query, instance_id, default_instance_id)
 
 
 async def generate_stores_for_simulation(instance_id: str):
