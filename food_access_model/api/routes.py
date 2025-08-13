@@ -193,16 +193,18 @@ async def reset_simulation_instance(instance_id: str) -> ORJSONResponse:
 
 @router.post("/simulation-instances")
 async def create_simulation_instance(name: Optional[str] = Body(None, embed=True),
-                                     description: Optional[str] = Body(None, embed=True)) -> ORJSONResponse:
+                                     description: Optional[str] = Body(None, embed=True),
+                                     household_limit: Optional[int] = Body(None, embed=True)) -> ORJSONResponse:
     """
     Create a new simulation instance.
 
     Parameters:
         name (str, optional): The name of the simulation instance.
         description (str, optional): A description of the simulation instance.
+        household_limit (int, optional): The maximum number of households to generate for the simulation instance.
 
     Returns:
-        dict: A dictionary containing the details of the crceated simulation instance.
+        dict: A dictionary containing the details of the created simulation instance.
     """
     # Generate a name if not provided
     if name is None:
@@ -219,7 +221,7 @@ async def create_simulation_instance(name: Optional[str] = Body(None, embed=True
 
     instance['id'] = str(instance['id'])  # Convert UUID to string for JSON serialization
 
-    await generate_household_instances_for_simulation(instance['id'])
+    await generate_household_instances_for_simulation(instance['id'], household_limit)
     await generate_stores_for_simulation(instance['id'])
 
     return ORJSONResponse({"simulation_instance": instance})
@@ -799,7 +801,7 @@ async def return_step_results_to_database(households: List[Dict[str, Any]],
             await conn.execute(insert_query, simulation_instance_id, simulation_step, simulation_step - 1)
 
 
-async def generate_household_instances_for_simulation(instance_id: str) -> None:
+async def generate_household_instances_for_simulation(instance_id: str, household_limit: Optional[int] = None) -> None:
     """
     Generates household instances for a given simulation instance.
 
@@ -817,8 +819,9 @@ async def generate_household_instances_for_simulation(instance_id: str) -> None:
         SELECT $1, 0, id, centroid_wkt, income, household_size, vehicles, number_of_workers,
             transit_time, walking_time, biking_time, driving_time
         FROM households
-        WHERE simulation_instance = $2 AND simulation_step = 0;
-    """
+        WHERE simulation_instance = $2 AND simulation_step = 0
+        LIMIT {limit};
+    """.format(limit=household_limit if household_limit is not None else 'ALL')
 
     # Assuming you already have an asyncpg connection object
     get_default_instance_id_query = """SELECT id FROM simulation_instances WHERE name = 'default_simulation';"""
