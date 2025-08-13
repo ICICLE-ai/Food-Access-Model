@@ -49,8 +49,8 @@ HOUSEHOLD_QUERY = """
                      household_size AS "Household Size",
                      vehicles AS "Vehicles",
                      number_of_workers AS "Number of Workers",
-                     NULL AS "Stores within 1 Mile",
-                     NULL AS "Closest Store (Miles)",
+                     stores_within_1_mile AS "Stores within 1 Mile",
+                     closest_store_miles AS "Closest Store (Miles)",
                      NULL AS "Rating for Distance to Closest Store",
                      NULL AS "Rating for Number of Stores within 1.0 Miles",
                      NULL AS "Ratings Based on Num of Vehicle",
@@ -58,7 +58,7 @@ HOUSEHOLD_QUERY = """
                      walking_time AS "Walking time",
                      biking_time AS "Biking time",
                      driving_time AS "Driving time",
-                     NULL AS "Food Access Score",
+                     food_score AS "Food Access Score",
                      NULL AS "Color"
                      FROM households
                      WHERE simulation_instance = $1
@@ -503,15 +503,30 @@ async def get_household_stats(simulation_instance_id: str = Query(..., descripti
     Returns:
         dict: Dictionaries with average income of the households and average vehicles per household
     """
-    households = await query_households(simulation_instance_id, simulation_step)
-    income = 0
-    vehicles = 0
-    for house in households:
-        income += house['Income']
-        vehicles += house['Vehicles']
-    avg_income = float(income) / len(households)
-    avg_vehicles = float(vehicles) / len(households)
-    return {"avg_income": avg_income, "avg_vehicles": avg_vehicles}
+    async with pool.acquire() as conn:
+        # select avg income and avg vehicles from households
+        query = """
+            SELECT AVG(income) AS avg_income,
+            AVG(vehicles) AS avg_vehicles,
+            AVG(food_score) AS avg_food_access_score,
+            AVG(closest_store_miles) AS avg_closest_store_miles,
+            AVG(stores_within_1_mile) AS avg_stores_within_1_mile
+            FROM households
+            WHERE simulation_instance = $1 AND simulation_step = $2
+            """
+        row = await conn.fetchrow(query, simulation_instance_id, simulation_step)
+    if row is None:
+        return {"avg_income": 0.0,
+                "avg_vehicles": 0.0,
+                "avg_food_access_score": 0.0,
+                "avg_closest_store_miles": 0.0,
+                "avg_stores_within_1_mile": 0.0}
+
+    return {"avg_income": float(row['avg_income']),
+            "avg_vehicles": float(row['avg_vehicles']),
+            "avg_food_access_score": float(row['avg_food_access_score']),
+            "avg_closest_store_miles": float(row['avg_closest_store_miles']),
+            "avg_stores_within_1_mile": float(row['avg_stores_within_1_mile'])}
 
 
 @router.get("/health")
@@ -740,7 +755,10 @@ async def return_step_results_to_database(households: List[Dict[str, Any]],
                             house["Transit time"],
                             house["Walking time"],
                             house["Biking time"],
-                            house["Driving time"]
+                            house["Driving time"],
+                            house["Food Access Score"],
+                            house["Stores within 1 Mile"],
+                            house["Closest Store (Miles)"]
                         )
                         for house in households  # generator: no big list in memory
                     ),
@@ -756,7 +774,10 @@ async def return_step_results_to_database(households: List[Dict[str, Any]],
                         "transit_time",
                         "walking_time",
                         "biking_time",
-                        "driving_time"
+                        "driving_time",
+                        "food_score",
+                        "stores_within_1_mile",
+                        "closest_store_miles"
                     ]
                 )
                 logging.info(f"Inserted {len(households)} households via COPY in {time.time() - t_insert:.3f}s")
