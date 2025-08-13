@@ -509,9 +509,12 @@ async def get_household_stats(simulation_instance_id: str = Query(..., descripti
     for house in households:
         income += house['Income']
         vehicles += house['Vehicles']
-    avg_income = float(income) / len(households)
-    avg_vehicles = float(vehicles) / len(households)
-    return {"avg_income": avg_income, "avg_vehicles": avg_vehicles}
+    if households:
+        avg_income = float(income) / len(households)
+        avg_vehicles = float(vehicles) / len(households)
+        return {"avg_income": avg_income, "avg_vehicles": avg_vehicles}
+    else:
+        return {"avg_income": 0, "avg_vehicles": 0}
 
 
 @router.get("/health")
