@@ -901,7 +901,6 @@ dependencies = [
     { name = "libpysal" },
     { name = "mesa" },
     { name = "pyproj" },
-    { name = "rasterio" },
     { name = "rtree" },
     { name = "shapely" },
     { name = "xyzservices" },
@@ -1389,28 +1388,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/01/14/1c18d7d5b7be2708f513f37c61bfadfa62161c10624f8733f1c8451b3509/pyzmq-26.2.0-cp311-cp311-win32.whl", hash = "sha256:eac5174677da084abf378739dbf4ad245661635f1600edd1221f150b165343f4", size = 576928, upload-time = "2024-08-22T08:59:48.856Z" },
     { url = "https://files.pythonhosted.org/packages/3b/1b/0a540edd75a41df14ec416a9a500b9fec66e554aac920d4c58fbd5756776/pyzmq-26.2.0-cp311-cp311-win_amd64.whl", hash = "sha256:5a509df7d0a83a4b178d0f937ef14286659225ef4e8812e05580776c70e155d5", size = 642317, upload-time = "2024-08-22T08:59:50.561Z" },
     { url = "https://files.pythonhosted.org/packages/98/77/1cbfec0358078a4c5add529d8a70892db1be900980cdb5dd0898b3d6ab9d/pyzmq-26.2.0-cp311-cp311-win_arm64.whl", hash = "sha256:c0e6091b157d48cbe37bd67233318dbb53e1e6327d6fc3bb284afd585d141003", size = 543834, upload-time = "2024-08-22T08:59:51.997Z" },
-]
-
-[[package]]
-name = "rasterio"
-version = "1.4.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "affine" },
-    { name = "attrs" },
-    { name = "certifi" },
-    { name = "click" },
-    { name = "click-plugins" },
-    { name = "cligj" },
-    { name = "numpy" },
-    { name = "pyparsing" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/2e/48/fcd02399c7c4041c850b59c7cd80c309f7b87c86649e2bfb515d44ad061c/rasterio-1.4.2.tar.gz", hash = "sha256:1be35ccb4d998a4c48fa51bbee9e37927ecd9b9e954a2b2581b8f3e9bb165332", size = 441402, upload-time = "2024-10-30T17:08:20.37Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8d/1d/ebdadd0b74704e09553753b23510fbd43fb7d9c2de468d5cf4ac223a4087/rasterio-1.4.2-cp311-cp311-macosx_10_15_x86_64.whl", hash = "sha256:019e6fbfea250fea91987a38abc7a02c752b50beadb3178d82a5d47e8e265313", size = 21535160, upload-time = "2024-10-30T17:07:22.972Z" },
-    { url = "https://files.pythonhosted.org/packages/09/b9/169a76e257e527d352da021da6602480a829eac03b0ab3045639c3f80fb6/rasterio-1.4.2-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:a9830e0c9d09d2680079b8a31085cc2a2b885b1ed6c4d95d2a91e2813efc22aa", size = 18757255, upload-time = "2024-10-30T17:07:26.391Z" },
-    { url = "https://files.pythonhosted.org/packages/8c/58/25a6531d8b578493c66a672c0ea47c976c4e702979d4d18cb538789a30a3/rasterio-1.4.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ea3f38da794e7a4df409f2c57799a26a777a2560025ad401fe33a0b8efe90a5a", size = 22199148, upload-time = "2024-10-30T17:07:29.839Z" },
-    { url = "https://files.pythonhosted.org/packages/4d/38/9bc2bd4b2df4527debd278011e917cc085007e6cf60c9ec44fea38cb8a7a/rasterio-1.4.2-cp311-cp311-win_amd64.whl", hash = "sha256:0c74d6a2e64fae6c2293bf520fa4048e12598379736953c34ca3dfb058cedfc5", size = 25446955, upload-time = "2024-10-30T17:07:33.592Z" },
 ]
 
 [[package]]
