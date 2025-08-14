@@ -4,6 +4,7 @@ ENV PYTHONUNBUFFERED=1
 # Install required system dependencies
  RUN apt-get update && apt-get install -y \
      gcc \
+     g++ \
      libpq-dev \
      libgdal-dev \
      libexpat1 \
@@ -26,5 +27,6 @@ COPY ./*.py ./
 
 # Container Entrypoint
 COPY entrypoint.sh .
+RUN chmod +x ./entrypoint.sh  # Make the script executable
 
 ENTRYPOINT ["sh", "entrypoint.sh"]
