@@ -78,9 +78,15 @@ pool: asyncpg.Pool = None  # will be set on startup
 @router.on_event("startup")
 async def startup():
     global pool
-    logging.info(f"Initializing database connection to database {os.getenv('DB_NAME')} at {os.getenv('DB_HOST')}")
-    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)
-    logging.info("Database pool created")
+    try:
+        logging.info(f"Initializing database connection to database {os.getenv('DB_NAME')} at {os.getenv('DB_HOST')}")
+        pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5, timeout=10)
+        logging.info("Database pool created")
+    except Exception as e:
+        # CRITICAL: If connection fails, log the error but DO NOT crash.
+        # The web server will stay alive, allowing the health check to pass.
+        logging.error(f"FATAL: Could not create database connection pool on startup: {e}")
+        pool = None  # Ensure pool is None if connection fails
 
 
 @router.on_event("shutdown")
