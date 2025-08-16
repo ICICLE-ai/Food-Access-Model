@@ -65,7 +65,7 @@ async def get_households(repository: DBRepository = Depends(get_db_repository))-
 
 
 @router.delete("/remove-store")
-async def remove_store(store_name: str = Body(...), repository: DBRepository = Depends(get_db_repository))->Dict[str, list]:
+async def remove_store(store_name: str = Body(...), repository: DBRepository = Depends(get_db_repository)):
     """
     Removes a store from a model given a name
     
@@ -240,7 +240,7 @@ def _run_model_step(repository: DBRepository)->int:
         max_steps=1,
         data_collection_period=1,
         display_progress=True,
-        number_processes=60,
+        number_processes=4, # used to be 60
     )
     
     print(f"Model Step Completed", flush=True)

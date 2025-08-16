@@ -67,10 +67,15 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://fassfrontstage.pods.icicleai.tapis.io"],  # React dev server. Used * for dev purposes
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        "https://fassfrontstage.pods.icicleai.tapis.io",
+        "http://localhost:3000",  # React dev server
+        "http://localhost:5173",  # Vite dev server
+        "http://127.0.0.1:3000",  # Alternative localhost
+        "http://127.0.0.1:5173",  # Alternative localhost for Vite
+        "http://localhost:8080",  # Vue/other dev servers
+        "http://127.0.0.1:8080",  # Alternative localhost
+    ],
 )
 
 #register_middlewares(app)

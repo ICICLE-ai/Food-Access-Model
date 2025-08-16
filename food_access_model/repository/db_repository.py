@@ -1,35 +1,40 @@
-import psycopg2
 import asyncio
-import time
+import logging
 import os
+import psycopg2
+import time
 from typing import Dict, List, Any, Optional
 #from geo_model import GeoModel
+
 from food_access_model.abm.geo_model import GeoModel
 
-DB_PASS = os.getenv("DB_PASS")
+
+logger = logging.getLogger(__name__)
+
+PASS = os.getenv("DB_PASS")
 APIKEY = os.getenv("APIKEY")
-DB_USER = os.getenv("DB_USER")
-DB_NAME = os.getenv("DB_NAME")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
+USER = os.getenv("DB_USER")
+NAME = os.getenv("DB_NAME")
+HOST = os.getenv("DB_HOST")
+PORT = os.getenv("DB_PORT")
 
 class DBRepository:
     """Singleton repository for database access and caching."""
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(DBRepository, cls).__new__(cls)
             cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
         if not self._initialized:
             self._initialized = True
             self.households = None
             self.food_stores = None
             self.model = None
-            
+
             # Database connection parameters
          
     async def initialize(self):
@@ -40,7 +45,15 @@ class DBRepository:
         start_time = time.time()
         
         # Create connection pool
-        connection = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS, port=DB_PORT)
+        connection = psycopg2.connect(
+            host=HOST, 
+            database=NAME, 
+            user=USER, 
+            password=PASS, 
+            port=PORT,
+            connect_timeout=10,
+            sslmode='require'
+        )
 
         with connection.cursor() as cursor:
             cursor.execute("SELECT * FROM food_stores;")
