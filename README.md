@@ -21,7 +21,6 @@ The Food Access and Strategy Simulation tool is a powerful resource for analyzin
    
 *National Science Foundation (NSF) funded AI institute for Intelligent Cyberinfrastructure with Computational Learning in the Environment (ICICLE) (OAC 2112606)*
 
-
 # Tutorial
 
 ## Example Use Case
@@ -32,7 +31,6 @@ The Food Access and Strategy Simulation tool is a powerful resource for analyzin
     access, particularly for households without vehicles.
 3. Remove a Store: Remove "Charlie’s Market" and/or surrounding stores and examine
     how food access challenges re-emerge in the affected area.
-
 
 # Explanation
 
@@ -57,7 +55,6 @@ explore detailed information about stores and households.
 
 2. Household Data
 
-
 - Attributes available for each household include:
     - Income
         - Household size
@@ -71,7 +68,6 @@ relevance. The data reflects real-world locations as closely as possible, with g
 at the census tract level.
 
 3. Community Data Bar
-
 
 - Aggregated metrics displayed for the selected area:
     - Total number of households
@@ -93,7 +89,6 @@ Step 1: Adding a Store
 4. Confirm the addition. The new store will now appear on the map.
 
 Step 2: Simulating Changes
-
 
 - Use the Step Function to simulate changes over time:
 
@@ -121,8 +116,6 @@ monitor the outcomes, and leverage the tool’s insights to drive meaningful com
 improvements. Should you need further support or wish to provide feedback, our team is here to
 assist.
 
-
-
 <!-- GETTING STARTED -->
 ## Getting Started
 
@@ -138,14 +131,22 @@ You will need python to run this application.
    ```sh
    git clone https://github.com/ICICLE-ai/Food-Access-Model.git
    ```
-2. Install python dependencies from pyproject.toml
+
+2. Switch to the appropriate branch
+If you are running the application locally, then switch to the "reduced_household_request" branch.  If you are running the application in a production environment, then switch to the "staging" branch.
+```sh
+  git checkout reduced_household_request 
+  ``` 
+
+3. Install python dependencies from pyproject.toml
    ```sh
    pip install uv
    uv install
    ```
-3. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html). This is only neccessary if you want to create new data. The current database will hold brown county data.
 
-4. create a file `.env` at the root and enter your API in `config.py`
+4. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html). This is only neccessary if you want to create new data. The current database will hold brown county data.
+
+5. create a file `.env` at the root and enter your API in `config.py`
    ```py
    API_KEY=[CENSUS API KEY (optional)]
    DB_NAME=[NAME OF DATABASE]
@@ -154,10 +155,7 @@ You will need python to run this application.
    DB_HOST=[DATABASE HOST]
    DB_PORT=[DATABASE PORT FOR DATABASE]
    ```
-   
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- USAGE EXAMPLES -->
 ## Usage
@@ -166,12 +164,10 @@ You can run this project on localhost with:
 ```sh
    uv run run.py
 ```
-
 Beyond testing api calls, running this project and the FASS-Frontend concurrently results in a user-experience
 using data within the database.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 
 <!-- CONTRIBUTING -->
 ## Contributing
@@ -200,9 +196,6 @@ Don't forget to give the project a star! Thanks again!
 - [Sophia](https://github.com/schen625)
 - [Edric](https://github.com/MiniMiniFridge)
 - [Tanish Upakare](https://github.com/tanishhh2077)
-
-
-
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
