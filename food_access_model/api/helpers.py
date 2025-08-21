@@ -14,20 +14,25 @@ class StoreInput(BaseModel):
         name (str): The name of the store.
         category (str): The category/type of the store (e.g., supermarket, grocery).
         longitude (str): The longitude coordinate of the store location.
-        latitude (str): The latitude coordinate of the store location.A
-    """   
+        latitude (str): The latitude coordinate of the store location.
+        simulation_instance_id (str): The ID of the simulation instance to which the store belongs.
+        simulation_step (int): The step of the simulation at which the store is added.
+    """
+
     name: str
     category: str
-    longitude: str 
+    longitude: str
     latitude: str
+    simulation_instance_id: str
+    simulation_step: int
 
 def convert_centroid_to_polygon(latitude: str, longitude: str, type: str) -> str:
     """
     Converts latitude and longitude into a polygon to display a store's area.
-    
+
     Transforms coordinates from EPSG:4326 to EPSG:3857 and returns a polygon
     shape according to the store type. 
-    
+
     Args:
         latitude (str): Store's latitude.
         longitude (str): Store's longitude.

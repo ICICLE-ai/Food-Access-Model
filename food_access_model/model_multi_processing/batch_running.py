@@ -12,12 +12,9 @@ This code changes the way parameters are passed to the model.
 
 from decimal import Decimal
 from functools import partial
-from multiprocessing import Pool, active_children
-
-
-#for p in active_children():
-#    p.terminate()
-#    p.join()
+import logging
+from multiprocessing import Pool
+import os
 
 from typing import (
     Any,
@@ -32,10 +29,9 @@ from typing import (
 )
 
 from mesa import Agent
+from mesa.model import Model
 from tqdm.auto import tqdm
 
-from mesa.model import Model
-import os
 
 def batch_run(
     model_cls: Type[Model],
@@ -76,17 +72,16 @@ def batch_run(
     runs_list = []
     run_id = 0
 
-    print(f"Batch runner began", flush=True)
-     
+    logging.info(f"Batch runner began")
+
     household_chunks = create_household_chunks(parameters["households"], number_processes)
-    
+
     # for iteration in range(iterations):
-        
+
     for household_group in household_chunks:
         model_config = {"stores": parameters['stores'], "households": household_group}
         runs_list.append((run_id, 0, model_config))
         run_id += 1
-        
 
     process_func = partial(
         _model_run_func,
@@ -95,7 +90,6 @@ def batch_run(
         data_collection_period=data_collection_period,
     )
 
-    
     results: List[Dict[str, Any]] = []
 
     with tqdm(total=len(runs_list), disable=not display_progress) as pbar:
@@ -104,7 +98,7 @@ def batch_run(
                 data = process_func(run)
                 results.append(data)
                 pbar.update()
-               
+
         else:
             try:
                 with Pool(number_processes) as pool:
@@ -116,15 +110,16 @@ def batch_run(
                     pool.join()
             except Exception as e:
                 return {"error": str(e), "input": data}
-                
-    print(f"tqdm FUNCTION END", flush=True)
+
+    logging.info("tqdm FUNCTION END")
     return results
 
-def create_household_chunks(households, number_processes : Optional[int] = None):
-    
+
+def create_household_chunks(households, number_processes: Optional[int] = None):
+
     if number_processes is None:
         number_processes = os.cpu_count() or 1
-    
+
     # Divide households into groups based on the number of cores
     household_groups = []
     chunk_size = len(households) // number_processes
@@ -137,19 +132,20 @@ def create_household_chunks(households, number_processes : Optional[int] = None)
 
     if last_chunk < len(households):
         household_groups[-1].extend(households[last_chunk:])
-    
+
     return household_groups
-    
+
+
 def create_store_records(stores: List[Agent]):
     store_records = []
     for store in stores:
-        name = store.name
-        type = store.type
-        geometry = store.raw_geometry
-        store = [type, geometry, name]
-
-        store_records.append(store)
+        entry = {}
+        entry['type'] = store.type
+        entry['geometry'] = store.raw_geometry
+        entry['name'] = store.name
+        store_records.append(entry)
     return store_records
+
 
 def extract_decimal(value):
     if isinstance(value, Decimal):
@@ -158,27 +154,29 @@ def extract_decimal(value):
         return float(value)
     return value
 
+
 def create_household_records(households: List[Dict[str, Any]]):
     household_records = []
     for household in households:
-        id = extract_decimal(household["AgentID"])
-        polygon = household["Geometry"]
-        income = extract_decimal(household["Income"])
-        household_size = extract_decimal(household["Household Size"])
-        vehicles = extract_decimal(household["Vehicles"])
-        number_of_workers = extract_decimal(household["Number of Workers"])
-        walking_time = extract_decimal(household["Walking time"])
-        biking_time = extract_decimal(household["Biking time"])
-        transit_time = extract_decimal(household["Transit time"])
-        driving_time = extract_decimal(household["Driving time"])
-        distance_to_closest_store = extract_decimal(household["Closest Store (Miles)"])
-        num_store_within_mile = extract_decimal(household["Stores within 1 Mile"])
-        mfai = extract_decimal(household["Food Access Score"])
-        color = household["Color"]
-        household = [id, polygon, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time, distance_to_closest_store, num_store_within_mile, mfai, color]
-        household_records.append(household)
+        entry = {}
+        entry['id'] = extract_decimal(household["AgentID"])
+        entry['Geometry'] = household["Geometry"]
+        entry['Income'] = extract_decimal(household["Income"])
+        entry['Household Size'] = extract_decimal(household["Household Size"])
+        entry['Vehicles'] = extract_decimal(household["Vehicles"])
+        entry['Number of Workers'] = extract_decimal(household["Number of Workers"])
+        entry['Walking time'] = extract_decimal(household["Walking time"])
+        entry['Biking time'] = extract_decimal(household["Biking time"])
+        entry['Transit time'] = extract_decimal(household["Transit time"])
+        entry['Driving time'] = extract_decimal(household["Driving time"])
+        entry['Closest Store (Miles)'] = extract_decimal(household["Closest Store (Miles)"])
+        entry['Stores within 1 Mile'] = extract_decimal(household["Stores within 1 Mile"])
+        entry['Food Access Score'] = extract_decimal(household["Food Access Score"])
+        entry['Color'] = household["Color"]
+        household_records.append(entry)
 
     return household_records
+
 
 def _model_run_func(
     model_cls: Type[Model],
@@ -215,9 +213,8 @@ def _model_run_func(
     while model.running and model.schedule.steps < max_steps:
         model.step()
 
-    
     data = []
-    
+
     steps = list(range(1, model.schedule.steps, data_collection_period))
 
     if not steps or steps[-1] != model.schedule.steps - 1:
@@ -238,7 +235,7 @@ def _model_run_func(
                     "Step": step,
                     "kwargs": kwargs,
                     "model_data": model_data,
-                    #TODO: Only housholds are being added to schedule when creating the model. That's why the data collector only process households.
+                    # TODO: Only housholds are being added to schedule when creating the model. That's why the data collector only process households.
                     "households": household_records,
                     "stores": store_records
                 }
@@ -258,27 +255,42 @@ def _model_run_func(
             ]
         data.extend(stepdata)
 
-
-    print("Finished data collection", flush=True)
+    logging.info("Finished data collection")
     return data
 
-def _collect_data(
-    model: Model,
-    step: int,
-) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    """Collect model and agent data from a model using mesas datacollector."""
+
+def _collect_data(model: Model,
+                  step: int) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """
+    Collect model and agent data from a model using mesas datacollector.
+
+    Parameters
+    ----------
+    model : Model
+        The model instance to collect data from.
+    step : int
+        The current step of the model.
+
+    Returns
+    -------
+    Tuple[Dict[str, Any], List[Dict[str, Any]]]
+        A tuple containing the model data and a list of all agent data.
+    """
+
     dc = model.datacollector
 
     model_data = {param: values[step] for param, values in dc.model_vars.items()}
 
     all_agents_data = []
+
     """
     Note: In the original code the implementation accesses _agent_records[step].
     However, when debugging this code and after reading the mesa-geo code, I realized that the data is stored in a different way.
     The data is stored in the _agent_records dictionary with steps starting from 1.
     So, I am adding 1 to step to access the correct data.
     """
-    raw_agent_data = dc._agent_records.get(step+1, [])
+    raw_agent_data = dc._agent_records.get(step + 1, [])
+
     for data in raw_agent_data:
         agent_dict = {"AgentID": data[1]}
         agent_dict.update(zip(dc.agent_reporters, data[2:]))
