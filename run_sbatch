@@ -1,0 +1,34 @@
+#!/bin/sh
+#SBATCH --partition=standard
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=60
+#SBATCH --time=07:00:00
+#SBATCH --output=lg-par-fass-backend.log
+#SBATCH --job-name=par-fass
+#SBATCH --exclusive
+#SBATCH --mem=300G
+
+
+
+echo "STARTING"
+
+vpkg_require anaconda/2024.02:python3
+
+conda activate fass-backend
+
+echo "SOURCING ENV"
+
+#source $PWD/.env
+
+export APIKEY='332b1c2864593c1fa8c92543dcd188fab2816358' 
+export NAME="fassdb-profiling"
+export USER="fassdb"
+export PASS="aKDl99utTr5DJ8FxrsgZtbOSHy7YVr"
+export HOST="fassdb.pods.icicleai.tapis.io"
+export PORT=443
+
+
+echo "RUNNING"
+uv run gunicorn food_access_model.main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout=7200
+
