@@ -4,7 +4,10 @@ ENV PYTHONUNBUFFERED=1
 # Install required system dependencies
  RUN apt-get update && apt-get install -y \
      gcc \
+     g++ \
      libpq-dev \
+     libgdal-dev \
+     libexpat1 \
      && apt-get clean
 
 # Install uv
@@ -18,9 +21,12 @@ COPY ./pyproject.toml .
 RUN uv sync --frozen --no-cache
 
 # Copy all necessary python code to run the server
+# COPY ./*.py ./
+COPY food_access_model ./food_access_model
 COPY ./*.py ./
 
 # Container Entrypoint
 COPY entrypoint.sh .
+RUN chmod +x ./entrypoint.sh  # Make the script executable
 
 ENTRYPOINT ["sh", "entrypoint.sh"]
