@@ -125,6 +125,15 @@ To get a local copy up and running follow these simple steps.
 
 You will need python to run this application.
 
+
+### Database
+
+The system is designed to work with a postGIS database which stores the simulation environment state along
+with other relevant data. In order to run the system, you will need to set up your database credentials (described below) to connect to either a remotely hosted database instance, or you can deploy an instance locally. A database dump file is provided in the repository (database.dmp) and can be restored to an existing postGIS database using the command
+```sh
+pg_restore -h <database_host> -U <database_user> -d <database_name> -p <database_port> --no-owner --no-privileges database.dmp
+```
+
 ### Installation
 
 1. Clone the repo
