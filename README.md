@@ -1,28 +1,76 @@
 # Food-Access-Model
 <!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
 <a id="readme-top"></a>
-The Food Access and Strategy Simulation tool is a powerful resource for analyzing and simulating the effects of adding or removing stores on household food access.
-- Food-Access
+
+---
+# Food Access Strategy Simulator (FEAST)
+---
+The Food Access and Strategy Simulation tool, also known as FEAST (Food Equity Access Simulation Technology tool), is a powerful resource for analyzing and simulating the effects of adding or removing stores on household food access.
+
+**Tags:** Food-Access, Smart-Foodsheds, Digital-Agriculture
 
 ### Built With
 
 * Python
 * React.js
-
+---
 ### License
+---
 <!-- TODO: link to relavant licenses  -->
+This project is licensed under the BSD 3-Clause License
 
+**Copyright (c) 2025, Intelligent Cyberinfrastructure with Computational Learning in the Environment -- ICICLE**
+
+[![BSD-3-Clause License][license-shield]][license-url]
+---
 ## References
+---
 <!-- TODO: e.g., libraries, tools) or external documentation.
 - Definitions of key terms and concepts used in the project.  -->
 
+### Technical Resources
+* **Spatial Analysis:** PostGIS for geographic database operations
+* **Census Data Integration:** U.S. Census Bureau API documentation
+* **Transportation Analysis:** Google Maps Distance Matrix API
+
+
+### Key Terms and Concepts
+* **Agent-based Model (ABM):** Computational model that simulates individual agents(households) and their interactions within a system
+* **Food Access Score:** Composite metric measuring geographic accessibility, economic accessibility, and food quality options
+* **Census Tract:** Geographic subdivision used by the U.S. Census Bureau, typically containing 1,200-8,000 residents
+* **Food Desert:** Geographic area with limited access to affordable and nutritious fresh foods
+
 ## Acknowledgements
-- Please include other funding sources to the section below.
    
 *National Science Foundation (NSF) funded AI institute for Intelligent Cyberinfrastructure with Computational Learning in the Environment (ICICLE) (OAC 2112606)*
+*Wisconsin Alumni Research Fund
+*The Farm2Facts Gift Fund
 
-# Tutorial
+---
+## Issue Reporting
+---
+We welcome feedback and issue reports to help improve FEAST. Please use the following channels:
+### GitHub Issues (Primary)
+* **Bug Reports:** https://github.com/ICICLE-ai/Food-Access-Model/issues
+- Use the "bug" label and bug report template
+- Included system information, steps to reproduce, and error messages
+* **Feature Requests:**  https://github.com/ICICLE-ai/Food-Access-Model/issues
+- Use the "enhancement" label and feature request template
+- Describe the proposed functionality and use case
 
+### Email Support
+* **Technical Support:**
+* **Research Inquiries:**
+* **Collaboration Opportunities:**
+
+### Before Reporting
+1. **Check Existing Issues:** Search open and closed issues to avoid duplicates
+2. **Review Documentation:** Ensure your question isn't answered in this README or linked resources
+3. **Test with Latest Version:** Verify the issue persists in the most recent release
+
+---
+## Tutorial
+---
 ## Example Use Case
 
 1. Add a Store: Place a new supermarket in an underserved area—for example, add
@@ -31,14 +79,20 @@ The Food Access and Strategy Simulation tool is a powerful resource for analyzin
     access, particularly for households without vehicles.
 3. Remove a Store: Remove "Charlie’s Market" and/or surrounding stores and examine
     how food access challenges re-emerge in the affected area.
-
-# Explanation
-
+---
+## Explanation
+---
 ## Introduction
 
-The Food Access and Strategy Simulation tool is a powerful resource for analyzing and
+The FEAST/Food Access and Strategy Simulation tool is a powerful resource for analyzing and
 simulating the effects of adding or removing stores on household food access. This guide
 provides clear, step-by-step instructions to help you navigate and utilize the tool effectively.
+
+### Why Agent-Based Modeling for Food Access?
+Traditional food access research relies on aggregate statistics and simple distance measurements. However, real household food shopping involve interactions between:
+- **Individual Constraints:** Income, vehicle access, work schedules, family size
+- **Geographic Factors:** Store locations, transportation networks, neighborhood characteristics
+- **Economic Dynamics:** Price variations and store quality differences
 
 ## Key Features of the Interface
 
@@ -74,9 +128,9 @@ at the census tract level.
     - Number of supermarkets and convenience stores
     - Average household income
     - Average number of household vehicles
-
-# How To Guide
-
+---
+## How To Guide
+---
 ## How To Use The Tool
 Step 1: Adding a Store
 
@@ -110,7 +164,12 @@ Step 3: Removing a Store
 target areas with low food access.
 - Simulate Iteratively: Run multiple steps to identify trends and long-term effects.
 
-By using the Food Access and Strategy Simulation tool, you can make informed decisions to
+### Troubleshooting Common Issues
+**"Simulation taking forever"**
+- **Normal:** Large simulations (50k+ households) can take 10-30 minutes per step
+- **Solution:** Use reduced sample size
+
+By using the FEAST/Food Access and Strategy Simulation tool, you can make informed decisions to
 address food access challenges and create impactful solutions. Explore different scenarios,
 monitor the outcomes, and leverage the tool’s insights to drive meaningful community
 improvements. Should you need further support or wish to provide feedback, our team is here to
@@ -144,7 +203,7 @@ If you are running the application locally, then switch to the "reduced_househol
    uv install
    ```
 
-4. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html). This is only neccessary if you want to create new data. The current database will hold brown county data.
+4. Get a free API Key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html). This is only necessary if you want to create new data. The current database will hold brown county data.
 
 5. create a file `.env` at the root and enter your API in `config.py`
    ```py
