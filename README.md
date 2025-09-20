@@ -57,12 +57,12 @@ We welcome feedback and issue reports to help improve FEAST. Please use the foll
 * **Feature Requests:**  https://github.com/ICICLE-ai/Food-Access-Model/issues
 - Use the "enhancement" label and feature request template
 - Describe the proposed functionality and use case
-
+<!--
 ### Email Support
 * **Technical Support:**
 * **Research Inquiries:**
 * **Collaboration Opportunities:**
-
+-->
 ### Before Reporting
 1. **Check Existing Issues:** Search open and closed issues to avoid duplicates
 2. **Review Documentation:** Ensure your question isn't answered in this README or linked resources
