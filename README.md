@@ -6,7 +6,7 @@
 ---
 The Food Equity Access Simulation Technology (FEAST) tool — previously known as the Food Access and Strategy Simulation (FASS) tool — is a powerful platform for analyzing how changes in the food retail landscape, such as adding or removing stores, affect household food access. FEAST enables users to simulate and evaluate strategies aimed at improving food equity across communities.
 
-**Tags:** Food-Access, Smart-Foodsheds, Digital-Agriculture
+**Tags:** Food-Access, Smart-Foodsheds, Food-Systems
 
 ### Built With
 
