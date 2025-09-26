@@ -2,7 +2,6 @@
 <a id="readme-top"></a>
 
 # The Food Equity Access Simulation Technology (FEAST)
----
 The Food Equity Access Simulation Technology (FEAST) tool — previously known as the Food Access and Strategy Simulation (FASS) tool — is a powerful platform for analyzing how changes in the food retail landscape, such as adding or removing stores, affect household food access. FEAST enables users to simulate and evaluate strategies aimed at improving food equity across communities.
 
 **Tags:** Food-Access, Smart-Foodsheds, Food-Systems
@@ -10,19 +9,16 @@ The Food Equity Access Simulation Technology (FEAST) tool — previously known a
 ### Built With
 
 * Python
-* React.js
----
+* React.j
 ### License
----
 <!-- TODO: link to relavant licenses  -->
 This project is licensed under the BSD 3-Clause License
 
 **Copyright (c) 2025, Intelligent Cyberinfrastructure with Computational Learning in the Environment -- ICICLE**
 
 [![BSD-3-Clause License][license-shield]][license-url]
----
+
 ## References
----
 <!-- TODO: e.g., libraries, tools) or external documentation.
 - Definitions of key terms and concepts used in the project.  -->
 
@@ -44,9 +40,7 @@ This project is licensed under the BSD 3-Clause License
 *Wisconsin Alumni Research Fund
 *The Farm2Facts Gift Fund
 
----
 ## Issue Reporting
----
 We welcome feedback and issue reports to help improve FEAST. Please use the following channels:
 ### GitHub Issues (Primary)
 * **Bug Reports:** https://github.com/ICICLE-ai/Food-Access-Model/issues
@@ -66,9 +60,10 @@ We welcome feedback and issue reports to help improve FEAST. Please use the foll
 2. **Review Documentation:** Ensure your question isn't answered in this README or linked resources
 3. **Test with Latest Version:** Verify the issue persists in the most recent release
 
+
 ---
-## Tutorial
----
+
+# Tutorials
 ## Example Use Case
 
 1. Add a Store: Place a new supermarket in an underserved area—for example, add
@@ -77,9 +72,10 @@ We welcome feedback and issue reports to help improve FEAST. Please use the foll
     access, particularly for households without vehicles.
 3. Remove a Store: Remove "Charlie’s Market" and/or surrounding stores and examine
     how food access challenges re-emerge in the affected area.
----
-## Explanation
----
+
+
+# Explanation
+
 ## Introduction
 
 The FEAST tool is a powerful resource for analyzing and
@@ -126,9 +122,9 @@ at the census tract level.
     - Number of supermarkets and convenience stores
     - Average household income
     - Average number of household vehicles
+
 ---
-## How To Guide
----
+# How To Guide
 ## How To Use The Tool
 Step 1: Adding a Store
 
