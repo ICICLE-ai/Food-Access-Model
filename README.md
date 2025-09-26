@@ -3,9 +3,9 @@
 <a id="readme-top"></a>
 
 ---
-# Food Access Strategy Simulator (FEAST)
+# The Food Equity Access Simulation Technology (FEAST)
 ---
-The Food Access and Strategy Simulation tool, also known as FEAST (Food Equity Access Simulation Technology tool), is a powerful resource for analyzing and simulating the effects of adding or removing stores on household food access.
+The Food Equity Access Simulation Technology (FEAST) tool — previously known as the Food Access and Strategy Simulation (FASS) tool — is a powerful platform for analyzing how changes in the food retail landscape, such as adding or removing stores, affect household food access. FEAST enables users to simulate and evaluate strategies aimed at improving food equity across communities.
 
 **Tags:** Food-Access, Smart-Foodsheds, Digital-Agriculture
 
@@ -84,7 +84,7 @@ We welcome feedback and issue reports to help improve FEAST. Please use the foll
 ---
 ## Introduction
 
-The FEAST/Food Access and Strategy Simulation tool is a powerful resource for analyzing and
+The FEAST tool is a powerful resource for analyzing and
 simulating the effects of adding or removing stores on household food access. This guide
 provides clear, step-by-step instructions to help you navigate and utilize the tool effectively.
 
@@ -169,7 +169,7 @@ target areas with low food access.
 - **Normal:** Large simulations (50k+ households) can take 10-30 minutes per step
 - **Solution:** Use reduced sample size
 
-By using the FEAST/Food Access and Strategy Simulation tool, you can make informed decisions to
+By using the FEAST simulation tool, you can make informed decisions to
 address food access challenges and create impactful solutions. Explore different scenarios,
 monitor the outcomes, and leverage the tool’s insights to drive meaningful community
 improvements. Should you need further support or wish to provide feedback, our team is here to
@@ -223,7 +223,7 @@ You can run this project on localhost with:
 ```sh
    uv run run.py
 ```
-Beyond testing api calls, running this project and the FASS-Frontend concurrently results in a user-experience
+Beyond testing api calls, running this project and the front end service contained in the [FASS-Frontend](https://github.com/ICICLE-ai/FASS-Frontend) concurrently results in a user-experience
 using data within the database.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
