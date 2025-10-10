@@ -443,6 +443,7 @@ def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
     create_households_query = '''
     CREATE TABLE households (
         id NUMERIC,
+        block_id NUMERIC,
         polygon TEXT,
         income NUMERIC,
         household_size NUMERIC,
@@ -461,6 +462,7 @@ def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
     household_query = """
     INSERT INTO households 
     (id,
+     block_id,
      polygon,
      income,
      household_size,

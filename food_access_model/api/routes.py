@@ -191,7 +191,8 @@ async def reset_simulation_instance(instance_id: str) -> ORJSONResponse:
 @router.post("/simulation-instances")
 async def create_simulation_instance(name: Optional[str] = Body(None, embed=True),
                                      description: Optional[str] = Body(None, embed=True),
-                                     household_limit: Optional[int] = Body(None, embed=True)) -> ORJSONResponse:
+                                     household_limit: Optional[int] = Body(None, embed=True),
+                                     county_code: Optional[int] = Body(None, embed=True)) -> ORJSONResponse:
     """
     Create a new simulation instance.
 
@@ -209,11 +210,11 @@ async def create_simulation_instance(name: Optional[str] = Body(None, embed=True
     query = """
         INSERT INTO simulation_instances (name, description)
         VALUES ($1, $2)
-        RETURNING id, name, description, created_at;
+        RETURNING id, name, description, county_code, created_at;
         """
 
     async with pool.acquire() as conn:
-        row = await conn.fetchrow(query, name, description)
+        row = await conn.fetchrow(query, name, description, county_code)
     instance = dict(row)
 
     instance['id'] = str(instance['id'])  # Convert UUID to string for JSON serialization
