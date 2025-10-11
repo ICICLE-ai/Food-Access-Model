@@ -24,6 +24,7 @@ from psycopg2 import extras
 from rtree.index import Index as RTreeIndex
 from psycopg2.extensions import connection as Connection, cursor as Cursor
 from shapely.geometry import Point, Polygon, LineString
+from shapely.geometry.base import BaseGeometry
 from shapely.strtree import STRtree
 from pyproj import Transformer
 from dotenv import load_dotenv 
@@ -401,21 +402,9 @@ def process_food_stores(
     for _, row in features.itertuples():
         point = row["geometry"].centroid if not isinstance(row["geometry"], Point) else row["geometry"]
 
-        if row["shop"] in ["supermarket", "grocery", "greengrocer"]:
-            polygon = Polygon([
-                (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
-                for angle in range(0, 360, 60)
-            ])
-        else:
-            polygon = Polygon([
-                (point.x, point.y + 20),
-                (point.x + 25, point.y - 30),
-                (point.x - 25, point.y - 30)
-            ])
-
-        map_elements.append(polygon.buffer(20))
-        store_tuples_strPoly.append((str(row["shop"]), str(polygon), str(row["name"])))
-        store_tuples_Poly.append((str(row["shop"]), polygon, str(row["name"])))
+        map_elements.append(point.buffer(20))
+        store_tuples_strPoly.append((str(row["shop"]), str(point), str(row["name"])))
+        store_tuples_Poly.append((str(row["shop"]), point, str(row["name"])))
     try:
         extras.execute_values(cursor, food_stores_query, store_tuples_strPoly)
     except psycopg2.Error as e:
@@ -423,7 +412,7 @@ def process_food_stores(
         connection.rollback()
         raise
     
-    return (STRtree(map_elements),store_tuples_Poly) , 
+    return (STRtree(map_elements),store_tuples_Poly)
 
 
 # Call the function and get the spatial index of mapped elements
@@ -444,7 +433,7 @@ def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
     CREATE TABLE households (
         id NUMERIC,
         block_id NUMERIC,
-        polygon TEXT,
+        point TEXT,
         income NUMERIC,
         household_size NUMERIC,
         vehicles NUMERIC,
@@ -463,7 +452,7 @@ def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
     INSERT INTO households 
     (id,
      block_id,
-     polygon,
+     point,
      income,
      household_size,
      vehicles,
@@ -490,43 +479,32 @@ def close_db_connection(connection: psycopg2.extensions.connection, cursor: psyc
     connection.close()
 
 
-def create_house_polygon(location: Point) -> Polygon:
+def create_house_point(location: Point) -> Point:
     """
-    Create a synthetic house polygon at a given location.
+    Create a synthetic house point at a given location.
 
     Args:
         location (Point): Center point of the house.
 
     Returns:
-        Polygon: A polygon representing the house footprint.
+        Point: A Point representing the house footprint.
     """
-    return Polygon([
-        (location.x + 10, location.y + 10),
-        (location.x, location.y + 20),
-        (location.x - 10, location.y + 10),
-        (location.x - 10, location.y - 5),
-        (location.x - 3, location.y - 5),
-        (location.x - 3, location.y + 3),
-        (location.x + 3, location.y + 3),
-        (location.x + 3, location.y - 5),
-        (location.x + 10, location.y - 5),
-        (location.x + 10, location.y + 10)  
-    ])
+    return Point(location.x, location.y)
 
 
 
-def place_houses_in_area(housing_area: Polygon, spacing: float = 30.0) -> List[Polygon]:
+def place_houses_in_area(housing_area: Polygon, spacing: float = 30.0) -> List[Point]:
     """
-    Place house-shaped polygons around the edges of a housing area polygon.
+    Place house points around the edges of a housing area polygon.
 
     Args:
         housing_area (Polygon): A polygon representing the buffer around a residential road.
         spacing (float): Distance between each house along the edge.
 
     Returns:
-        List[Polygon]: List of synthetic house polygons.
+        List[Point]: List of synthetic house points.
     """
-    houses: List[Polygon] = []
+    houses: List[Point] = []
     exterior_coords = list(housing_area.exterior.coords)
     edges = [LineString([exterior_coords[i], exterior_coords[i + 1]])
              for i in range(len(exterior_coords) - 1)]
@@ -546,38 +524,34 @@ def place_houses_in_area(housing_area: Polygon, spacing: float = 30.0) -> List[P
             location = Point(coord1[0] + norm_vector[0] * i * spacing,
                              coord1[1] + norm_vector[1] * i * spacing)
 
-            house = create_house_polygon(location)
+            house = create_house_point(location)
 
             houses.append(house)
 
     return houses
 
 def is_valid_house(
-    house: Polygon,
+    house: Point,
     map_elements_index: STRtree,
     houses_index: rtree.index.Index,
-    map_elements: List[Polygon]
+    map_elements: List[BaseGeometry]
 ) -> bool:
     """
-    Check whether a house polygon is valid by verifying it does not intersect
+    Check whether a house point is valid by verifying it does not intersect
     with roads or existing houses.
 
     Args:
-        house (Polygon): The house polygon to check.
+        house (Point): The house point to check.
         map_elements_index (STRtree): Spatial index for roads and store areas.
         houses_index (rtree.index.Index): R-tree index of all placed houses.
-        map_elements (List[Polygon]): The list of buffered roads and stores.
+        map_elements (List[BaseGeometry]): The list of buffered roads and stores.
 
     Returns:
         bool: True if house is valid; False if it intersects with other features.
     """
     # Check collision with road/store polygons
-    search_area = Polygon([
-        (house.centroid.x + 10, house.centroid.y + 20),
-        (house.centroid.x - 10, house.centroid.y + 20),
-        (house.centroid.x - 10, house.centroid.y - 5),
-        (house.centroid.x + 10, house.centroid.y - 5)
-    ])
+    # NOTE: Not sure if this should be in the backend or frontend
+    search_area = house
 
     for index in map_elements_index.query(search_area):
         if map_elements[index].intersects(house):
@@ -741,20 +715,20 @@ def generate_houses_from_housing_areas(
 
 
 def get_nearest_store(
-        house: Polygon, 
+        house: Point, 
         store_tuples : List[Tuple[str, str, str]], 
-        shapely_loader: Callable[[str], Polygon]
-        )-> Optional[Polygon]:
+        shapely_loader: Callable[[str], BaseGeometry]
+        )-> Optional[Point]: #NOTE: This may have to be a BaseGeometry obj
     """
-    Find the nearest store polygon to house. 
+    Find the nearest store point to house. 
 
     Args:
-        house (Polygon): The house polygon to check
+        house (Point): The house point to check
         store_tuples: (List[Tuple[str, str, str]]): List of tuples (shop type, WKT polygon, name) for stores.
         shapely_loader (Any): Function to convert WKT string to Shapely geometry.
     
     Returns:
-        Optional[Polygon]: The nearest store polygon, or None if no stores found.
+        Optional[Point]: The nearest store point, or None if no stores found.
     """
     nearest_store = None
     store_distance = float('inf')
@@ -770,23 +744,27 @@ def get_nearest_store(
     return nearest_store
 
 
-def transform_polygon_coords(polygon: Polygon, source_crs : str, target_crs : str) -> Polygon:
-    """Transform a polygon's coordinates from one CRS to another.
+# def transform_polygon_coords(bm: BaseGeometry, source_crs : str, target_crs : str) -> BaseGeometry:
+#     """Transform a polygon's coordinates from one CRS to another.
 
-    Args:
-        polygon (Polygon): The polygon to transform.
-        source_crs (str): The source coordinate reference system (e.g., "EPSG:3857").
-        target_crs (str): The target coordinate reference system (e.g., "EPSG:4326").
+#     Args:
+#         bm (BaseGeometry): The polygon to transform.
+#         source_crs (str): The source coordinate reference system (e.g., "EPSG:3857").
+#         target_crs (str): The target coordinate reference system (e.g., "EPSG:4326").
 
-    Returns:
-        Polygon: A new Polygon with its coordinates in the target CRS.
-    """
+#     Returns:
+#         BaseGeometry: A new BaseGeometry with its coordinates in the target CRS.
+#     """
+#     transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
+#     coords = [transformer.transform(x, y) for x, y in bm.exterior.coords]
+#     return BaseGeometry(coords)
+
+def transform_geometry_coords(geom: BaseGeometry, source_crs: str, target_crs: str) -> BaseGeometry:
     transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
-    coords = [transformer.transform(x, y) for x, y in polygon.exterior.coords]
-    return Polygon(coords)
+    return shapely.transform(transformer.transform, geom)
 
 def get_tract_for_house(
-    house: Polygon,
+    house: Point,
     tract_index: STRtree,
     data: pd.DataFrame
 ) -> Optional[pd.Series]:
@@ -794,7 +772,7 @@ def get_tract_for_house(
     Find the census tract containing the house centroid.
 
     Args:
-        house (Polygon): The house polygon.
+        house (Point): The house point.
         tract_index (STRtree): Spatial index of tract geometries.
         data (pd.DataFrame): Census data including geometries.
 
@@ -809,7 +787,7 @@ def get_tract_for_house(
 def process_housing_areas(
     housing_areas: List[Polygon],
     map_elements_index: STRtree,
-    map_elements: List[Polygon],
+    map_elements: List[BaseGeometry],
     data: pd.DataFrame,
     store_tuples: List[Tuple[str, str, str]],
 ) -> List[Tuple]:
@@ -820,7 +798,7 @@ def process_housing_areas(
     Args:
         housing_areas (List[Polygon]): Polygons representing areas around residential roads.
         map_elements_index (STRtree): STRtree index for nearby road/store geometries.
-        map_elements (List[Polygon]): Buffered geometries (roads, stores) for intersection checking.
+        map_elements (List[BaseGeometry]): Buffered geometries (roads, stores) for intersection checking.
         data (pd.DataFrame): Census tract data with attributes.
         store_tuples (List[Tuple[str, str, str]]): Store (shop type, WKT, name).
 
@@ -856,7 +834,7 @@ def process_housing_areas(
                     edge.coords[0][1] + norm_vector[1] * j * 30
                 )
 
-                house = create_house_polygon(location)
+                house = create_house_point(location)
 
                 if not is_valid_house(house, map_elements_index, houses_index, map_elements):
                     continue
@@ -879,8 +857,8 @@ def process_housing_areas(
                 if nearest_store is None:
                     continue
 
-                house_4326 = transform_polygon_coords(house, "EPSG:3857", "EPSG:4326")
-                store_4326 = transform_polygon_coords(nearest_store, "EPSG:3857", "EPSG:4326")
+                house_4326 = transform_geometry_coords(house, "EPSG:3857", "EPSG:4326")
+                store_4326 = transform_geometry_coords(nearest_store, "EPSG:3857", "EPSG:4326")
                 ##origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
                 ##destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
 
