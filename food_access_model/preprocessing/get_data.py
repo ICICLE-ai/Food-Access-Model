@@ -366,7 +366,7 @@ roads_query = "INSERT INTO roads (name, highway, length, geometry, service) VALU
 def process_food_stores(
     center_point: Tuple[float, float],
     dist: float,
-    map_elements: List[geometry.base.BaseGeometry],
+    map_elements: List[geometry.base.BaseGeometry],  # NOTE: This should probably be List[Polygon]
     cursor: psycopg2.extensions.cursor
 ) -> Tuple[STRtree, List] : 
     """
@@ -534,7 +534,7 @@ def is_valid_house(
     house: Point,
     map_elements_index: STRtree,
     houses_index: rtree.index.Index,
-    map_elements: List[BaseGeometry]
+    map_elements: List[BaseGeometry] # NOTE: This should probably be List[Polygon]
 ) -> bool:
     """
     Check whether a house point is valid by verifying it does not intersect
@@ -787,7 +787,7 @@ def get_tract_for_house(
 def process_housing_areas(
     housing_areas: List[Polygon],
     map_elements_index: STRtree,
-    map_elements: List[BaseGeometry],
+    map_elements: List[BaseGeometry],  # NOTE: This should probably be List[Polygon]
     data: pd.DataFrame,
     store_tuples: List[Tuple[str, str, str]],
 ) -> List[Tuple]:
