@@ -19,3 +19,5 @@ jobs:
         run: uv sync
       - name: flake8 Lint
         uses: py-actions/flake8@v2
+        with:
+          path: ./food_access_model
