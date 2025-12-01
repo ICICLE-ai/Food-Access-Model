@@ -13,6 +13,8 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
+      - name: Install UV
+        uses: astral-sh/setup-uv@v3
       - name: Install dependencies
         run: uv sync
       - name: flake8 Lint
