@@ -139,7 +139,7 @@ class Household(GeoAgent):
         for store in self.model.stores_list: 
          #distance = self.model.space.distance(self,store)
          distance = self.distances_map[store.unique_id]
-         if distance <= METERS_IN_MILE:
+         if distance <= 1:
           total += 1 
         self.rating_evaluation(total)
         return total 
