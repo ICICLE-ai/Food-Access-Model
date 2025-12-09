@@ -17,11 +17,14 @@ USER = os.getenv("DB_USER")
 NAME = os.getenv("DB_NAME")
 HOST = os.getenv("DB_HOST")
 PORT = os.getenv("DB_PORT")
-MAX_HOUSEHOLDS = os.getenv("MAX_HOUSEHOLDS")
 
 class DBRepository:
     """Singleton repository for database access and caching."""
     _instance = None
+
+    # max_households = 20000
+    # max_households = 100000
+    # max_households = 300000
 
     def __new__(cls):
         if cls._instance is None:
@@ -55,12 +58,8 @@ class DBRepository:
             self.food_stores = stores
             logging.debug(f"Fetched {len(stores)} food stores")
 
-            max_households = MAX_HOUSEHOLDS
             if hasattr(DBRepository, 'max_households'):
-                max_households = DBRepository.max_households
-
-            if max_households:
-                cursor.execute("SELECT id, centroid_wkt, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households LIMIT " + str(max_households) + ";")
+                cursor.execute("SELECT id, centroid_wkt, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households LIMIT " + str(DBRepository.max_households) + ";")
             else:
                 cursor.execute("SELECT id, centroid_wkt, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households;")
 
