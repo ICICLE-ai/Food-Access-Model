@@ -7,13 +7,6 @@ import json
 from food_access_model.api.routes import router as api_router
 from food_access_model.config.logging_config import setup_logging
 
-# Custom encoder for Decimal
-class CustomEncoder(json.JSONEncoder):
-    def encode(self, obj):
-        if not isinstance(obj, str):
-            return str(obj)
-        return super().default(obj)
-
 # Load environment variables from .env file
 load_dotenv(override=True)
 
