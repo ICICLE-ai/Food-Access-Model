@@ -584,28 +584,28 @@ async def _run_model_step(simulation_instance_id) -> None:
     """
     start_time = time.time()
     current_step = await query_current_simulation_step(simulation_instance_id)
-    logging.info(f"Step {current_step}: Queried current simulation step in {time.time() - start_time:.3f}s")
+    logging.debug(f"Step {current_step}: Queried current simulation step in {time.time() - start_time:.3f}s")
 
     t1 = time.time()
     households = await query_households(simulation_instance_id=simulation_instance_id, simulation_step=current_step)
-    logging.info(f"Step {current_step}: Queried {len(households)} households in {time.time() - t1:.3f}s")
+    logging.debug(f"Step {current_step}: Queried {len(households)} households in {time.time() - t1:.3f}s")
 
     t2 = time.time()
     food_stores = await query_food_stores(simulation_instance_id=simulation_instance_id, simulation_step=current_step)
-    logging.info(f"Step {current_step}: Queried {len(food_stores)} food stores in {time.time() - t2:.3f}s")
+    logging.debug(f"Step {current_step}: Queried {len(food_stores)} food stores in {time.time() - t2:.3f}s")
 
     t3 = time.time()
     batch_results = await batch_run_model(households=households, food_stores=food_stores)
-    logging.info(f"Step {current_step}: Ran model step in {time.time() - t3:.3f}s")
+    logging.debug(f"Step {current_step}: Ran model step in {time.time() - t3:.3f}s")
 
     t4 = time.time()
     await return_step_results_to_database(households=batch_results['households'],
                                           simulation_instance_id=simulation_instance_id,
                                           simulation_step=current_step + 1)
 
-    logging.info(f"Step {current_step}: Saved step results to database in {time.time() - t4:.3f}s")
+    logging.debug(f"Step {current_step}: Saved step results to database in {time.time() - t4:.3f}s")
 
-    logging.info(f"Step {current_step}: Total time for _run_model_step: {time.time() - start_time:.3f}s")
+    logging.debug(f"Step {current_step}: Total time for _run_model_step: {time.time() - start_time:.3f}s")
 
 
 async def reset_simulation(instance_id: str) -> None:
