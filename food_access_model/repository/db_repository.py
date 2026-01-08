@@ -56,7 +56,7 @@ class DBRepository:
             cursor.execute("SELECT * FROM food_stores;")
             stores = cursor.fetchall()
             self.food_stores = stores
-            logging.debug(f"Fetched {len(stores)} food stores")
+            logging.info(f"Fetched {len(stores)} food stores")
 
             if hasattr(DBRepository, 'max_households'):
                 cursor.execute("SELECT id, centroid_wkt, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households LIMIT " + str(DBRepository.max_households) + ";")
@@ -65,12 +65,12 @@ class DBRepository:
 
             households = cursor.fetchall()
             self.households = households
-            logging.debug(f"Fetched {len(households)} households")
+            logging.info(f"Fetched {len(households)} households")
 
 
         end_time = time.time()
         startup_duration = end_time - start_time
-        logging.debug(f"Repository initialized in {startup_duration:.4f} seconds")
+        logging.info(f"Repository initialized in {startup_duration:.4f} seconds")
 
         self.model = GeoModel(households=self.households, stores=self.food_stores)
 
