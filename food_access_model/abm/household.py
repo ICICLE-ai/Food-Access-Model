@@ -132,17 +132,14 @@ class Household(GeoAgent):
         Returns:
             int: total number of stores within a mile
         """
-        # constants
-        METERS_IN_MILE = 1609.34
-
         total = 0 
         for store in self.model.stores_list: 
-         #distance = self.model.space.distance(self,store)
+         # distance is already in miles (converted in calculate_distances)
          distance = self.distances_map[store.unique_id]
-         if distance <= METERS_IN_MILE:
+         if distance <= 1.0:
           total += 1 
         self.rating_evaluation(total)
-        return total 
+        return total
 
     def closest_cspm_and_spm(self) -> tuple:
         """
