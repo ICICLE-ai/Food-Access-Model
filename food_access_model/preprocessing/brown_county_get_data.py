@@ -29,6 +29,8 @@ from shapely.strtree import STRtree
 from pyproj import Transformer
 from dotenv import load_dotenv 
 
+INCLUDE_CENSUS_STORES = False
+STORES_CSV = "BC_stores.csv"
 
 # Local Application Imports
 from household_constants import (
@@ -393,17 +395,21 @@ def process_food_stores(
     Returns:
         STRtree: Spatial index of all geometric elements including food stores.
     """
-    features = ox.features.features_from_point(
-        center_point,
-        dist=dist * 3,
-        tags={"shop": [
-            "convenience", "supermarket", "butcher", "wholesale",
-            "farm", "greengrocer", "health_food", "grocery"
-        ]}
-    )
-
-    features = features.to_crs("epsg:3857")
-    features = features[["shop", "geometry", "name"]]
+    if INCLUDE_CENSUS_STORES:
+        features = ox.features.features_from_point(
+            center_point,
+            dist=dist * 3,
+            tags={"shop": [
+                "convenience", "supermarket", "butcher", "wholesale",
+                "farm", "greengrocer", "health_food", "grocery"
+            ]}
+        )
+        features = features.to_crs("epsg:3857")
+        features = features[["shop", "geometry", "name"]]
+    else:
+        import geopandas as gpd
+        features = gpd.GeoDataFrame(columns=["shop", "geometry", "name"], geometry="geometry")
+        logging.info("INCLUDE_CENSUS_STORES=False — skipping OpenStreetMap store fetch.")
 
     store_tuples_strPoly: List[Tuple] = []
     store_tuples_Poly: List[Tuple] = []
@@ -895,11 +901,12 @@ def process_housing_areas(
                         logging.warning(f"First attribute assignment error: {e}")
                     continue
 
-                nearest_store = get_nearest_store(house, store_tuples, shapely.wkt.loads)
-                if nearest_store is None:
-                    failed_store += 1
-                    continue
-                
+                if store_tuples:
+                    nearest_store = get_nearest_store(house, store_tuples, shapely.wkt.loads)
+                    if nearest_store is None:
+                        failed_store += 1
+                        continue
+
                 success += 1
 
                 house_4326 = transform_polygon_coords(house, "EPSG:3857", "EPSG:4326")
@@ -1073,17 +1080,26 @@ def main() -> None:
         connection.rollback()
         raise
 
-    logging.info("Inserting food stores...")
-    food_stores_query = "INSERT INTO food_stores (simulation_instance, simulation_step, shop, geometry, name, store_id) VALUES %s"
-    # Update store tuples with simulation_instance_id
-    store_tuples_with_id = [(simulation_instance_id, step, shop, geom, name, sid) 
-                            for (_, step, shop, geom, name, sid) in simulation_data['stores']]
-    try:
-        extras.execute_values(cursor, food_stores_query, store_tuples_with_id)
-    except psycopg2.Error as e:
-        logging.error(f"Food stores insertion failed: {e}")
-        connection.rollback()
-        raise
+    if INCLUDE_CENSUS_STORES:
+        logging.info("Inserting census food stores from OpenStreetMap...")
+        food_stores_query = "INSERT INTO food_stores (simulation_instance, simulation_step, shop, geometry, name, store_id) VALUES %s"
+        store_tuples_with_id = [(simulation_instance_id, step, shop, geom, name, sid) 
+                                for (_, step, shop, geom, name, sid) in simulation_data['stores']]
+        try:
+            extras.execute_values(cursor, food_stores_query, store_tuples_with_id)
+        except psycopg2.Error as e:
+            logging.error(f"Food stores insertion failed: {e}")
+            connection.rollback()
+            raise
+    else:
+        logging.info("INCLUDE_CENSUS_STORES=False — inserting curated local stores...")
+        import subprocess
+        insert_script = os.path.join(os.path.dirname(__file__), '..', '..', 'insert_stores.py')
+        result = subprocess.run([sys.executable, insert_script, STORES_CSV], capture_output=True, text=True)
+        if result.returncode == 0:
+            logging.info(f"insert_stores.py completed successfully:\n{result.stdout}")
+        else:
+            logging.error(f"insert_stores.py failed:\n{result.stderr}")
 
     logging.info("Inserting households into the database...")
     # Update household tuples with simulation_instance_id
