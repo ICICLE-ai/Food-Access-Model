@@ -652,7 +652,7 @@ async def batch_run_model(households: List[Dict[str, Any]], food_stores: List[Di
         max_steps=1,
         data_collection_period=1,
         display_progress=True,
-        number_processes=8,
+        number_processes=int(os.getenv('NUMBER_PROCESSES')),
     )
     # at this point, stores do not have an id
     all_households = []
