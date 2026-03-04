@@ -379,7 +379,7 @@ def process_food_stores(
     center_point: Tuple[float, float],
     dist: float,
     map_elements: List[geometry.base.BaseGeometry],
-) -> Tuple[STRtree, List, List[Tuple]] : 
+) -> Tuple[STRtree, STRtree, List, List[Tuple]]:
     """
     Retrieve and process food store locations from OpenStreetMap, convert them into geometric shapes,
     and insert them into the database.
@@ -388,10 +388,13 @@ def process_food_stores(
         center_point (Tuple[float, float]): Latitude and longitude for the area of interest.
         dist (float): Distance in meters for the search radius (3x for food stores).
         map_elements (List[BaseGeometry]): List to append buffered polygons representing stores
-        cursor (psycopg2.extensions.cursor): Cursor for executing database insert queries.
 
     Returns:
-        STRtree: Spatial index of all geometric elements including food stores.
+        Tuple containing:
+            - STRtree: Spatial index of all geometric elements (roads, stores, water).
+            - STRtree: Spatial index of store geometries only, for O(log N) nearest-store lookup (#72).
+            - List: Store tuples with Polygon geometry.
+            - List[Tuple]: Store tuples with WKT string geometry.
     """
     features = ox.features.features_from_point(
         center_point,
@@ -430,7 +433,9 @@ def process_food_stores(
         store_tuples_Poly.append((None, 0, str(row.shop), polygon, str(row.name), store_id))
         store_id += 1
     
-    return (STRtree(map_elements),store_tuples_Poly, store_tuples_strPoly)  
+    store_geometries = [s[3] for s in store_tuples_Poly]
+    store_tree = STRtree(store_geometries)
+    return (STRtree(map_elements), store_tree, store_tuples_Poly, store_tuples_strPoly)
 
 def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
     """
@@ -744,40 +749,25 @@ def generate_houses_from_housing_areas(
 
 
 def get_nearest_store(
-        house: Polygon, 
-        store_tuples : List[Tuple[str, str, str]], 
-        shapely_loader: Callable[[str], Polygon]
+        house: Polygon,
+        store_tree: STRtree,
+        store_geometries: List[Polygon],
         )-> Optional[Polygon]:
     """
-    Find the nearest store polygon to house. 
+    Find the nearest store polygon to a house using STRtree.nearest() for O(log N) lookup (#72).
 
     Args:
-        house (Polygon): The house polygon to check
-        store_tuples: (List[Tuple[str, str, str]]): List of tuples (shop type, WKT polygon, name)
-        shapely_loader (Any): Function to convert WKT string to Shapely geometry.
-    
+        house (Polygon): The house polygon to check.
+        store_tree (STRtree): Spatial index containing only store geometries.
+        store_geometries (List[Polygon]): Store polygons, indexed to match store_tree.
+
     Returns:
-        Optional[Polygon]: The nearest store polygon, or None if no stores found.
+        Optional[Polygon]: The nearest store polygon, or None if no stores exist.
     """
-    nearest_store = None
-    store_distance = float('inf')
-
-    for store in store_tuples:
-        # Store format: (sim_instance, sim_step, shop, geometry, name, store_id)
-        # geometry is at index 3, could be Polygon or WKT string
-        geometry = store[3]
-        if isinstance(geometry, str):
-            store_poly = shapely_loader(geometry)
-        else:
-            store_poly = geometry  # Already a Polygon
-        
-        dist = store_poly.distance(house)
-
-        if dist <= store_distance:
-            nearest_store = store_poly
-            store_distance = dist  # Fixed: should use actual distance, not DIST
-
-    return nearest_store
+    if not store_geometries:
+        return None
+    idx = store_tree.nearest(house)
+    return store_geometries[idx]
 
 
 def transform_polygon_coords(polygon: Polygon, source_crs : str, target_crs : str) -> Polygon:
@@ -822,6 +812,7 @@ def process_housing_areas(
     map_elements: List[Polygon],
     data: pd.DataFrame,
     store_tuples: List[Tuple[str, str, str]],
+    store_tree: STRtree = None,
 ) -> List[Tuple]:
     """
     Process a list of housing area polygons, generate synthetic houses along their borders,
@@ -833,6 +824,7 @@ def process_housing_areas(
         map_elements (List[Polygon]): Buffered geometries (roads, stores) for intersection checks.
         data (pd.DataFrame): Census tract data with attributes.
         store_tuples (List[Tuple[str, str, str]]): Store (shop type, WKT, name).
+        store_tree (STRtree): Stores-only spatial index for O(log N) nearest-store lookup (#72).
 
     Returns:
         List[Tuple]: Tuples of household data ready for DB insertion.
@@ -852,6 +844,7 @@ def process_housing_areas(
     houses_index = RTreeIndex()
     # STRtree index of tract geometries.
     tract_index = STRtree(data["geometry"])
+    store_geometries = [s[3] for s in store_tuples]
     
     for i, housing_area in enumerate(housing_areas):
         logging.info(f"{round((i + 1) / len(housing_areas) * 100)}%")
@@ -895,7 +888,7 @@ def process_housing_areas(
                         logging.warning(f"First attribute assignment error: {e}")
                     continue
 
-                nearest_store = get_nearest_store(house, store_tuples, shapely.wkt.loads)
+                nearest_store = get_nearest_store(house, store_tree, store_geometries)
                 if nearest_store is None:
                     failed_store += 1
                     continue
@@ -1012,8 +1005,8 @@ def initialize_simulation(
     county_data = fetch_county_data(households_key_list, str(year), state_code, county_code, api_key)
     tract_data = load_and_merge_geodata(str(year), state_code, county_code, county_data)
     map_elements, housing_areas, road_tuples = process_road_network(center_point, dist) 
-    store_index, store_tuples_poly, store_tuples_str = process_food_stores(center_point, dist, map_elements)
-    house_tuples = process_housing_areas(housing_areas, store_index, map_elements, tract_data, store_tuples_poly)
+    store_index, store_tree, store_tuples_poly, store_tuples_str = process_food_stores(center_point, dist, map_elements)
+    house_tuples = process_housing_areas(housing_areas, store_index, map_elements, tract_data, store_tuples_poly, store_tree)
 
     return {
         'households' : house_tuples,
