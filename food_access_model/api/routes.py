@@ -220,6 +220,7 @@ async def create_simulation_instance(name: Optional[str] = Body(None, embed=True
 
     await generate_household_instances_for_simulation(instance['id'], household_limit)
     await generate_stores_for_simulation(instance['id'])
+    await _run_model_step(instance['id'])  # run a step right after creating a new isntance 
 
     return ORJSONResponse({"simulation_instance": instance})
 
