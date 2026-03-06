@@ -388,7 +388,6 @@ def process_food_stores(
         center_point (Tuple[float, float]): Latitude and longitude for the area of interest.
         dist (float): Distance in meters for the search radius (3x for food stores).
         map_elements (List[BaseGeometry]): List to append buffered polygons representing stores
-        cursor (psycopg2.extensions.cursor): Cursor for executing database insert queries.
 
     Returns:
         STRtree: Spatial index of all geometric elements including food stores.
@@ -405,32 +404,19 @@ def process_food_stores(
     features = features.to_crs("epsg:3857")
     features = features[["shop", "geometry", "name"]]
 
-    store_tuples_strPoly: List[Tuple] = []
-    store_tuples_Poly: List[Tuple] = []
+    store_tuples: List[Tuple] = []
 
     store_id = 0
     for row in features.itertuples():
         point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
 
-        if row.shop in ["supermarket", "grocery", "greengrocer"]:
-            polygon = Polygon([
-                (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
-                for angle in range(0, 360, 60)
-            ])
-        else:
-            polygon = Polygon([
-                (point.x, point.y + 20),
-                (point.x + 25, point.y - 30),
-                (point.x - 25, point.y - 30)
-            ])
-
-        map_elements.append(polygon.buffer(20))
+        map_elements.append(point.buffer(20))
         # New format: (simulation_instance, simulation_step, shop, geometry, name, store_id)
-        store_tuples_strPoly.append((None, 0, str(row.shop), str(polygon), str(row.name), store_id))
-        store_tuples_Poly.append((None, 0, str(row.shop), polygon, str(row.name), store_id))
+        # Store only the point
+        store_tuples.append((None, 0, str(row.shop), point.x, point.y, str(row.name), store_id))
         store_id += 1
     
-    return (STRtree(map_elements),store_tuples_Poly, store_tuples_strPoly)  
+    return (STRtree(map_elements),store_tuples)  
 
 def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
     """
