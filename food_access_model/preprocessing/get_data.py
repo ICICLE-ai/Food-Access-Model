@@ -287,7 +287,7 @@ def initialize_database_tables(
     ''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS food_stores (
-        simulation_instance UUID,
+        simulation_instance_id UUID,
         simulation_step INTEGER,
         shop VARCHAR(15),
         geometry TEXT,
