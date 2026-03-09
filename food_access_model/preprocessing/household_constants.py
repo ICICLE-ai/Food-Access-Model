@@ -1,9 +1,9 @@
 
 YEAR = 2022
-PLACE_NAME  = "Franklin County, Ohio, USA"
-CENTER_POINT = (39.938806, -82.972361)   
-DIST = 1000
-FIPSCODE = "39049"
+PLACE_NAME  = "Brown County, Wisconsin, USA"
+CENTER_POINT = (44.5, -88.0)   
+DIST = 15000  # 15km radius
+FIPSCODE = "55009"
 
 #Dictionary to describe homedata Variables
 households_variables_dict = {

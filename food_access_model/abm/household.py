@@ -2,9 +2,6 @@ from mesa_geo import GeoAgent
 import shapely
 import random
 
-# Constants
-METERS_IN_MILE = 1609.34
-
 class Household(GeoAgent):
     """
     Represents one Household. Extends the mesa_geo GeoAgent class. The step function
@@ -135,14 +132,14 @@ class Household(GeoAgent):
         Returns:
             int: total number of stores within a mile
         """
-
         total = 0 
-        for store in self.model.stores_list:
-            distance = self.distances_map[store.unique_id]
-            if distance <= 1:
-                total += 1
+        for store in self.model.stores_list: 
+         # distance is already in miles (converted in calculate_distances)
+         distance = self.distances_map[store.unique_id]
+         if distance <= 1.0:
+          total += 1 
         self.rating_evaluation(total)
-        return total 
+        return total
 
     def closest_cspm_and_spm(self) -> tuple:
         """
@@ -210,26 +207,18 @@ class Household(GeoAgent):
 
         return int(sum(food_avail)/MAX_TOTAL_FSA*100)
 
-    def calculate_distances(self) -> None:
+    def calculate_distances(self)-> None:
         """
-        Calculates and stores Euclidean distances (in miles) from this household to all stores.
-        
-        Uses EPSG:3857 projection (units in meters). Distance values are stored in the distances_map
-        dictionary with store unique_id as key and distance in miles as value.
-        
-        Raises:
-            ValueError: If the model's CRS is not EPSG:3857
+        Creates dictionary with key (indicating the store) and value (indicating the distance from the household to
+        that store)
         """
-        # Validate CRS - distance units depend on this
-        if str(self.crs) not in ["3857", "EPSG:3857"]:
-            raise ValueError(f"Expected CRS EPSG:3857, but got {self.crs}. Distance calculations require meter-based projection.")
-            
+        METERS_IN_MILE = 1609.34
         self.distances_map = dict()
-        for store in self.model.stores_list:
-            agent_unique_id = store.unique_id
-            distance = self.model.space.distance(self, store)
-            distance = round(distance / METERS_IN_MILE, 2)
-            self.distances_map[agent_unique_id] = distance
+        for store in self.model.stores_list: 
+            agent_unique_id  = store.unique_id
+            distance = self.model.space.distance(self,store)
+            distance = round(distance/METERS_IN_MILE,2)
+            self.distances_map[agent_unique_id] = distance 
 
     def step(self) -> None:
         """

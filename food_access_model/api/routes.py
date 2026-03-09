@@ -53,7 +53,7 @@ HOUSEHOLD_QUERY = """
                      food_score AS "Food Access Score",
                      NULL AS "Color"
                      FROM households
-                     WHERE simulation_instance = $1
+                     WHERE simulation_instance_id = $1
                      AND simulation_step = $2;
                      """
 
@@ -240,12 +240,12 @@ async def delete_simulation_instance(instance_id: str) -> ORJSONResponse:
 
     household_query = """
         DELETE FROM households
-        WHERE simulation_instance = $1;
+        WHERE simulation_instance_id = $1;
         """
 
     store_query = """
         DELETE FROM food_stores
-        WHERE simulation_instance = $1;
+        WHERE simulation_instance_id = $1;
         """
 
     instance_query = """
@@ -329,7 +329,7 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
         row = await conn.fetchrow("""
             SELECT MAX(store_id) AS max_id
             FROM food_stores
-            WHERE simulation_instance = $1 AND simulation_step = $2
+            WHERE simulation_instance_id = $1 AND simulation_step = $2
         """, store.simulation_instance_id, store.simulation_step)
         max_id = row['max_id'] if row and row['max_id'] is not None else 0
         new_store_id = max_id + 1
@@ -416,7 +416,7 @@ async def get_num_households(simulation_instance_id: str = Query(..., descriptio
         # Find the store to remove
         row = await conn.fetchrow("""
             SELECT count(*) FROM households
-            WHERE simulation_instance = $1 AND simulation_step = $2
+            WHERE simulation_instance_id = $1 AND simulation_step = $2
             """, simulation_instance_id, simulation_step)
 
     household_count = row['count'] if row else 0
@@ -481,7 +481,7 @@ async def get_household_stats(simulation_instance_id: str = Query(..., descripti
             AVG(closest_store_miles) AS avg_closest_store_miles,
             AVG(stores_within_1_mile) AS avg_stores_within_1_mile
             FROM households
-            WHERE simulation_instance = $1 AND simulation_step = $2
+            WHERE simulation_instance_id = $1 AND simulation_step = $2
             """
         row = await conn.fetchrow(query, simulation_instance_id, simulation_step)
     if row is None:
@@ -529,7 +529,7 @@ async def query_current_simulation_step(simulation_instance_id: str) -> int:
     """
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT MAX(simulation_step) AS current_step FROM households WHERE simulation_instance = $1",
+            "SELECT MAX(simulation_step) AS current_step FROM households WHERE simulation_instance_id = $1",
             simulation_instance_id
         )
     if row is None or row["current_step"] is None:
@@ -548,11 +548,20 @@ async def query_households(simulation_instance_id: str, simulation_step: int = 0
     Returns:
         List[Any]: A list of household data.
     """
+    from decimal import Decimal
+    
     async with pool.acquire() as conn:
         rows = await conn.fetch(HOUSEHOLD_QUERY, simulation_instance_id, simulation_step)
 
-    # Convert rows to a list of dictionaries
-    households_data = [dict(row) for row in rows]
+    # Convert rows to a list of dictionaries and convert Decimal to float for JSON serialization
+    households_data = []
+    for row in rows:
+        row_dict = dict(row)
+        # Convert Decimal values to float
+        for key, value in row_dict.items():
+            if isinstance(value, Decimal):
+                row_dict[key] = float(value)
+        households_data.append(row_dict)
     return households_data
 
 
@@ -619,11 +628,11 @@ async def reset_simulation(instance_id: str) -> None:
     async with pool.acquire() as conn:
         # Delete all households for the given simulation instance
         await conn.execute(
-            "DELETE FROM households WHERE simulation_instance = $1 and simulation_step != 0", instance_id
+            "DELETE FROM households WHERE simulation_instance_id = $1 and simulation_step != 0", instance_id
         )
         # Delete all food stores for the given simulation instance
         await conn.execute(
-            "DELETE FROM food_stores WHERE simulation_instance = $1 and simulation_step != 0", instance_id
+            "DELETE FROM food_stores WHERE simulation_instance_id = $1 and simulation_step != 0", instance_id
         )
 
 
@@ -643,7 +652,8 @@ async def batch_run_model(households: List[Dict[str, Any]], food_stores: List[Di
         max_steps=1,
         data_collection_period=1,
         display_progress=True,
-        number_processes=25,
+        # sets default value to 2 if no inputted val in .env file
+        number_processes=int(os.getenv('NUMBER_PROCESSES'), 2), 
     )
     # at this point, stores do not have an id
     all_households = []
@@ -700,7 +710,7 @@ async def return_step_results_to_database(households: List[Dict[str, Any]],
     async with pool.acquire() as conn:
         # Delete existing records for the current step
         await conn.execute(
-            "DELETE FROM households WHERE simulation_instance = $1 AND simulation_step = $2",
+            "DELETE FROM households WHERE simulation_instance_id = $1 AND simulation_step = $2",
             simulation_instance_id,
             simulation_step
         )
@@ -738,7 +748,7 @@ async def return_step_results_to_database(households: List[Dict[str, Any]],
                     ),
                     columns=[
                         "id",
-                        "simulation_instance",
+                        "simulation_instance_id",
                         "simulation_step",
                         "centroid_wkt",
                         "income",
@@ -791,7 +801,7 @@ async def generate_household_instances_for_simulation(instance_id: str, househol
             SELECT $1, 0, id, centroid_wkt, income, household_size, vehicles, number_of_workers,
                 transit_time, walking_time, biking_time, driving_time
             FROM households
-            WHERE simulation_instance = $2 AND simulation_step = 0
+            WHERE simulation_instance_id = $2 AND simulation_step = 0
             LIMIT $3;
         """
     else:
@@ -803,7 +813,7 @@ async def generate_household_instances_for_simulation(instance_id: str, househol
             SELECT $1, 0, id, centroid_wkt, income, household_size, vehicles, number_of_workers,
                 transit_time, walking_time, biking_time, driving_time
             FROM households
-            WHERE simulation_instance = $2 AND simulation_step = 0;
+            WHERE simulation_instance_id = $2 AND simulation_step = 0;
         """
 
     # Assuming you already have an asyncpg connection object
@@ -849,7 +859,7 @@ async def generate_stores_for_simulation(instance_id: str):
             )
             SELECT $1, 0, name, shop, geometry, store_id
             FROM food_stores
-            WHERE simulation_instance = $2 AND simulation_step = 0;
+            WHERE simulation_instance_id = $2 AND simulation_step = 0;
         """
 
         await conn.execute(insert_query, instance_id, default_instance_id)
@@ -872,7 +882,7 @@ async def generate_stores_for_simulation_step(instance_id: str, simulation_step:
             )
             SELECT $1, $2, name, shop, geometry, store_id
             FROM food_stores
-            WHERE simulation_instance = $1 AND simulation_step = $3;
+            WHERE simulation_instance_id = $1 AND simulation_step = $3;
         """
 
         await conn.execute(insert_query, instance_id, simulation_step, simulation_step - 1)
