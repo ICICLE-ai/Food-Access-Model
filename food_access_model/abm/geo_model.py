@@ -17,7 +17,7 @@ HOST = os.getenv("HOST")
 PORT = os.getenv("PORT")
 
 SEARCHRADIUS = 500
-CRS = "3857"  # constant value (i.e.3857),used to map households on a flat earth display
+CRS = "4326"  # constant value (i.e.4326),used to map households on a flat earth display
 
 class GeoModel(Model):
     """

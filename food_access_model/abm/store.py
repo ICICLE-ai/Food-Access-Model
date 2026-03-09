@@ -25,6 +25,6 @@ class Store(GeoAgent):
             y (float): EPSG:3857 y coordinate
         """
         point = Point(x, y)
-        super().__init__(id, model, point, "epsg:3857")
+        super().__init__(id, model, point, "epsg:4326")
         self.type = type
         self.name = name

@@ -406,15 +406,16 @@ def process_food_stores(
     features = features[["shop", "geometry", "name"]]
 
     store_tuples: List[Tuple] = []
-
+    transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
     store_id = 0
     for row in features.itertuples():
         point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
-
         map_elements.append(point.buffer(20))
+
+        lon, lat = transformer.transform(point.x, point.y)
         # New format: (simulation_instance, simulation_step, shop, geometry, name, store_id)
         # Store only the point
-        store_tuples.append((None, 0, str(row.shop), point.x, point.y, str(row.name), store_id))
+        store_tuples.append((None, 0, str(row.shop), lon, lat, str(row.name), store_id))
         store_id += 1
     
     return (STRtree(map_elements),store_tuples)  
@@ -903,11 +904,16 @@ def process_housing_areas(
                 stores_within_1_mile = None
                 closest_store_miles = None
 
+                transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
+                lon, lat = transformer.transform(house.centroid.x, house.centroid.y)
+                f"POINT ({lon} {lat})"
+
                 house_tuples.append((
                     total_count,
                     None,  # simulation_instance_id (will be set during insertion)
                     0,  # simulation_step (initial step)
-                    str(house.centroid),  # centroid_wkt instead of full polygon
+                    # str(house.centroid),  # centroid_wkt instead of full polygon
+                    f"POINT ({lon} {lat})",
                     income,
                     size,
                     vehicles,
