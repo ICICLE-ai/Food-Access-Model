@@ -65,8 +65,8 @@ class GeoModel(Model):
                 self,
                 store['store_id'],
                 store['name'],
-                store['shop'],
-                store['geometry']
+                store['x'],
+                store['y']
             )
             index_count += 1
             self.space.add_agents(agent)
