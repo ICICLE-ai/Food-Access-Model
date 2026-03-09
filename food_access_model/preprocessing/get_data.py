@@ -841,6 +841,8 @@ def process_housing_areas(
     # STRtree index of tract geometries.
     tract_index = STRtree(data["geometry"])
     
+    transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
+
     for i, housing_area in enumerate(housing_areas):
         logging.info(f"{round((i + 1) / len(housing_areas) * 100)}%")
 
@@ -904,9 +906,7 @@ def process_housing_areas(
                 stores_within_1_mile = None
                 closest_store_miles = None
 
-                transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
                 lon, lat = transformer.transform(house.centroid.x, house.centroid.y)
-                f"POINT ({lon} {lat})"
 
                 house_tuples.append((
                     total_count,
