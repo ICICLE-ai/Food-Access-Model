@@ -3,9 +3,11 @@ import logging
 import math
 import os
 import random
+import sys
 import tempfile
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 from typing import List, Tuple, Optional, Callable, Any
 from zipfile import ZipFile
 
@@ -27,6 +29,13 @@ from shapely.geometry import Point, Polygon, LineString
 from shapely.strtree import STRtree
 from pyproj import Transformer
 from dotenv import load_dotenv 
+
+try:
+    from food_access_model.distance import Distance
+except ModuleNotFoundError:
+    # Supports running this file directly as a script.
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
+    from food_access_model.distance import Distance
 
 
 # Local Application Imports
@@ -72,6 +81,17 @@ PORT = os.getenv("DB_PORT")
 if not PORT:
     logging.critical("DB_PORT environment variable not set.")
     raise ValueError("DB_PORT is required.") 
+
+RESIDENTIAL_AREA_BUFFER = Distance.from_meters(30)
+RESIDENTIAL_ROAD_BUFFER = Distance.from_meters(3)
+MOTORWAY_BUFFER = Distance.from_meters(100)
+TRUNK_BUFFER = Distance.from_meters(30)
+PRIMARY_SECONDARY_BUFFER = Distance.from_meters(10)
+STORE_RENDER_BUFFER = Distance.from_meters(20)
+SUPERMARKET_STORE_RADIUS = Distance.from_meters(50)
+OTHER_STORE_VERTICAL_OFFSET = Distance.from_meters(20)
+OTHER_STORE_HORIZONTAL_OFFSET = Distance.from_meters(25)
+HOUSE_SPACING = Distance.from_meters(30)
 
 def fetch_county_data(
         household_keys: List[str], 
@@ -305,7 +325,7 @@ def process_road_network(
 
     Args:
         center_point (Tuple[float, float]): Latitude and longitude of the center location.
-        dist (float): Distance in 1000 meters to define the radius of the map from the center point.
+        dist (float): Search radius in meters from the center point.
 
     Returns:
         Tuple[
@@ -319,8 +339,9 @@ def process_road_network(
     """
     map_elements: List[geometry.base.BaseGeometry] = []
     housing_areas: List[geometry.base.BaseGeometry] = []
+    search_radius = Distance.from_meters(dist)
 
-    G = ox.graph_from_point(center_point, dist=dist, network_type='all', retain_all=True)
+    G = ox.graph_from_point(center_point, dist=search_radius.meters, network_type='all', retain_all=True)
     gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
     gdf_edges = gdf_edges.to_crs("epsg:3857")
 
@@ -329,21 +350,21 @@ def process_road_network(
     gdf_edges = gdf_edges[["name", "highway", "length", "geometry", "service"]]
 
 
-    for _, row in gdf_edges.itertuples():
+    for _, row in gdf_edges.iterrows():
         if row["highway"] in ["residential", "living_street"]:
-            housing_areas.append(row["geometry"].buffer(30))
-            map_elements.append(row["geometry"].buffer(3))
+            housing_areas.append(row["geometry"].buffer(RESIDENTIAL_AREA_BUFFER.meters))
+            map_elements.append(row["geometry"].buffer(RESIDENTIAL_ROAD_BUFFER.meters))
         elif row["service"] == "alley":
-            housing_areas.append(row["geometry"].buffer(30))
-            map_elements.append(row["geometry"].buffer(3))
+            housing_areas.append(row["geometry"].buffer(RESIDENTIAL_AREA_BUFFER.meters))
+            map_elements.append(row["geometry"].buffer(RESIDENTIAL_ROAD_BUFFER.meters))
         elif row["highway"] == "motorway":
-            map_elements.append(row["geometry"].buffer(100))
+            map_elements.append(row["geometry"].buffer(MOTORWAY_BUFFER.meters))
         elif row["highway"] == "trunk":
-            map_elements.append(row["geometry"].buffer(30))
+            map_elements.append(row["geometry"].buffer(TRUNK_BUFFER.meters))
         elif row["highway"] == "primary":
-            map_elements.append(row["geometry"].buffer(10))
+            map_elements.append(row["geometry"].buffer(PRIMARY_SECONDARY_BUFFER.meters))
         elif row["highway"] == "secondary":
-            map_elements.append(row["geometry"].buffer(10))
+            map_elements.append(row["geometry"].buffer(PRIMARY_SECONDARY_BUFFER.meters))
         elif isinstance(row["geometry"], LineString):
             map_elements.append(row["geometry"])
 
@@ -381,9 +402,10 @@ def process_food_stores(
     Returns:
         STRtree: Spatial index of all geometric elements including food stores.
     """
+    search_radius = Distance.from_meters(dist)
     features = ox.features.features_from_point(
         center_point,
-        dist=dist * 3,
+        dist=search_radius.scaled(3).meters,
         tags={"shop": [
             "convenience", "supermarket", "butcher", "wholesale",
             "farm", "greengrocer", "health_food", "grocery"
@@ -398,22 +420,25 @@ def process_food_stores(
 
     food_stores_query = "INSERT INTO food_stores (shop, geometry, name) VALUES %s"
 
-    for _, row in features.itertuples():
+    for _, row in features.iterrows():
         point = row["geometry"].centroid if not isinstance(row["geometry"], Point) else row["geometry"]
 
         if row["shop"] in ["supermarket", "grocery", "greengrocer"]:
             polygon = Polygon([
-                (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
+                (
+                    point.x + SUPERMARKET_STORE_RADIUS.meters * math.cos(math.radians(angle)),
+                    point.y + SUPERMARKET_STORE_RADIUS.meters * math.sin(math.radians(angle))
+                )
                 for angle in range(0, 360, 60)
             ])
         else:
             polygon = Polygon([
-                (point.x, point.y + 20),
-                (point.x + 25, point.y - 30),
-                (point.x - 25, point.y - 30)
+                (point.x, point.y + OTHER_STORE_VERTICAL_OFFSET.meters),
+                (point.x + OTHER_STORE_HORIZONTAL_OFFSET.meters, point.y - RESIDENTIAL_AREA_BUFFER.meters),
+                (point.x - OTHER_STORE_HORIZONTAL_OFFSET.meters, point.y - RESIDENTIAL_AREA_BUFFER.meters)
             ])
 
-        map_elements.append(polygon.buffer(20))
+        map_elements.append(polygon.buffer(STORE_RENDER_BUFFER.meters))
         store_tuples_strPoly.append((str(row["shop"]), str(polygon), str(row["name"])))
         store_tuples_Poly.append((str(row["shop"]), polygon, str(row["name"])))
     try:
@@ -513,7 +538,7 @@ def create_house_polygon(location: Point) -> Polygon:
 
 
 
-def place_houses_in_area(housing_area: Polygon, spacing: float = 30.0) -> List[Polygon]:
+def place_houses_in_area(housing_area: Polygon, spacing: float = HOUSE_SPACING.meters) -> List[Polygon]:
     """
     Place house-shaped polygons around the edges of a housing area polygon.
 
@@ -755,15 +780,15 @@ def get_nearest_store(
         Optional[Polygon]: The nearest store polygon, or None if no stores found.
     """
     nearest_store = None
-    store_distance = float('inf')
+    store_distance = Distance.from_meters(float('inf'))
 
     for store in store_tuples:
         store_poly = shapely_loader(store[1])
-        dist = store_poly.distance(house)
+        dist = Distance.from_meters(store_poly.distance(house))
 
-        if dist <= store_distance:
+        if dist.meters <= store_distance.meters:
             nearest_store = store_poly
-            store_distance = DIST
+            store_distance = dist
 
     return nearest_store
 
@@ -848,10 +873,10 @@ def process_housing_areas(
             magnitude = math.hypot(*direction)
             norm_vector = (direction[0] / magnitude, direction[1] / magnitude) if magnitude else (0, 0)
 
-            for j in range(int(magnitude // 30) + 1):
+            for j in range(int(magnitude // HOUSE_SPACING.meters) + 1):
                 location = Point(
-                    edge.coords[0][0] + norm_vector[0] * j * 30,
-                    edge.coords[0][1] + norm_vector[1] * j * 30
+                    edge.coords[0][0] + norm_vector[0] * j * HOUSE_SPACING.meters,
+                    edge.coords[0][1] + norm_vector[1] * j * HOUSE_SPACING.meters
                 )
 
                 house = create_house_polygon(location)

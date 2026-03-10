@@ -6,6 +6,7 @@ from mesa_geo import GeoSpace  # GeoSpace that houses agents
 import psycopg2
 from typing import List, Any
 
+from constants import SEARCHRADIUS_DISTANCE
 from food_access_model.abm.store import Store  # Store agent class
 from food_access_model.abm.household import Household  # Household agent class
 
@@ -16,7 +17,7 @@ NAME = os.getenv("NAME")
 HOST = os.getenv("HOST")
 PORT = os.getenv("PORT")
 
-SEARCHRADIUS = 500
+SEARCHRADIUS = SEARCHRADIUS_DISTANCE
 CRS = "3857"  # constant value (i.e.3857),used to map households on a flat earth display
 
 class GeoModel(Model):

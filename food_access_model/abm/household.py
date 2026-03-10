@@ -1,16 +1,16 @@
 from mesa_geo import GeoAgent
 import shapely
 import random
+from typing import Optional
 
-# Constants
-METERS_IN_MILE = 1609.34
+from food_access_model.distance import Distance
 
 class Household(GeoAgent):
     """
     Represents one Household. Extends the mesa_geo GeoAgent class. The step function
     defines the behavior of a single household on each step through the model.
     """
-    def __init__(self, model, id: int, polygon: str, income: int, household_size: int, vehicles: int, number_of_workers: int, walking_time: int, biking_time: int, transit_time: int, driving_time: int, search_radius: int, crs: str, distance_to_closest_store: float = None, num_store_within_mile: int = None, mfai: int = None, color: str= None) -> None:
+    def __init__(self, model, id: int, polygon: str, income: int, household_size: int, vehicles: int, number_of_workers: int, walking_time: int, biking_time: int, transit_time: int, driving_time: int, search_radius: float | Distance, crs: str, distance_to_closest_store: Optional[float] = None, num_store_within_mile: Optional[int] = None, mfai: Optional[int] = None, color: str = None) -> None:
         """
         Initialize the Household Agent.
 
@@ -23,7 +23,7 @@ class Household(GeoAgent):
             - vehicles (int): total vechiles in the household
             - number_of_workers (int): total working members (having job) in the household
             - stores_list : List containing all the stores with their attributes
-            - search_radius (int): how far to search for stores (default 500)
+            - search_radius (float | Distance): how far to search for stores (meters)
             - crs (string): constant value (i.e.3857),used to map households on a flat earth display
         """
 
@@ -33,7 +33,7 @@ class Household(GeoAgent):
         # Setting argument values to the passed parameteric values.
         super().__init__(id,model,polygon,crs)
         self.income = income
-        self.search_radius = search_radius
+        self.search_radius = search_radius if isinstance(search_radius, Distance) else Distance.from_meters(search_radius)
         self.household_size = household_size
         self.vehicles = vehicles
         self.number_of_workers = number_of_workers
@@ -161,7 +161,6 @@ class Household(GeoAgent):
         spm_distance = 10000000
         for store in self.model.stores_list: 
             #distance = self.model.space.distance(self,store)
-            #distance = round(distance/1609.34,2)
             distance = self.distances_map[store.unique_id]
             if store.type == "supermarket":
                 if distance <= spm_distance:
@@ -227,9 +226,9 @@ class Household(GeoAgent):
         self.distances_map = dict()
         for store in self.model.stores_list:
             agent_unique_id = store.unique_id
-            distance = self.model.space.distance(self, store)
-            distance = round(distance / METERS_IN_MILE, 2)
-            self.distances_map[agent_unique_id] = distance
+            distance_meters = self.model.space.distance(self, store)
+            distance = Distance.from_meters(distance_meters)
+            self.distances_map[agent_unique_id] = round(distance.miles, 2)
 
     def step(self) -> None:
         """

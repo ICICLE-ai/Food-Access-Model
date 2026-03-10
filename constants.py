@@ -1,6 +1,11 @@
-#Radius that households look for stores on first search iteration. 
-# Units => Meters^^
-SEARCHRADIUS = 500
+from food_access_model.distance import Distance
+
+
+# Radius that households look for stores on first search iteration.
+# Units => meters.
+SEARCHRADIUS_DISTANCE = Distance.from_meters(500)
+# Backward-compatible numeric constant for existing call sites.
+SEARCHRADIUS = int(SEARCHRADIUS_DISTANCE.meters)
 
 #crs geometry for map (this is web mercator)
 CRS = "3857"
