@@ -144,7 +144,7 @@ class Household(GeoAgent):
         self.rating_evaluation(total)
         return total
     
-    def get_closest_cspm(self) -> object:
+    def get_closest_cspm(self) -> tuple:
         cspm = None
         cspm_distance = 10000000
         for store in self.model.stores_list:
@@ -153,9 +153,9 @@ class Household(GeoAgent):
                 if distance <= cspm_distance:
                     cspm = store
                     cspm_distance = distance
-        return cspm
+        return (cspm, cspm_distance)
     
-    def get_closest_spm(self) -> object:
+    def get_closest_spm(self) -> tuple:
         spm = None
         spm_distance = 10000000
         for store in self.model.stores_list:
@@ -164,7 +164,7 @@ class Household(GeoAgent):
                 if distance <= spm_distance:
                     spm = store
                     spm_distance = distance
-        return spm
+        return (spm, spm_distance)
 
     def has_resources(self) -> bool:
         if self.income < 10000:
@@ -185,7 +185,10 @@ class Household(GeoAgent):
             return 6
 
     # chance of choosing a close spm is just hard code val 0.8
-    def chance_of_choosing_distant_spm(self) -> float:
+    def chance_of_choosing_spm(self, spm_dist, cspm_dist) -> float:
+        if spm_dist < cspm_dist:
+            return 0.8
+        
         if self.resources:
             if self.has_vehicles:
                 return 0.76
@@ -201,20 +204,13 @@ class Household(GeoAgent):
         return self.distances_map[store.unique_id]
     
     # returns store object
-    def choose_store(self, spm, cspm) -> object:
+    def choose_store(self, spm, cspm, spm_dist, cspm_dist) -> object:
         if spm is None:
             return cspm
         if cspm is None:
             return spm
-        
-        spm_dist = self.get_store_dist(spm)
-        cspm_dist = self.get_store_dist(cspm)
 
-        if spm_dist < cspm_dist:
-            spm_chance = 0.8
-        else:
-            # the chance of someone choosing a dist spm over a close cspm
-            spm_chance = self.chance_of_choosing_distant_spm()
+        spm_chance = self.chance_of_choosing_distant_spm(spm_dist, cspm_dist)
 
         #randomly choose based off chances
         return random.choices([cspm, spm], [(1 - spm_chance), spm_chance], k = 1)[0]
@@ -231,13 +227,13 @@ class Household(GeoAgent):
             int: the mfai value
         """
         # closest cspm/spm
-        closest_cspm = self.get_closest_cspm()
-        closest_spm = self.get_closest_spm()
+        closest_cspm, cspm_dist = self.get_closest_cspm()
+        closest_spm, spm_dist = self.get_closest_spm()
 
         food_avail = list()
         for i in range(self.monthly_trips):
             # randomly select the closest spm/cspm
-            store = self.choose_store(closest_spm, closest_cspm)
+            store = self.choose_store(closest_spm, closest_cspm, spm_dist, cspm_dist)
 
             if store is not None and store.type == "supermarket":
                 fsa = 95
@@ -267,9 +263,9 @@ class Household(GeoAgent):
         if self.distances_map is None:
             self.calculate_distances()
         # find spm for get_color and rating_evaluation methods (cspm and spm not needed for mfai method anymore)
-        spm = self.get_closest_spm()
+        spm, spm_dist = self.get_closest_spm()
         if spm is not None:
-            self.distance_to_closest_store = self.get_store_dist(spm)
+            self.distance_to_closest_store = spm_dist
 
         self.num_store_within_mile = self.stores_with_1_miles()
         self.mfai = self.get_mfai()
