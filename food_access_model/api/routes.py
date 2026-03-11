@@ -61,7 +61,8 @@ FOOD_STORE_QUERY = """
                      SELECT
                      store_id,
                      shop,
-                     geometry,
+                     x,
+                     y,
                      name
                      FROM food_stores
                      WHERE simulation_instance = $1
@@ -318,18 +319,13 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
 
     """
     # convert latitude and longitude to a polygon
-    geo = str(
-        convert_centroid_to_polygon(
-            store.latitude, store.longitude, store.category
-        )
-    )
 
     # get the highest store_id for the simulation instance and step
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
             SELECT MAX(store_id) AS max_id
             FROM food_stores
-            WHERE simulation_instance_id = $1 AND simulation_step = $2
+            WHERE simulation_instance = $1 AND simulation_step = $2
         """, store.simulation_instance_id, store.simulation_step)
         max_id = row['max_id'] if row and row['max_id'] is not None else 0
         new_store_id = max_id + 1
@@ -337,9 +333,10 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
     async with pool.acquire() as conn:
         # Insert the new store
         await conn.fetchrow("""
-            INSERT INTO food_stores (name, shop, geometry, simulation_instance, simulation_step, store_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
-        """, store.name, store.category, geo, store.simulation_instance_id, store.simulation_step, new_store_id)
+            INSERT INTO food_stores (name, shop, x, y, simulation_instance, simulation_step, store_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """, store.name, store.category, float(store.longitude), float(store.latitude),
+            store.simulation_instance_id, store.simulation_step, new_store_id)
 
         # get all of the stores for the simulation instance and timestep
         stores = await query_food_stores(simulation_instance_id=store.simulation_instance_id,
@@ -772,9 +769,9 @@ async def return_step_results_to_database(households: List[Dict[str, Any]],
         async with pool.acquire() as conn:
             insert_query = """
                 INSERT INTO food_stores (
-                    simulation_instance, simulation_step, name, shop, geometry, store_id
+                    simulation_instance, simulation_step, name, shop, x, y, store_id
                 )
-                SELECT $1, $2, name, shop, geometry, store_id
+                SELECT $1, $2, name, shop, x, y, store_id
                 FROM food_stores
                 WHERE simulation_instance = $1 AND simulation_step = $3;
             """
@@ -854,9 +851,9 @@ async def generate_stores_for_simulation(instance_id: str):
 
         insert_query = """
             INSERT INTO food_stores (
-                simulation_instance, simulation_step, name, shop, geometry, store_id
+                simulation_instance, simulation_step, name, shop, x, y, store_id
             )
-            SELECT $1, 0, name, shop, geometry, store_id
+            SELECT $1, 0, name, shop, x, y, store_id
             FROM food_stores
             WHERE simulation_instance_id = $2 AND simulation_step = 0;
         """
@@ -877,9 +874,9 @@ async def generate_stores_for_simulation_step(instance_id: str, simulation_step:
 
         insert_query = """
             INSERT INTO food_stores (
-                simulation_instance, simulation_step, name, shop, geometry, store_id
+                simulation_instance, simulation_step, name, shop, x, y, store_id
             )
-            SELECT $1, $2, name, shop, geometry, store_id
+            SELECT $1, $2, name, shop, x, y, store_id
             FROM food_stores
             WHERE simulation_instance_id = $1 AND simulation_step = $3;
         """
