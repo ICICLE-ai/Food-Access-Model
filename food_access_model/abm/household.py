@@ -50,6 +50,9 @@ class Household(GeoAgent):
         self.num_store_within_mile = num_store_within_mile
         self.mfai = mfai #MFAI (monthly food access index)
         self.color = color
+        self.has_vehicles = self.vehicles > 0
+        self.resources = self.has_resources()
+        self.monthly_trips = self.get_monthly_trip_count()
 
     def get_color(self) -> str:
         """
@@ -140,37 +143,79 @@ class Household(GeoAgent):
           total += 1 
         self.rating_evaluation(total)
         return total
-
-    def closest_cspm_and_spm(self) -> tuple:
-        """
-        Finds the closest supermarket and the closest market of the other types (convenience, wholesale, etc).
-        Helper method for get_mfai and step functions
-
-        Returns:
-            cspm (object): closest store with the market type of convenience, wholesale, other
-            spm (object): closest store with type supermarket
-            spm_distance (int): distance of the closest supermarket to the household
-            cspm_distance (int): distance of the closest other market to the household
-        """
+    
+    def get_closest_cspm(self) -> tuple:
         cspm = None
         cspm_distance = 10000000
-        spm = None
-        spm_distance = 10000000
-        for store in self.model.stores_list: 
-            #distance = self.model.space.distance(self,store)
-            #distance = round(distance/1609.34,2)
-            distance = self.distances_map[store.unique_id]
-            if store.type == "supermarket":
-                if distance <= spm_distance:
-                    spm = store
-                    spm_distance = distance
-            else:
+        for store in self.model.stores_list:
+            if store.type != "supermarket":
+                distance = self.get_store_dist(store)
                 if distance <= cspm_distance:
                     cspm = store
                     cspm_distance = distance
-        return cspm, spm, spm_distance, cspm_distance
+        return (cspm, cspm_distance)
+    
+    def get_closest_spm(self) -> tuple:
+        spm = None
+        spm_distance = 10000000
+        for store in self.model.stores_list:
+            if store.type == "supermarket":
+                distance = self.get_store_dist(store)
+                if distance <= spm_distance:
+                    spm = store
+                    spm_distance = distance
+        return (spm, spm_distance)
 
-    def get_mfai(self,cspm: object, spm: object) -> int:
+    def has_resources(self) -> bool:
+        if self.income < 10000:
+            return False
+        if self.household_size >= 2 and self.income < 15000:
+            return False
+        if self.household_size >= 3 and self.income < 25000:
+            return False
+        return True
+    
+    def get_monthly_trip_count(self) -> int:
+        if self.resources:
+            if self.has_vehicles:
+                return 7
+            else:
+                return 8
+        else:
+            return 6
+
+    # chance of choosing a close spm is just hard code val 0.8
+    def chance_of_choosing_spm(self, spm_dist, cspm_dist) -> float:
+        if spm_dist < cspm_dist:
+            return 0.8
+        
+        if self.resources:
+            if self.has_vehicles:
+                return 0.76
+            else:
+                return 0.72
+        else:
+            if self.has_vehicles:
+                return 0.64
+            else:
+                return 0.6
+            
+    def get_store_dist(self, store) -> float:
+        return self.distances_map[store.unique_id]
+    
+    # returns store object
+    def choose_store(self, spm, cspm, spm_dist, cspm_dist) -> object:
+        if spm is None:
+            return cspm
+        if cspm is None:
+            return spm
+
+        spm_chance = self.chance_of_choosing_distant_spm(spm_dist, cspm_dist)
+
+        #randomly choose based off chances
+        return random.choices([cspm, spm], [(1 - spm_chance), spm_chance], k = 1)[0]
+
+    def get_mfai(self) -> int:
         """
         Calculates the MFAI (monthly food access index)
 
@@ -181,31 +226,22 @@ class Household(GeoAgent):
         Returns:
             int: the mfai value
         """
-        #constants
-        MAX_FSA, MIN_FSA = 100, 55
-        MONTHLY_TRIP_COUNT = 7
-        VEHICLE_ACCESS_WEIGHT = 10
-        INCOME_WEIGHT = 80
-        NO_VEHICLE_REDUCTION_FACTOR = 0.8
-        MAX_TOTAL_FSA = MONTHLY_TRIP_COUNT * MAX_FSA
+        # closest cspm/spm
+        closest_cspm, cspm_dist = self.get_closest_cspm()
+        closest_spm, spm_dist = self.get_closest_spm()
 
-        #calculate mfai
-        #cspm, spm,f,f = self.closest_cspm_and_spm()
         food_avail = list()
-        for i in range(MONTHLY_TRIP_COUNT):
-            chance_of_choosing_spm = int(((self.vehicles*VEHICLE_ACCESS_WEIGHT)+(self.income/200000)*INCOME_WEIGHT))
-            store = random.choices([cspm,spm], [(chance_of_choosing_spm-100)*-1,chance_of_choosing_spm], k=1)[0]
-            fsa = 0
-            if store is not None and store.type == "supermarket":
-                fsa = MAX_FSA
-            else:
-                fsa = MIN_FSA
-            if self.vehicles == 0:
-                fsa = fsa*NO_VEHICLE_REDUCTION_FACTOR
-            fsa = fsa*0.85+fsa*0.25*abs(1-self.distance_to_closest_store)
-            food_avail.append(fsa)
+        for i in range(self.monthly_trips):
+            # randomly select the closest spm/cspm
+            store = self.choose_store(closest_spm, closest_cspm, spm_dist, cspm_dist)
 
-        return int(sum(food_avail)/MAX_TOTAL_FSA*100)
+            if store is not None and store.type == "supermarket":
+                fsa = 95
+            else:
+                fsa = 55
+
+            food_avail.append(fsa)
+        return sum(food_avail) / len(food_avail)
 
     def calculate_distances(self)-> None:
         """
@@ -226,9 +262,13 @@ class Household(GeoAgent):
         """
         if self.distances_map is None:
             self.calculate_distances()
-        cspm, spm, self.distance_to_closest_store, f = self.closest_cspm_and_spm()
+        # find spm for get_color and rating_evaluation methods (cspm and spm not needed for mfai method anymore)
+        spm, spm_dist = self.get_closest_spm()
+        if spm is not None:
+            self.distance_to_closest_store = spm_dist
+
         self.num_store_within_mile = self.stores_with_1_miles()
-        self.mfai = self.get_mfai(cspm, spm)
+        self.mfai = self.get_mfai()
         self.color = self.get_color()
 
         return None
