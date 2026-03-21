@@ -29,6 +29,8 @@ from shapely.strtree import STRtree
 from pyproj import Transformer
 from dotenv import load_dotenv 
 
+INCLUDE_OSM_STORES = False
+STORES_CSV = "BC_stores.csv"
 
 # Local Application Imports
 from household_constants import (
@@ -428,64 +430,52 @@ def process_food_stores(
             - List: Store tuples with Polygon geometries.
             - List[Tuple]: Store tuples with string geometries for SQL insertion.
     """
-    features = ox.features.features_from_point(
-        center_point,
-        dist=dist * 3,
-        tags={"shop": [
-            "convenience", "supermarket", "butcher", "wholesale",
-            "farm", "greengrocer", "health_food", "grocery"
-        ]}
-    )
-
-    features = features.to_crs("epsg:3857")
-    features = features[["shop", "geometry", "name"]]
-
     store_tuples: List[Tuple] = []
-    transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
     store_id = 0
-    for row in features.itertuples():
-        point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
-        map_elements.append(point.buffer(20))
 
-        lon, lat = transformer.transform(point.x, point.y)
-        # New format: (simulation_instance, simulation_step, shop, geometry, name, store_id)
-        # Store only the point
-        store_tuples.append((None, 0, str(row.shop), lon, lat, str(row.name), store_id))
-        store_id += 1
-    
-    return (STRtree(map_elements),store_tuples) 
-    
+    if INCLUDE_OSM_STORES:
+        features = ox.features.features_from_point(
+            center_point,
+            dist=dist * 3,
+            tags={"shop": [
+                "convenience", "supermarket", "butcher", "wholesale",
+                "farm", "greengrocer", "health_food", "grocery"
+            ]}
+        )
+        features = features.to_crs("epsg:3857")
+        features = features[["shop", "geometry", "name"]]
 
-    # This is from the mvp branch, unsure of whether this should be inccluded or not
+        transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
+        for row in features.itertuples():
+            point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
+            map_elements.append(point.buffer(20))
 
-    # store_tuples_strPoly: List[Tuple] = []
-    # store_tuples_Poly: List[Tuple] = []
+            lon, lat = transformer.transform(point.x, point.y)
+            store_tuples.append((None, 0, str(row.shop), lon, lat, str(row.name), store_id))
+            store_id += 1
+    else:
+        logging.info("INCLUDE_OSM_STORES=False — loading curated stores from %s", STORES_CSV)
+        transformer_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
+        csv_path = os.path.join(os.path.dirname(__file__), STORES_CSV)
+        df = pd.read_csv(csv_path)
 
-    # store_id = 0
-    # for row in features.itertuples():
-    #     point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
+        for _, row in df.iterrows():
+            # Store x/y in 4326 directly
+            lon = float(row['long'])
+            lat = float(row['lat'])
+            shop_type = str(row['Type'])[:15]
+            store_name = str(row['Name'])[:50]
 
-    #     if row.shop in ["supermarket", "grocery", "greengrocer"]:
-    #         polygon = Polygon([
-    #             (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
-    #             for angle in range(0, 360, 60)
-    #         ])
-    #     else:
-    #         polygon = Polygon([
-    #             (point.x, point.y + 20),
-    #             (point.x + 25, point.y - 30),
-    #             (point.x - 25, point.y - 30)
-    #         ])
+            # Convert to 3857 only for map_elements buffer (spatial math)
+            x_3857, y_3857 = transformer_to_3857.transform(lon, lat)
+            map_elements.append(Point(x_3857, y_3857).buffer(20))
 
-    #     map_elements.append(polygon.buffer(20))
-    #     # New format: (simulation_instance, simulation_step, shop, geometry, name, store_id)
-    #     store_tuples_strPoly.append((None, 0, str(row.shop), str(polygon), str(row.name), store_id))
-    #     store_tuples_Poly.append((None, 0, str(row.shop), polygon, str(row.name), store_id))
-    #     store_id += 1
-    
-    # return (STRtree(map_elements),store_tuples_Poly, store_tuples_strPoly)  
+            store_tuples.append((None, 0, shop_type, lon, lat, store_name, store_id))
+            store_id += 1
 
+        logging.info("Loaded %d curated stores from CSV", store_id)
 
+    return (STRtree(map_elements), store_tuples)  
 
 def get_household_insert_query() -> str:
     """
