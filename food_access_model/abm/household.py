@@ -21,7 +21,7 @@ class Household(GeoAgent):
             - number_of_workers (int): total working members (having job) in the household
             - stores_list : List containing all the stores with their attributes
             - search_radius (int): how far to search for stores (default 500)
-            - crs (string): constant value (i.e.3857),used to map households on a flat earth display
+            - crs (string): constant value (i.e.4326),used to map households on a flat earth display
         """
 
         self.raw_geometry = polygon 
