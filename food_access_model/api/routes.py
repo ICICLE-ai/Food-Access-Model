@@ -330,7 +330,7 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
         row = await conn.fetchrow("""
             SELECT MAX(store_id) AS max_id
             FROM food_stores
-            WHERE simulation_instance_id = $1 AND simulation_step = $2
+            WHERE simulation_instance = $1 AND simulation_step = $2
         """, store.simulation_instance_id, store.simulation_step)
         max_id = row['max_id'] if row and row['max_id'] is not None else 0
         new_store_id = max_id + 1
