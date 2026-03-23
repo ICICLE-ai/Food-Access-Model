@@ -48,6 +48,8 @@ from household_constants import (
 
 load_dotenv()
 
+ox.settings.timeout = 180  # 3 minute timeout to prevent indefinite hangs
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -289,7 +291,7 @@ def initialize_database_tables(
     ''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS food_stores (
-        simulation_instance_id UUID,
+        simulation_instance UUID,
         simulation_step INTEGER,
         shop VARCHAR(15),
         x NUMERIC,
@@ -432,7 +434,7 @@ def process_food_stores(
     """
     features = ox.features.features_from_point(
         center_point,
-        dist=dist * 3,
+        dist=dist * 1.5,
         tags={"shop": [
             "convenience", "supermarket", "butcher", "wholesale",
             "farm", "greengrocer", "health_food", "grocery"
@@ -1037,7 +1039,7 @@ def main() -> None:
     simulation_data = initialize_simulation(CENTER_POINT, FIPSCODE, YEAR, DIST, APIKEY)
 
     logging.info("Initializing database and creating tables...")
-    connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT)
+    connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT, destroy_tables=True)
     household_query = get_household_insert_query()
     
     # Insert or get default simulation instance

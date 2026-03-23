@@ -210,7 +210,7 @@ class Household(GeoAgent):
         if cspm is None:
             return spm
 
-        spm_chance = self.chance_of_choosing_distant_spm(spm_dist, cspm_dist)
+        spm_chance = self.chance_of_choosing_spm(spm_dist, cspm_dist)
 
         #randomly choose based off chances
         return random.choices([cspm, spm], [(1 - spm_chance), spm_chance], k = 1)[0]

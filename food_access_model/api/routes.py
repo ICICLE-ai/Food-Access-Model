@@ -247,7 +247,7 @@ async def delete_simulation_instance(instance_id: str) -> ORJSONResponse:
 
     store_query = """
         DELETE FROM food_stores
-        WHERE simulation_instance_id = $1;
+        WHERE simulation_instance = $1;
         """
 
     instance_query = """
@@ -630,7 +630,7 @@ async def reset_simulation(instance_id: str) -> None:
         )
         # Delete all food stores for the given simulation instance
         await conn.execute(
-            "DELETE FROM food_stores WHERE simulation_instance_id = $1 and simulation_step != 0", instance_id
+            "DELETE FROM food_stores WHERE simulation_instance = $1 and simulation_step != 0", instance_id
         )
 
 
@@ -651,7 +651,7 @@ async def batch_run_model(households: List[Dict[str, Any]], food_stores: List[Di
         data_collection_period=1,
         display_progress=True,
         # sets default value to 2 if no inputted val in .env file
-        number_processes=int(os.getenv('NUMBER_PROCESSES'), 2), 
+        number_processes=int(os.getenv('NUMBER_PROCESSES', '2')), 
     )
     # at this point, stores do not have an id
     all_households = []
@@ -793,7 +793,7 @@ async def generate_household_instances_for_simulation(instance_id: str, househol
     if household_limit is not None:
         query = """
             INSERT INTO households (
-                simulation_instance, simulation_step, id, centroid_wkt, income, household_size,
+                simulation_instance_id, simulation_step, id, centroid_wkt, income, household_size,
                 vehicles, number_of_workers, transit_time, walking_time, biking_time, driving_time
             )
             SELECT $1, 0, id, centroid_wkt, income, household_size, vehicles, number_of_workers,
@@ -805,7 +805,7 @@ async def generate_household_instances_for_simulation(instance_id: str, househol
     else:
         query = """
             INSERT INTO households (
-                simulation_instance, simulation_step, id, centroid_wkt, income, household_size,
+                simulation_instance_id, simulation_step, id, centroid_wkt, income, household_size,
                 vehicles, number_of_workers, transit_time, walking_time, biking_time, driving_time
             )
             SELECT $1, 0, id, centroid_wkt, income, household_size, vehicles, number_of_workers,
@@ -857,7 +857,7 @@ async def generate_stores_for_simulation(instance_id: str):
             )
             SELECT $1, 0, name, shop, x, y, store_id
             FROM food_stores
-            WHERE simulation_instance_id = $2 AND simulation_step = 0;
+            WHERE simulation_instance = $2 AND simulation_step = 0;
         """
 
         await conn.execute(insert_query, instance_id, default_instance_id)
@@ -880,7 +880,7 @@ async def generate_stores_for_simulation_step(instance_id: str, simulation_step:
             )
             SELECT $1, $2, name, shop, x, y, store_id
             FROM food_stores
-            WHERE simulation_instance_id = $1 AND simulation_step = $3;
+            WHERE simulation_instance = $1 AND simulation_step = $3;
         """
 
         await conn.execute(insert_query, instance_id, simulation_step, simulation_step - 1)
