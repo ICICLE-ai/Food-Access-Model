@@ -216,14 +216,7 @@ class Household(GeoAgent):
         
         Uses EPSG:3857 projection (units in meters). Distance values are stored in the distances_map
         dictionary with store unique_id as key and distance in miles as value.
-        
-        Raises:
-            ValueError: If the model's CRS is not EPSG:3857
         """
-        # Validate CRS once per household, before entering the loop
-        if str(self.crs) not in ["3857", "EPSG:3857"]:
-            raise ValueError(f"Expected CRS EPSG:3857, but got {self.crs}. Distance calculations require meter-based projection.")
-
         # TODO (#74): Replace this brute-force loop with an STRtree.query to only
         # calculate distances for stores within a 10-mile radius.
         if not hasattr(self.model, '_store_centroids'):
