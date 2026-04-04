@@ -812,7 +812,7 @@ def process_housing_areas(
     map_elements: List[Polygon],
     data: pd.DataFrame,
     store_tuples: List[Tuple[str, str, str]],
-    store_tree: STRtree = None,
+    store_tree: STRtree,
 ) -> List[Tuple]:
     """
     Process a list of housing area polygons, generate synthetic houses along their borders,

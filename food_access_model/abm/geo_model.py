@@ -3,7 +3,6 @@ import os
 from mesa import Model, DataCollector  # Base class for GeoModel
 from mesa.time import RandomActivation  # Used to specify that agents are run randomly within each step
 from mesa_geo import GeoSpace  # GeoSpace that houses agents
-from shapely.strtree import STRtree
 import psycopg2
 from typing import List, Any
 
@@ -73,16 +72,6 @@ class GeoModel(Model):
             self.space.add_agents(agent)
             # Initializing empty list to collect all the store objects
             self.stores_list.append(agent)
-
-        # Build spatial index over store centroids for fast radius queries (#72)
-        store_centroids = [s.geometry.centroid for s in self.stores_list]
-        self.store_tree = STRtree(store_centroids)
-        self._store_id_by_idx = {
-            i: s.unique_id for i, s in enumerate(self.stores_list)
-        }
-        self._store_by_id = {
-            s.unique_id: s for s in self.stores_list
-        }
 
         # Initialize all household agents and add them to the scheduler and the Geospace
         for house in self.households:
