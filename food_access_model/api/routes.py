@@ -440,7 +440,7 @@ async def get_num_stores(simulation_instance_id: str = Query(..., description="S
         rows = await conn.fetch("""
             SELECT
                 CASE
-                    WHEN shop IN ('supermarket', 'greengrocer', 'grocery') THEN 'numSPM'
+                    WHEN shop = 'supermarket' THEN 'numSPM'
                     ELSE 'numNonSPM'
                 END AS store_group,
                 COUNT(*) AS store_count

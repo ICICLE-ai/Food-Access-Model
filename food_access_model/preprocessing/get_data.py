@@ -432,32 +432,45 @@ def process_food_stores(
             - List: Store tuples with Polygon geometries.
             - List[Tuple]: Store tuples with string geometries for SQL insertion.
     """
-    features = ox.features.features_from_point(
-        center_point,
-        dist=dist * 1.5,
-        tags={"shop": [
-            "convenience", "supermarket", "butcher", "wholesale",
-            "farm", "greengrocer", "health_food", "grocery"
-        ]}
-    )
-
-    features = features.to_crs("epsg:3857")
-    features = features[["shop", "geometry", "name"]]
-
     store_tuples: List[Tuple] = []
-    transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
     store_id = 0
-    for row in features.itertuples():
-        point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
-        map_elements.append(point.buffer(20))
 
-        lon, lat = transformer.transform(point.x, point.y)
-        # New format: (simulation_instance, simulation_step, shop, geometry, name, store_id)
-        # Store only the point
-        store_tuples.append((None, 0, str(row.shop), lon, lat, str(row.name), store_id))
-        store_id += 1
-    
-    return (STRtree(map_elements),store_tuples)
+    if INCLUDE_OSM_STORES:
+        features = ox.features.features_from_point(
+            center_point,
+            dist=dist * 1.5,
+            tags={"shop": [
+                "convenience", "supermarket", "butcher", "wholesale",
+                "farm", "greengrocer", "health_food", "grocery"
+            ]}
+        )
+        features = features.to_crs("epsg:3857")
+        features = features[["shop", "geometry", "name"]]
+        transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
+        for row in features.itertuples():
+            point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
+            map_elements.append(point.buffer(20))
+            lon, lat = transformer.transform(point.x, point.y)
+            store_tuples.append((None, 0, str(row.shop), lon, lat, str(row.name), store_id))
+            store_id += 1
+    else:
+        logging.info("INCLUDE_OSM_STORES=False — loading curated stores from %s", STORES_CSV)
+        csv_path = os.path.join(os.path.dirname(__file__), STORES_CSV)
+        df = pd.read_csv(csv_path)
+        to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
+        for _, row in df.iterrows():
+            lat = float(row['lat'])
+            lon = float(row['long'])
+            spm_flag = str(row.get('cspm/spm', '')).strip().lower()
+            shop_type = 'supermarket' if spm_flag == 'spm' else str(row['Type'])[:15]
+            store_name = str(row['Name'])[:50]
+            x_3857, y_3857 = to_3857.transform(lon, lat)
+            map_elements.append(Point(x_3857, y_3857).buffer(20))  # 20m exclusion zone in EPSG:3857
+            store_tuples.append((None, 0, shop_type, lon, lat, store_name, store_id))
+            store_id += 1
+        logging.info("Loaded %d stores from CSV", store_id)
+
+    return (STRtree(map_elements), store_tuples)
 
 def get_household_insert_query() -> str:
     """

@@ -117,11 +117,11 @@ class Household(GeoAgent):
             self.rating_num_store_within_mile = "C"    
         if total < 10 and total >= 5:
             self.rating_num_store_within_mile = "B"  
-        if self.distance_to_closest_store > 2.00: 
+        if self.distance_to_closest_store is not None and self.distance_to_closest_store > 2.00: 
             self.rating_distance_to_closest_store  = "D"  
-        if self.distance_to_closest_store > 1.00 and self.distance_to_closest_store <= 2.00: 
+        if self.distance_to_closest_store is not None and self.distance_to_closest_store > 1.00 and self.distance_to_closest_store <= 2.00: 
             self.rating_distance_to_closest_store  = "C"  
-        if self.distance_to_closest_store > 0.50 and self.distance_to_closest_store <= 1.00: 
+        if self.distance_to_closest_store is not None and self.distance_to_closest_store > 0.50 and self.distance_to_closest_store <= 1.00: 
             self.rating_distance_to_closest_store  = "B"   
         if self.vehicles == 0:  
             self.rating_based_on_num_vehicles = "C"   
@@ -264,8 +264,13 @@ class Household(GeoAgent):
             self.calculate_distances()
         # find spm for get_color and rating_evaluation methods (cspm and spm not needed for mfai method anymore)
         spm, spm_dist = self.get_closest_spm()
-        if spm is not None:
+        cspm, cspm_dist = self.get_closest_cspm()
+        if spm is not None and cspm is not None:
+            self.distance_to_closest_store = min(spm_dist, cspm_dist)
+        elif spm is not None:
             self.distance_to_closest_store = spm_dist
+        elif cspm is not None:
+            self.distance_to_closest_store = cspm_dist
 
         self.num_store_within_mile = self.stores_with_1_miles()
         self.mfai = self.get_mfai()
