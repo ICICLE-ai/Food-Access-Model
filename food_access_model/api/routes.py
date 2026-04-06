@@ -4,6 +4,7 @@ import logging
 import asyncio
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 import asyncpg
 from typing import List, Dict, Union, Any, Optional
@@ -69,6 +70,27 @@ FOOD_STORE_QUERY = """
                      """
 
 
+def _row_to_dict(row) -> Dict[str, Any]:
+    """Convert a database row to a JSON-serializable dictionary.
+
+    Handles asyncpg Record objects and converts:
+      - decimal.Decimal -> float
+      - uuid.UUID -> str
+      - datetime -> ISO 8601 string
+    """
+    out = {}
+    for key, value in dict(row).items():
+        if isinstance(value, Decimal):
+            out[key] = float(value)
+        elif isinstance(value, uuid.UUID):
+            out[key] = str(value)
+        elif isinstance(value, datetime):
+            out[key] = value.isoformat()
+        else:
+            out[key] = value
+    return out
+
+
 router = APIRouter(prefix="/api", tags=["ABM"])
 # FRONT_URL = os.environ.get("FRONT_URL", "http://localhost:5173")
 
@@ -112,7 +134,7 @@ async def get_simulation_instances() -> ORJSONResponse:
     async with pool.acquire() as conn:
         rows = await conn.fetch(query)
 
-    simulation_instances = [dict(row) for row in rows]
+    simulation_instances = [_row_to_dict(row) for row in rows]
     return ORJSONResponse({"simulation_instances": simulation_instances})
 
 
@@ -148,7 +170,7 @@ async def get_simulation_instance(instance_id: str) -> ORJSONResponse:
 
     if row is None:
         raise HTTPException(status_code=404, detail="Simulation instance not found")
-    instance = dict(row)
+    instance = _row_to_dict(row)
     return ORJSONResponse({"simulation_instance": instance})
 
 
@@ -214,9 +236,7 @@ async def create_simulation_instance(name: Optional[str] = Body(None, embed=True
 
     async with pool.acquire() as conn:
         row = await conn.fetchrow(query, name, description)
-    instance = dict(row)
-
-    instance['id'] = str(instance['id'])  # Convert UUID to string for JSON serialization
+    instance = _row_to_dict(row)
 
     await generate_household_instances_for_simulation(instance['id'], household_limit)
     await generate_stores_for_simulation(instance['id'])
@@ -484,24 +504,18 @@ async def get_household_stats(simulation_instance_id: str = Query(..., descripti
             WHERE simulation_instance_id = $1 AND simulation_step = $2
             """
         row = await conn.fetchrow(query, simulation_instance_id, simulation_step)
+    defaults = {
+        "avg_income": 0.0,
+        "avg_vehicles": 0.0,
+        "avg_food_access_score": 0.0,
+        "avg_closest_store_miles": 0.0,
+        "avg_stores_within_1_mile": 0.0,
+    }
     if row is None:
-        return {"avg_income": 0.0,
-                "avg_vehicles": 0.0,
-                "avg_food_access_score": 0.0,
-                "avg_closest_store_miles": 0.0,
-                "avg_stores_within_1_mile": 0.0}
+        return defaults
 
-    avg_income = row['avg_income'] if row['avg_income'] is not None else 0.0
-    avg_vehicles = row['avg_vehicles'] if row['avg_vehicles'] is not None else 0.0
-    avg_food_access_score = row['avg_food_access_score'] if row['avg_food_access_score'] is not None else 0.0
-    avg_closest_store_miles = row['avg_closest_store_miles'] if row['avg_closest_store_miles'] is not None else 0.0
-    avg_stores_within_1_mile = row['avg_stores_within_1_mile'] if row['avg_stores_within_1_mile'] is not None else 0.0
-
-    return {"avg_income": float(avg_income),
-            "avg_vehicles": float(avg_vehicles),
-            "avg_food_access_score": float(avg_food_access_score),
-            "avg_closest_store_miles": float(avg_closest_store_miles),
-            "avg_stores_within_1_mile": float(avg_stores_within_1_mile)}
+    converted = _row_to_dict(row)
+    return {key: converted.get(key) or fallback for key, fallback in defaults.items()}
 
 
 @router.get("/health")
@@ -548,21 +562,10 @@ async def query_households(simulation_instance_id: str, simulation_step: int = 0
     Returns:
         List[Any]: A list of household data.
     """
-    from decimal import Decimal
-    
     async with pool.acquire() as conn:
         rows = await conn.fetch(HOUSEHOLD_QUERY, simulation_instance_id, simulation_step)
 
-    # Convert rows to a list of dictionaries and convert Decimal to float for JSON serialization
-    households_data = []
-    for row in rows:
-        row_dict = dict(row)
-        # Convert Decimal values to float
-        for key, value in row_dict.items():
-            if isinstance(value, Decimal):
-                row_dict[key] = float(value)
-        households_data.append(row_dict)
-    return households_data
+    return [_row_to_dict(row) for row in rows]
 
 
 async def query_food_stores(simulation_instance_id: str, simulation_step: int = 0) -> List[Any]:
@@ -579,9 +582,7 @@ async def query_food_stores(simulation_instance_id: str, simulation_step: int = 
     async with pool.acquire() as conn:
         rows = await conn.fetch(FOOD_STORE_QUERY, simulation_instance_id, simulation_step)
 
-    # Convert rows to a list of dictionaries
-    food_stores_data = [dict(row) for row in rows]
-    return food_stores_data
+    return [_row_to_dict(row) for row in rows]
 
 
 async def _run_model_step(simulation_instance_id) -> None:
