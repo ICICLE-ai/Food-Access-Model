@@ -631,8 +631,9 @@ async def reset_simulation(instance_id: str) -> None:
             "DELETE FROM households WHERE simulation_instance_id = $1 and simulation_step != 0", instance_id
         )
         # Delete all food stores for the given simulation instance
+        # Note: `food_stores` uses the column name `simulation_instance` (not `simulation_instance_id`)
         await conn.execute(
-            "DELETE FROM food_stores WHERE simulation_instance_id = $1 and simulation_step != 0", instance_id
+            "DELETE FROM food_stores WHERE simulation_instance = $1 and simulation_step != 0", instance_id
         )
 
 
