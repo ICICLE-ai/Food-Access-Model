@@ -60,8 +60,8 @@ class DBRepository:
                     'simulation_instance': row[0],
                     'simulation_step': row[1],
                     'shop': row[2],
-                    'x': row[3],
-                    'y': row[4],
+                    'longitude': row[3],
+                    'latitude': row[4],
                     'name': row[5],
                     'store_id': row[6]
                 }

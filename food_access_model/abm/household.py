@@ -1,4 +1,6 @@
 from mesa_geo import GeoAgent
+from pyproj import Transformer
+from shapely.geometry import Point
 import shapely
 import random
 
@@ -21,14 +23,18 @@ class Household(GeoAgent):
             - number_of_workers (int): total working members (having job) in the household
             - stores_list : List containing all the stores with their attributes
             - search_radius (int): how far to search for stores (default 500)
-            - crs (string): constant value (i.e.4326),used to map households on a flat earth display
         """
-
+        # Keep original 4326 WKT for DB writes
         self.raw_geometry = polygon 
 
-        polygon = shapely.wkt.loads(polygon)
+        # Reproject from 4326 to 3857 for in-memory spatial math, but the original 4326 geometry is kept in self.raw_geometry was saved for database writes
+        point_4326 = shapely.wkt.loads(polygon)
+        transformer = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
+        x_3857, y_3857 = transformer.transform(point_4326.x, point_4326.y)
+        point_3857 = Point(x_3857, y_3857)
+        
         # Setting argument values to the passed parameteric values.
-        super().__init__(id,model,polygon,crs)
+        super().__init__(id, model, point_3857, "epsg:3857")
         self.income = income
         self.search_radius = search_radius
         self.household_size = household_size

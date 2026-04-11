@@ -17,7 +17,6 @@ HOST = os.getenv("HOST")
 PORT = os.getenv("PORT")
 
 SEARCHRADIUS = 500
-CRS = "4326"  # constant value (i.e.4326),used to map households on a flat earth display
 
 class GeoModel(Model):
     """
@@ -65,8 +64,8 @@ class GeoModel(Model):
                 self,
                 store['store_id'],
                 store['name'],
-                store['x'],
-                store['y']
+                store['longitude'],
+                store['latitude']
             )
             index_count += 1
             self.space.add_agents(agent)
@@ -88,7 +87,6 @@ class GeoModel(Model):
                 house['Transit time'],  # transit_time
                 house['Driving time'],  # driving_time
                 SEARCHRADIUS,
-                CRS,
                 house['Closest Store (Miles)'] if 'Closest Store (Miles)' in house else 0,  # distance_to_closest_store
                 house['Stores within 1 Mile'] if 'Stores within 1 Mile' in house else 0,  # num_store_within_mile
                 house['Food Access Score'] if 'Food Access Score' in house else 0,  # mfai
