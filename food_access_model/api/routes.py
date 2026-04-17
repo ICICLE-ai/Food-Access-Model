@@ -220,6 +220,7 @@ async def create_simulation_instance(name: Optional[str] = Body(None, embed=True
 
     await generate_household_instances_for_simulation(instance['id'], household_limit)
     await generate_stores_for_simulation(instance['id'])
+    await _run_model_step(instance['id'])  # run a step right after creating a new instance 
 
     return ORJSONResponse({"simulation_instance": instance})
 
@@ -652,7 +653,8 @@ async def batch_run_model(households: List[Dict[str, Any]], food_stores: List[Di
         max_steps=1,
         data_collection_period=1,
         display_progress=True,
-        number_processes=8,
+        # sets default value to 2 if no inputted val in .env file
+        number_processes=int(os.getenv('NUMBER_PROCESSES'), 2), 
     )
     # at this point, stores do not have an id
     all_households = []

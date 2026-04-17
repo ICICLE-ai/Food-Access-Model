@@ -29,6 +29,8 @@ from shapely.strtree import STRtree
 from pyproj import Transformer
 from dotenv import load_dotenv 
 
+INCLUDE_OSM_STORES = False
+STORES_CSV = "BC_stores.csv"
 
 # Local Application Imports
 from household_constants import (
@@ -233,7 +235,8 @@ def initialize_database_tables(
     database: str,
     user: str,
     password: str,
-    port: str
+    port: str,
+    destroy_tables: bool = False
 ) -> Tuple[psycopg2.extensions.connection, psycopg2.extensions.cursor]:
     """
     Connect to the PostgreSQL database and initialize required tables.
@@ -244,7 +247,7 @@ def initialize_database_tables(
         user (str): Database username.
         password (str): User's database password.
         port (str): Port number for the database connection.
-
+        destroy_tables (bool): Developer can set this to true in line 1036 of main to destroy
     Returns:
         Tuple[psycopg2.extensions.connection, psycopg2.extensions.cursor]: 
             A tuple containing the active connection and cursor objects.
@@ -261,39 +264,66 @@ def initialize_database_tables(
     except psycopg2.Error as e:
         logging.error(f"Failed to connect to the database: {e}")
         return None, None
-    
 
-    # Drop tables if they already exist
-    try:
-        cursor.execute('DROP TABLE IF EXISTS roads;')
-        cursor.execute('DROP TABLE IF EXISTS food_stores;')
-    except psycopg2.Error as e:
-        logging.error(f"Database table operation failed: {e}")
-        connection.rollback()
-        return None, None
+    if destroy_tables:
+        # Drop tables if needed
+        try:
+            cursor.execute('DROP TABLE IF EXISTS households;')
+            cursor.execute('DROP TABLE IF EXISTS food_stores;')
+            cursor.execute('DROP TABLE IF EXISTS roads;')
+            cursor.execute('DROP TABLE IF EXISTS simulation_instances;')
+        except psycopg2.Error as e:
+            logging.error(f"Database table operation failed: {e}")
+            connection.rollback()
+            return None, None
 
-    # Create tables
-    create_roads_query = '''
-    CREATE TABLE roads (
+    # Create tables if they don't exist
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS roads (
         name TEXT,
         highway VARCHAR(30),
         length NUMERIC,
         geometry TEXT,
         service VARCHAR(30)
     );
-    '''
-    create_food_stores_query = '''
-    CREATE TABLE food_stores (
-        simulation_instance UUID,
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS food_stores (
+        simulation_instance_id UUID,
         simulation_step INTEGER,
         shop VARCHAR(15),
         geometry TEXT,
         name VARCHAR(50),
         store_id INTEGER
     );
-    '''
-    cursor.execute(create_roads_query)
-    cursor.execute(create_food_stores_query)
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS simulation_instances (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT UNIQUE NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS households (
+        id NUMERIC,
+        simulation_instance_id UUID,
+        simulation_step INTEGER,
+        centroid_wkt TEXT,
+        income NUMERIC,
+        household_size NUMERIC,
+        vehicles NUMERIC,
+        number_of_workers NUMERIC,
+        walking_time NUMERIC,
+        biking_time NUMERIC,
+        transit_time NUMERIC,
+        driving_time NUMERIC,
+        food_score NUMERIC,
+        stores_within_1_mile NUMERIC,
+        closest_store_miles NUMERIC
+    );
+    ''')
     
     return connection, cursor
 
@@ -335,7 +365,11 @@ def process_road_network(
         water_features = ox.features.features_from_point(
             center_point,
             dist=dist,
-            tags={"natural": ["water"], "waterway": ["river", "stream", "canal"]}
+            tags={
+                "natural": ["water", "bay", "wetland", "spring"],
+                "waterway": ["river", "stream", "canal", "riverbank", "dock", "dam"],
+                "landuse": ["reservoir", "basin"]
+            }
         )
         if not water_features.empty:
             water_features = water_features.to_crs("epsg:3857")
@@ -387,85 +421,89 @@ def process_food_stores(
     Args:
         center_point (Tuple[float, float]): Latitude and longitude for the area of interest.
         dist (float): Distance in meters for the search radius (3x for food stores).
-        map_elements (List[BaseGeometry]): List to append buffered polygons representing stores
-        cursor (psycopg2.extensions.cursor): Cursor for executing database insert queries.
+        map_elements (List[BaseGeometry]): List to append buffered polygons representing stores.
 
     Returns:
-        STRtree: Spatial index of all geometric elements including food stores.
+        Tuple[STRtree, List, List[Tuple]]: A tuple containing:
+            - STRtree: Spatial index of all geometric elements including food stores.
+            - List: Store tuples with Polygon geometries.
+            - List[Tuple]: Store tuples with string geometries for SQL insertion.
     """
-    features = ox.features.features_from_point(
-        center_point,
-        dist=dist * 3,
-        tags={"shop": [
-            "convenience", "supermarket", "butcher", "wholesale",
-            "farm", "greengrocer", "health_food", "grocery"
-        ]}
-    )
-
-    features = features.to_crs("epsg:3857")
-    features = features[["shop", "geometry", "name"]]
-
     store_tuples_strPoly: List[Tuple] = []
     store_tuples_Poly: List[Tuple] = []
-
     store_id = 0
-    for row in features.itertuples():
-        point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
 
-        if row.shop in ["supermarket", "grocery", "greengrocer"]:
-            polygon = Polygon([
-                (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
-                for angle in range(0, 360, 60)
-            ])
-        else:
-            polygon = Polygon([
-                (point.x, point.y + 20),
-                (point.x + 25, point.y - 30),
-                (point.x - 25, point.y - 30)
-            ])
+    if INCLUDE_OSM_STORES:
+        features = ox.features.features_from_point(
+            center_point,
+            dist=dist * 3,
+            tags={"shop": [
+                "convenience", "supermarket", "butcher", "wholesale",
+                "farm", "greengrocer", "health_food", "grocery"
+            ]}
+        )
+        features = features.to_crs("epsg:3857")
+        features = features[["shop", "geometry", "name"]]
 
-        map_elements.append(polygon.buffer(20))
-        # New format: (simulation_instance, simulation_step, shop, geometry, name, store_id)
-        store_tuples_strPoly.append((None, 0, str(row.shop), str(polygon), str(row.name), store_id))
-        store_tuples_Poly.append((None, 0, str(row.shop), polygon, str(row.name), store_id))
-        store_id += 1
-    
-    return (STRtree(map_elements),store_tuples_Poly, store_tuples_strPoly)  
+        for row in features.itertuples():
+            point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
 
-def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
+            if row.shop in ["supermarket", "grocery", "greengrocer"]:
+                polygon = Polygon([
+                    (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
+                    for angle in range(0, 360, 60)
+                ])
+            else:
+                polygon = Polygon([
+                    (point.x, point.y + 20),
+                    (point.x + 25, point.y - 30),
+                    (point.x - 25, point.y - 30)
+                ])
+
+            map_elements.append(polygon.buffer(20))
+            store_tuples_strPoly.append((None, 0, str(row.shop), str(polygon), str(row.name), store_id))
+            store_tuples_Poly.append((None, 0, str(row.shop), polygon, str(row.name), store_id))
+            store_id += 1
+    else:
+        logging.info("INCLUDE_OSM_STORES=False — loading curated stores from %s", STORES_CSV)
+        transformer = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
+        csv_path = os.path.join(os.path.dirname(__file__), STORES_CSV)
+        df = pd.read_csv(csv_path)
+
+        for _, row in df.iterrows():
+            lon, lat = transformer.transform(float(row['lat']), float(row['long']))
+            shop_type = str(row['Type'])[:15]
+            store_name = str(row['Name'])[:50]
+
+            if shop_type in ["supermarket", "grocery", "greengrocer"]:
+                polygon = Polygon([
+                    (lon + 50 * math.cos(math.radians(angle)), lat + 50 * math.sin(math.radians(angle)))
+                    for angle in range(0, 360, 60)
+                ])
+            else:
+                polygon = Polygon([
+                    (lon, lat + 20),
+                    (lon + 25, lat - 30),
+                    (lon - 25, lat - 30)
+                ])
+
+            map_elements.append(polygon.buffer(20))
+            store_tuples_strPoly.append((None, 0, shop_type, str(polygon), store_name, store_id))
+            store_tuples_Poly.append((None, 0, shop_type, polygon, store_name, store_id))
+            store_id += 1
+
+        logging.info("Loaded %d curated stores from CSV", store_id)
+
+    return (STRtree(map_elements), store_tuples_Poly, store_tuples_strPoly)  
+
+def get_household_insert_query() -> str:
     """
-    Create the 'households' table in the database after dropping it if it already exists.
-
-    Args:
-        cursor (psycopg2.extensions.cursor): Active database cursor.
+    Returns the prepared SQL insert query string for inserting household data.
 
     Returns:
-        str: Prepared SQL insert query string for inserting household data.
+        str: SQL INSERT query template for households.
     """
-    create_households_query = '''
-    CREATE TABLE households (
-        id NUMERIC,
-        simulation_instance_id UUID,
-        simulation_step INTEGER,
-        centroid_wkt TEXT,
-        income NUMERIC,
-        household_size NUMERIC,
-        vehicles NUMERIC,
-        number_of_workers NUMERIC,
-        walking_time NUMERIC,
-        biking_time NUMERIC,
-        transit_time NUMERIC,
-        driving_time NUMERIC,
-        food_score NUMERIC,
-        stores_within_1_mile NUMERIC,
-        closest_store_miles NUMERIC
-    );
-    '''
-
-    cursor.execute('DROP TABLE IF EXISTS households;')
-    cursor.execute(create_households_query)
-
-    household_query = """
+    return """
     INSERT INTO households 
     (id,
      simulation_instance_id,
@@ -484,7 +522,6 @@ def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
      closest_store_miles) 
     VALUES %s
     """
-    return household_query
 
 
 def close_db_connection(connection: psycopg2.extensions.connection, cursor: psycopg2.extensions.cursor):
@@ -840,7 +877,7 @@ def process_housing_areas(
     house_tuples: List[Tuple] = []
     total_count = 0
     
-    # Debug counters
+    # Progress monitoring counters
     attempted = 0
     failed_validation = 0
     failed_tract = 0
@@ -854,7 +891,7 @@ def process_housing_areas(
     tract_index = STRtree(data["geometry"])
     
     for i, housing_area in enumerate(housing_areas):
-        logging.info(f"{round((i + 1) / len(housing_areas) * 100)}%")
+        logging.info(f"Processing housing areas: {round((i + 1) / len(housing_areas) * 100)}% ({i + 1}/{len(housing_areas)})")
 
         exterior_coords = list(housing_area.exterior.coords)
         edges = [LineString([exterior_coords[i], exterior_coords[i + 1]])
@@ -1034,18 +1071,7 @@ def main() -> None:
 
     logging.info("Initializing database and creating tables...")
     connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT)
-    household_query = create_households_table(cursor)
-    
-    # Create or get the default simulation instance
-    logging.info("Creating simulation_instances table if not exists...")
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS simulation_instances (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT UNIQUE NOT NULL,
-            description TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    ''')
+    household_query = get_household_insert_query()
     
     # Insert or get default simulation instance
     cursor.execute("""
@@ -1074,8 +1100,7 @@ def main() -> None:
         raise
 
     logging.info("Inserting food stores...")
-    food_stores_query = "INSERT INTO food_stores (simulation_instance, simulation_step, shop, geometry, name, store_id) VALUES %s"
-    # Update store tuples with simulation_instance_id
+    food_stores_query = "INSERT INTO food_stores (simulation_instance_id, simulation_step, shop, geometry, name, store_id) VALUES %s"
     store_tuples_with_id = [(simulation_instance_id, step, shop, geom, name, sid) 
                             for (_, step, shop, geom, name, sid) in simulation_data['stores']]
     try:
