@@ -1,6 +1,9 @@
 from mesa_geo import GeoAgent
+import math
 import shapely
 import random
+
+METERS_IN_MILE = 1609.34
 
 class Household(GeoAgent):
     """
@@ -243,18 +246,26 @@ class Household(GeoAgent):
             food_avail.append(fsa)
         return sum(food_avail) / len(food_avail)
 
-    def calculate_distances(self)-> None:
+    def calculate_distances(self) -> None:
         """
-        Creates dictionary with key (indicating the store) and value (indicating the distance from the household to
-        that store)
+        Calculates and stores Euclidean distances (in miles) from this household to all stores.
+        
+        Uses EPSG:3857 projection (units in meters). Distance values are stored in the distances_map
+        dictionary with store unique_id as key and distance in miles as value.
         """
-        METERS_IN_MILE = 1609.34
-        self.distances_map = dict()
-        for store in self.model.stores_list: 
-            agent_unique_id  = store.unique_id
-            distance = self.model.space.distance(self,store)
-            distance = round(distance/METERS_IN_MILE,2)
-            self.distances_map[agent_unique_id] = distance 
+        # TODO (#74): Replace this brute-force loop with an STRtree.query to only
+        # calculate distances for stores within a 10-mile radius.
+        if not hasattr(self.model, '_store_centroids'):
+            self.model._store_centroids = [
+                (s.unique_id, *s.geometry.centroid.coords[0])
+                for s in self.model.stores_list
+            ]
+
+        self.distances_map = {}
+        hx, hy = self.geometry.centroid.coords[0]
+        for sid, sx, sy in self.model._store_centroids:
+            distance_m = math.hypot(hx - sx, hy - sy)
+            self.distances_map[sid] = round(distance_m / METERS_IN_MILE, 2)
 
     def step(self) -> None:
         """

@@ -1100,7 +1100,7 @@ def main() -> None:
         raise
 
     logging.info("Inserting food stores...")
-    food_stores_query = "INSERT INTO food_stores (simulation_instance, simulation_step, shop, geometry, name, store_id) VALUES %s"
+    food_stores_query = "INSERT INTO food_stores (simulation_instance_id, simulation_step, shop, geometry, name, store_id) VALUES %s"
     store_tuples_with_id = [(simulation_instance_id, step, shop, geom, name, sid) 
                             for (_, step, shop, geom, name, sid) in simulation_data['stores']]
     try:
