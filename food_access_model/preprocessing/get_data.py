@@ -415,7 +415,7 @@ def process_food_stores(
     center_point: Tuple[float, float],
     dist: float,
     map_elements: List[geometry.base.BaseGeometry],
-) -> Tuple[STRtree, List, List[Tuple]] : 
+) -> Tuple[STRtree, List[Tuple]]:
     """
     Retrieve and process food store locations from OpenStreetMap, convert them into geometric shapes,
     and insert them into the database.
@@ -426,9 +426,8 @@ def process_food_stores(
         map_elements (List[BaseGeometry]): List to append buffered polygons representing stores.
 
     Returns:
-        Tuple[STRtree, List, List[Tuple]]: A tuple containing:
-            - STRtree: Spatial index of all geometric elements including food stores.
-            - List: Store tuples with Polygon geometries.
+        Tuple containing:
+            - STRtree: Spatial index of all geometric elements (roads, stores, water).
             - List[Tuple]: Store tuples with string geometries for SQL insertion.
     """
     store_tuples: List[Tuple] = []
@@ -818,7 +817,7 @@ def process_housing_areas(
     house_tuples: List[Tuple] = []
     total_count = 0
     
-    # Debug counters
+    # Progress monitoring counters
     attempted = 0
     failed_validation = 0
     failed_tract = 0
