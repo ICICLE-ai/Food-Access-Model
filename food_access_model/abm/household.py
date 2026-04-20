@@ -11,13 +11,14 @@ class Household(GeoAgent):
     Represents one Household. Extends the mesa_geo GeoAgent class. The step function
     defines the behavior of a single household on each step through the model.
     """
-    def __init__(self, model, id: int, income: int, household_size: int, vehicles: int, number_of_workers: int, walking_time: int, biking_time: int, transit_time: int, driving_time: int, search_radius: int, crs: str, distance_to_closest_store: float = None, num_store_within_mile: int = None, mfai: int = None, color: str= None) -> None:
+    def __init__(self, model, geometry_4326: str, id: int, income: int, household_size: int, vehicles: int, number_of_workers: int, walking_time: int, biking_time: int, transit_time: int, driving_time: int, search_radius: int, crs: str, distance_to_closest_store: float = None, num_store_within_mile: int = None, mfai: int = None, color: str= None) -> None:
         """
         Initialize the Household Agent.
 
         Args:
             - model (GeoModel): model from mesa that places Households on a GeoSpace
             - id: id number of agent
+            - geometry_4326 (str): WKT string of the household location in EPSG:4326
             - income (int): total income of the household
             - household_size (int): total members in the household
             - vehicles (int): total vechiles in the household
@@ -26,10 +27,10 @@ class Household(GeoAgent):
             - search_radius (int): how far to search for stores (default 500)
         """
         # Keep original 4326 WKT for DB writes
-        self.raw_geometry = polygon 
+        self.raw_geometry = geometry_4326
 
         # Reproject from 4326 to 3857 for in-memory spatial math, but the original 4326 geometry is kept in self.raw_geometry was saved for database writes
-        point_4326 = shapely.wkt.loads(polygon)
+        point_4326 = shapely.wkt.loads(geometry_4326)
         x_3857, y_3857 = _TO_3857.transform(point_4326.x, point_4326.y)
         point_3857 = Point(x_3857, y_3857)
         
