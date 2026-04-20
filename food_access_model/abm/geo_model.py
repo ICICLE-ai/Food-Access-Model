@@ -47,6 +47,9 @@ class GeoModel(Model):
         # Create new GeoSpace to contain agents
         self.space = GeoSpace(warn_crs_conversion=False)
 
+        if str(CRS) not in ["3857", "EPSG:3857"]:
+            raise ValueError(f"Expected CRS EPSG:3857, but got {CRS}. Distance calculations require meter-based projection.")
+
         # Specify that agents should be activated randomly during each step
         self.schedule = RandomActivation(self)
 

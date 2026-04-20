@@ -291,11 +291,10 @@ def initialize_database_tables(
     ''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS food_stores (
-        simulation_instance UUID,
+        simulation_instance_id UUID,
         simulation_step INTEGER,
         shop VARCHAR(15),
-        x NUMERIC,
-        y NUMERIC,
+        geometry TEXT,
         name VARCHAR(50),
         store_id INTEGER
     );
@@ -432,13 +431,14 @@ def process_food_stores(
             - List: Store tuples with Polygon geometries.
             - List[Tuple]: Store tuples with string geometries for SQL insertion.
     """
-    store_tuples: List[Tuple] = []
+    store_tuples_strPoly: List[Tuple] = []
+    store_tuples_Poly: List[Tuple] = []
     store_id = 0
 
     if INCLUDE_OSM_STORES:
         features = ox.features.features_from_point(
             center_point,
-            dist=dist * 1.5,
+            dist=dist * 3,
             tags={"shop": [
                 "convenience", "supermarket", "butcher", "wholesale",
                 "farm", "greengrocer", "health_food", "grocery"
@@ -446,31 +446,57 @@ def process_food_stores(
         )
         features = features.to_crs("epsg:3857")
         features = features[["shop", "geometry", "name"]]
-        transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
+
         for row in features.itertuples():
             point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
-            map_elements.append(point.buffer(20))
-            lon, lat = transformer.transform(point.x, point.y)
-            store_tuples.append((None, 0, str(row.shop), lon, lat, str(row.name), store_id))
+
+            if row.shop in ["supermarket", "grocery", "greengrocer"]:
+                polygon = Polygon([
+                    (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
+                    for angle in range(0, 360, 60)
+                ])
+            else:
+                polygon = Polygon([
+                    (point.x, point.y + 20),
+                    (point.x + 25, point.y - 30),
+                    (point.x - 25, point.y - 30)
+                ])
+
+            map_elements.append(polygon.buffer(20))
+            store_tuples_strPoly.append((None, 0, str(row.shop), str(polygon), str(row.name), store_id))
+            store_tuples_Poly.append((None, 0, str(row.shop), polygon, str(row.name), store_id))
             store_id += 1
     else:
         logging.info("INCLUDE_OSM_STORES=False — loading curated stores from %s", STORES_CSV)
+        transformer = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
         csv_path = os.path.join(os.path.dirname(__file__), STORES_CSV)
         df = pd.read_csv(csv_path)
-        to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
-        for _, row in df.iterrows():
-            lat = float(row['lat'])
-            lon = float(row['long'])
-            spm_flag = str(row.get('cspm/spm', '')).strip().lower()
-            shop_type = 'supermarket' if spm_flag == 'spm' else str(row['Type'])[:15]
-            store_name = str(row['Name'])[:50]
-            x_3857, y_3857 = to_3857.transform(lon, lat)
-            map_elements.append(Point(x_3857, y_3857).buffer(20))  # 20m exclusion zone in EPSG:3857
-            store_tuples.append((None, 0, shop_type, lon, lat, store_name, store_id))
-            store_id += 1
-        logging.info("Loaded %d stores from CSV", store_id)
 
-    return (STRtree(map_elements), store_tuples)
+        for _, row in df.iterrows():
+            lon, lat = transformer.transform(float(row['lat']), float(row['long']))
+            shop_type = str(row['Type'])[:15]
+            store_name = str(row['Name'])[:50]
+
+            if shop_type in ["supermarket", "grocery", "greengrocer"]:
+                polygon = Polygon([
+                    (lon + 50 * math.cos(math.radians(angle)), lat + 50 * math.sin(math.radians(angle)))
+                    for angle in range(0, 360, 60)
+                ])
+            else:
+                polygon = Polygon([
+                    (lon, lat + 20),
+                    (lon + 25, lat - 30),
+                    (lon - 25, lat - 30)
+                ])
+
+            map_elements.append(polygon.buffer(20))
+            store_tuples_strPoly.append((None, 0, shop_type, str(polygon), store_name, store_id))
+            store_tuples_Poly.append((None, 0, shop_type, polygon, store_name, store_id))
+            store_id += 1
+
+        logging.info("Loaded %d curated stores from CSV", store_id)
+
+    return (STRtree(map_elements), store_tuples_Poly, store_tuples_strPoly)  
 
 def get_household_insert_query() -> str:
     """
@@ -1031,12 +1057,12 @@ def initialize_simulation(
     county_data = fetch_county_data(households_key_list, str(year), state_code, county_code, api_key)
     tract_data = load_and_merge_geodata(str(year), state_code, county_code, county_data)
     map_elements, housing_areas, road_tuples = process_road_network(center_point, dist) 
-    store_index, store_tuples = process_food_stores(center_point, dist, map_elements)
-    house_tuples = process_housing_areas(housing_areas, store_index, map_elements, tract_data, store_tuples)
+    store_index, store_tuples_poly, store_tuples_str = process_food_stores(center_point, dist, map_elements)
+    house_tuples = process_housing_areas(housing_areas, store_index, map_elements, tract_data, store_tuples_poly)
 
     return {
         'households' : house_tuples,
-        'stores' : store_tuples,
+        'stores' : store_tuples_str,
         'roads' : road_tuples,
         'tract_data' : tract_data,
         'store_index' : store_index
@@ -1082,10 +1108,9 @@ def main() -> None:
         raise
 
     logging.info("Inserting food stores...")
-    food_stores_query = "INSERT INTO food_stores (simulation_instance, simulation_step, shop, x, y, name, store_id) VALUES %s"
-    # Update store tuples with simulation_instance_id
-    store_tuples_with_id = [(simulation_instance_id, step, shop, x, y, name, sid) 
-                            for (_, step, shop, x, y, name, sid) in simulation_data['stores']]
+    food_stores_query = "INSERT INTO food_stores (simulation_instance_id, simulation_step, shop, geometry, name, store_id) VALUES %s"
+    store_tuples_with_id = [(simulation_instance_id, step, shop, geom, name, sid) 
+                            for (_, step, shop, geom, name, sid) in simulation_data['stores']]
     try:
         extras.execute_values(cursor, food_stores_query, store_tuples_with_id)
     except psycopg2.Error as e:
