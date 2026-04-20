@@ -1013,7 +1013,8 @@ def main() -> None:
     args = parser.parse_args()
 
     connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT, destroy_tables=args.reset_db) 
-    
+    household_query = get_household_insert_query()
+
     # Insert or get default simulation instance
     cursor.execute("""
         INSERT INTO simulation_instances (name, description)
