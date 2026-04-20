@@ -41,8 +41,9 @@ if __name__ == "__main__":
     for idx, row in df.iterrows():
         store_name = str(row['Name'])[:50]  # Truncate to 50 chars
         store_type = str(row['Type'])[:15]  # Truncate to 15 chars
-        lon = float(row['latitude'])   # CSV 'latitude' column actually contains longitude
-        lat = float(row['long'])  # CSV 'long' column actually contains latitude
+        # NOTE: Assuming the CSV has columns of ('longitude', 'latitude') order. Swap if different.
+        lon = float(row['longitude'])  
+        lat = float(row['latitude'])  
         cursor.execute("""
             INSERT INTO food_stores (simulation_instance_id, simulation_step, shop, longitude, latitude, name, store_id)
             VALUES (%s, %s, %s, %s, %s, %s, %s)

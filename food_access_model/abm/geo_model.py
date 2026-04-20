@@ -64,6 +64,7 @@ class GeoModel(Model):
                 self,
                 store['store_id'],
                 store['name'],
+                store['type'], 
                 store['longitude'],
                 store['latitude']
             )

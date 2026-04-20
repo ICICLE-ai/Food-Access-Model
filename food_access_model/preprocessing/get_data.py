@@ -1,4 +1,5 @@
 # Standard Library Imports
+import argparse
 import logging
 import math
 import os
@@ -1005,8 +1006,13 @@ def main() -> None:
     simulation_data = initialize_simulation(CENTER_POINT, FIPSCODE, YEAR, DIST, APIKEY)
 
     logging.info("Initializing database and creating tables...")
-    connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT, destroy_tables=True) # destroy_tables=True to alow create tables with new schemas when this file is changed
-    household_query = get_household_insert_query()
+
+    # Add CL argument for resetting the database tables
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--reset-db", action="store_true")
+    args = parser.parse_args()
+
+    connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT, destroy_tables=args.reset_db) 
     
     # Insert or get default simulation instance
     cursor.execute("""

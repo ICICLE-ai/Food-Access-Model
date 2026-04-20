@@ -150,7 +150,7 @@ async def get_simulation_instance(instance_id: str) -> ORJSONResponse:
     if row is None:
         raise HTTPException(status_code=404, detail="Simulation instance not found")
     instance = dict(row)
-    return ORJSONResponse({"simulation_instance_id": instance})
+    return ORJSONResponse({"simulation_instance": instance})
 
 
 @router.post("/simulation-instances/{instance_id}/advance")
@@ -223,7 +223,7 @@ async def create_simulation_instance(name: Optional[str] = Body(None, embed=True
     await generate_stores_for_simulation(instance['id'])
     await _run_model_step(instance['id'])  # run a step right after creating a new instance 
 
-    return ORJSONResponse({"simulation_instance_id": instance})
+    return ORJSONResponse({"simulation_instance": instance})
 
 
 @router.delete("/simulation-instances/{instance_id}")
@@ -319,8 +319,6 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
         dict: A dictionary of stores in the simulation with the new added store
 
     """
-    # convert latitude and longitude to a polygon
-
     # get the highest store_id for the simulation instance and step
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""

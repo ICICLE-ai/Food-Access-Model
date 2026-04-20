@@ -2,6 +2,8 @@ from mesa_geo import GeoAgent
 from shapely.geometry import Point
 from pyproj import Transformer
 
+_TO_3857 = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
+
 class Store(GeoAgent):
     """
     Represents a Store. Extends the mesa_geo GeoAgent class.
@@ -25,8 +27,7 @@ class Store(GeoAgent):
             latitude (float): EPSG:4326 latitude coordinate
         """
         # Convert 4326 to 3857 for in-memory spatial math
-        transformer = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
-        x_3857, y_3857 = transformer.transform(longitude, latitude)
+        x_3857, y_3857 = _TO_3857.transform(longitude, latitude) 
         point = Point(x_3857, y_3857)
         super().__init__(id, model, point, "epsg:3857")
         self.type = type
