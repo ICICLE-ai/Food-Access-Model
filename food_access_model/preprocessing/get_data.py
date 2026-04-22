@@ -1,4 +1,5 @@
 # Standard Library Imports
+import argparse
 import logging
 import math
 import os
@@ -294,7 +295,8 @@ def initialize_database_tables(
         simulation_instance_id UUID,
         simulation_step INTEGER,
         shop VARCHAR(15),
-        geometry TEXT,
+        longitude NUMERIC,
+        latitude NUMERIC,
         name VARCHAR(50),
         store_id INTEGER
     );
@@ -415,7 +417,7 @@ def process_food_stores(
     center_point: Tuple[float, float],
     dist: float,
     map_elements: List[geometry.base.BaseGeometry],
-) -> Tuple[STRtree, List, List[Tuple]] : 
+) -> Tuple[STRtree, List[Tuple]]:
     """
     Retrieve and process food store locations from OpenStreetMap, convert them into geometric shapes,
     and insert them into the database.
@@ -426,13 +428,11 @@ def process_food_stores(
         map_elements (List[BaseGeometry]): List to append buffered polygons representing stores.
 
     Returns:
-        Tuple[STRtree, List, List[Tuple]]: A tuple containing:
-            - STRtree: Spatial index of all geometric elements including food stores.
-            - List: Store tuples with Polygon geometries.
+        Tuple containing:
+            - STRtree: Spatial index of all geometric elements (roads, stores, water).
             - List[Tuple]: Store tuples with string geometries for SQL insertion.
     """
-    store_tuples_strPoly: List[Tuple] = []
-    store_tuples_Poly: List[Tuple] = []
+    store_tuples: List[Tuple] = []
     store_id = 0
 
     if INCLUDE_OSM_STORES:
@@ -447,56 +447,49 @@ def process_food_stores(
         features = features.to_crs("epsg:3857")
         features = features[["shop", "geometry", "name"]]
 
+        transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
         for row in features.itertuples():
             point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
-
-            if row.shop in ["supermarket", "grocery", "greengrocer"]:
-                polygon = Polygon([
-                    (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
-                    for angle in range(0, 360, 60)
-                ])
+            # Buffer compensates for point vs original polygon exclusion zone
+            # supermarkets used 50m radius hexagon + 20m buffer = 70m total
+            # others used ~25m triangle + 20m buffer = 45m total
+            if str(row.shop) in ["supermarket", "grocery", "greengrocer"]:
+                map_elements.append(point.buffer(70))
             else:
-                polygon = Polygon([
-                    (point.x, point.y + 20),
-                    (point.x + 25, point.y - 30),
-                    (point.x - 25, point.y - 30)
-                ])
+                map_elements.append(point.buffer(45))
 
-            map_elements.append(polygon.buffer(20))
-            store_tuples_strPoly.append((None, 0, str(row.shop), str(polygon), str(row.name), store_id))
-            store_tuples_Poly.append((None, 0, str(row.shop), polygon, str(row.name), store_id))
+            lon, lat = transformer.transform(point.x, point.y)
+            store_tuples.append((None, 0, str(row.shop), lon, lat, str(row.name), store_id))
             store_id += 1
     else:
         logging.info("INCLUDE_OSM_STORES=False — loading curated stores from %s", STORES_CSV)
-        transformer = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
+        transformer_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
         csv_path = os.path.join(os.path.dirname(__file__), STORES_CSV)
         df = pd.read_csv(csv_path)
 
         for _, row in df.iterrows():
-            lon, lat = transformer.transform(float(row['lat']), float(row['long']))
+            # Store x/y in 4326 directly
+            lon = float(row['longitude'])
+            lat = float(row['latitude'])
             shop_type = str(row['Type'])[:15]
             store_name = str(row['Name'])[:50]
 
+            # Convert to 3857 only for map_elements buffer (spatial math)
+            x_3857, y_3857 = transformer_to_3857.transform(lon, lat)
+            # Buffer compensates for point vs original polygon exclusion zone
+            # supermarkets used 50m radius hexagon + 20m buffer = 70m total
+            # others used ~25m triangle + 20m buffer = 45m total
             if shop_type in ["supermarket", "grocery", "greengrocer"]:
-                polygon = Polygon([
-                    (lon + 50 * math.cos(math.radians(angle)), lat + 50 * math.sin(math.radians(angle)))
-                    for angle in range(0, 360, 60)
-                ])
+                map_elements.append(Point(x_3857, y_3857).buffer(70))
             else:
-                polygon = Polygon([
-                    (lon, lat + 20),
-                    (lon + 25, lat - 30),
-                    (lon - 25, lat - 30)
-                ])
+                map_elements.append(Point(x_3857, y_3857).buffer(45))
 
-            map_elements.append(polygon.buffer(20))
-            store_tuples_strPoly.append((None, 0, shop_type, str(polygon), store_name, store_id))
-            store_tuples_Poly.append((None, 0, shop_type, polygon, store_name, store_id))
+            store_tuples.append((None, 0, shop_type, lon, lat, store_name, store_id))
             store_id += 1
 
         logging.info("Loaded %d curated stores from CSV", store_id)
 
-    return (STRtree(map_elements), store_tuples_Poly, store_tuples_strPoly)  
+    return (STRtree(map_elements), store_tuples)  
 
 def get_household_insert_query() -> str:
     """
@@ -781,59 +774,6 @@ def generate_houses_from_housing_areas(
 
     return house_tuples
 
-
-# def get_nearest_store(
-#         house: Polygon, 
-#         store_tuples : List[Tuple[str, str, str]], 
-#         shapely_loader: Callable[[str], Polygon]
-#         )-> Optional[Polygon]:
-#     """
-#     Find the nearest store polygon to house. 
-
-#     Args:
-#         house (Polygon): The house polygon to check
-#         store_tuples: (List[Tuple[str, str, str]]): List of tuples (shop type, WKT polygon, name)
-#         shapely_loader (Any): Function to convert WKT string to Shapely geometry.
-    
-#     Returns:
-#         Optional[Polygon]: The nearest store polygon, or None if no stores found.
-#     """
-#     nearest_store = None
-#     store_distance = float('inf')
-
-#     for store in store_tuples:
-#         # Store format: (sim_instance, sim_step, shop, geometry, name, store_id)
-#         # geometry is at index 3, could be Polygon or WKT string
-#         geometry = store[3]
-#         if isinstance(geometry, str):
-#             store_poly = shapely_loader(geometry)
-#         else:
-#             store_poly = geometry  # Already a Polygon
-        
-#         dist = store_poly.distance(house)
-
-#         if dist <= store_distance:
-#             nearest_store = store_poly
-#             store_distance = dist  # Fixed: should use actual distance, not DIST
-
-#     return nearest_store
-
-
-# def transform_polygon_coords(polygon: Polygon, source_crs : str, target_crs : str) -> Polygon:
-#     """Transform a polygon's coordinates from one CRS to another.
-
-#     Args:
-#         polygon (Polygon): The polygon to transform.
-#         source_crs (str): The source coordinate reference system (e.g., "EPSG:3857").
-#         target_crs (str): The target coordinate reference system (e.g., "EPSG:4326").
-
-#     Returns:
-#         Polygon: A new Polygon with its coordinates in the target CRS.
-#     """
-#     transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
-#     coords = [transformer.transform(x, y) for x, y in polygon.exterior.coords]
-#     return Polygon(coords)
-
 def get_tract_for_house(
     house: Polygon,
     tract_index: STRtree,
@@ -935,19 +875,8 @@ def process_housing_areas(
                     if failed_attributes == 1:  # Log first error
                         logging.warning(f"First attribute assignment error: {e}")
                     continue
-
-                # nearest_store = get_nearest_store(house, store_tuples, shapely.wkt.loads)
-                # if nearest_store is None:
-                #     failed_store += 1
-                #     continue
-                
+           
                 success += 1
-
-                # Removed to avoid backend polygon handling
-                # house_4326 = transform_polygon_coords(house, "EPSG:3857", "EPSG:4326")
-                # store_4326 = transform_polygon_coords(nearest_store, "EPSG:3857", "EPSG:4326")
-                ##origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
-                ##destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
 
                 # Placeholder travel times (to be replaced with real data if available)
                 walking_time = biking_time = transit_time = driving_time = 0
@@ -1057,12 +986,12 @@ def initialize_simulation(
     county_data = fetch_county_data(households_key_list, str(year), state_code, county_code, api_key)
     tract_data = load_and_merge_geodata(str(year), state_code, county_code, county_data)
     map_elements, housing_areas, road_tuples = process_road_network(center_point, dist) 
-    store_index, store_tuples_poly, store_tuples_str = process_food_stores(center_point, dist, map_elements)
-    house_tuples = process_housing_areas(housing_areas, store_index, map_elements, tract_data, store_tuples_poly)
+    store_index, store_tuples = process_food_stores(center_point, dist, map_elements)
+    house_tuples = process_housing_areas(housing_areas, store_index, map_elements, tract_data, store_tuples)
 
     return {
         'households' : house_tuples,
-        'stores' : store_tuples_str,
+        'stores' : store_tuples,
         'roads' : road_tuples,
         'tract_data' : tract_data,
         'store_index' : store_index
@@ -1078,9 +1007,15 @@ def main() -> None:
     simulation_data = initialize_simulation(CENTER_POINT, FIPSCODE, YEAR, DIST, APIKEY)
 
     logging.info("Initializing database and creating tables...")
-    connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT, destroy_tables=True)
+
+    # Add CL argument for resetting the database tables
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--reset-db", action="store_true")
+    args = parser.parse_args()
+
+    connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT, destroy_tables=args.reset_db) 
     household_query = get_household_insert_query()
-    
+
     # Insert or get default simulation instance
     cursor.execute("""
         INSERT INTO simulation_instances (name, description)
@@ -1108,9 +1043,10 @@ def main() -> None:
         raise
 
     logging.info("Inserting food stores...")
-    food_stores_query = "INSERT INTO food_stores (simulation_instance_id, simulation_step, shop, geometry, name, store_id) VALUES %s"
-    store_tuples_with_id = [(simulation_instance_id, step, shop, geom, name, sid) 
-                            for (_, step, shop, geom, name, sid) in simulation_data['stores']]
+    food_stores_query = "INSERT INTO food_stores (simulation_instance_id, simulation_step, shop, longitude, latitude, name, store_id) VALUES %s"
+    # Update store tuples with simulation_instance_id
+    store_tuples_with_id = [(simulation_instance_id, step, shop, longitude, latitude, name, sid) 
+                            for (_, step, shop, longitude, latitude, name, sid) in simulation_data['stores']]
     try:
         extras.execute_values(cursor, food_stores_query, store_tuples_with_id)
     except psycopg2.Error as e:

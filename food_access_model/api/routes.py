@@ -61,11 +61,11 @@ FOOD_STORE_QUERY = """
                      SELECT
                      store_id,
                      shop,
-                     x,
-                     y,
+                     longitude,
+                     latitude,
                      name
                      FROM food_stores
-                     WHERE simulation_instance = $1
+                     WHERE simulation_instance_id = $1
                      AND simulation_step = $2;
                      """
 
@@ -157,7 +157,7 @@ async def get_simulation_instance(instance_id: str) -> ORJSONResponse:
 async def advance_simulation_instance(instance_id: str) -> ORJSONResponse:
     """
     Advance the simulation instance by one step.
-
+ 
     Parameters:
         instance_id (str): The ID of the simulation instance to advance
 
@@ -272,37 +272,37 @@ async def delete_simulation_instance(instance_id: str) -> ORJSONResponse:
 
 
 @router.get("/households")
-async def get_all_households(simulation_instance: str = Query(..., description="Simulation instance ID"),
+async def get_all_households(simulation_instance_id: str = Query(..., description="Simulation instance ID"),
                              simulation_step: Optional[int] = Query(0, description="Optional step filter")) -> Dict[str, list]:
     """
     Gets all households in the model
 
     Parameters:
-        simulation_instance (str): The ID of the simulation instance to get households for
+        simulation_instance_id (str): The ID of the simulation instance to get households for
         simulation_step (int): The step number to get households for
 
     Returns:
         dict: A dictionary of households in the model with 'households_json' as the key which has a list of
               household objects
     """
-    household_data = await query_households(simulation_instance_id=simulation_instance, simulation_step=simulation_step)
+    household_data = await query_households(simulation_instance_id, simulation_step=simulation_step)
     return ORJSONResponse({"households_json": household_data})
 
 
 @router.get("/stores")
-async def get_stores(simulation_instance: str = Query(..., description="Simulation instance ID"),
+async def get_stores(simulation_instance_id: str = Query(..., description="Simulation instance ID"),
                      simulation_step: Optional[int] = Query(0, description="Optional step filter")) -> Dict[str, list]:
     """
     Gets all stores in the model
 
     Parameters:
-        simulation_instance (str): The ID of the simulation instance to get stores for
+        simulation_instance_id (str): The ID of the simulation instance to get stores for
         simulation_step (int): The step number to get stores for
 
     Returns:
         dict: A dictionary of stores in the model with 'store_json' as the key which has a list of store objects
     """
-    food_stores = await query_food_stores(simulation_instance_id=simulation_instance, simulation_step=simulation_step)
+    food_stores = await query_food_stores(simulation_instance_id, simulation_step=simulation_step)
     return {"store_json": food_stores}
 
 
@@ -319,8 +319,6 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
         dict: A dictionary of stores in the simulation with the new added store
 
     """
-    # convert latitude and longitude to a polygon
-
     # get the highest store_id for the simulation instance and step
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
@@ -334,10 +332,10 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
     async with pool.acquire() as conn:
         # Insert the new store
         await conn.fetchrow("""
-            INSERT INTO food_stores (name, shop, x, y, simulation_instance, simulation_step, store_id)
+            INSERT INTO food_stores (simulation_instance_id, simulation_step, name, shop, longitude, latitude, store_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-        """, store.name, store.category, float(store.longitude), float(store.latitude),
-            store.simulation_instance_id, store.simulation_step, new_store_id)
+        """, store.simulation_instance_id, store.simulation_step, store.name, store.category, 
+            float(store.longitude), float(store.latitude), new_store_id)
 
         # get all of the stores for the simulation instance and timestep
         stores = await query_food_stores(simulation_instance_id=store.simulation_instance_id,
@@ -365,7 +363,7 @@ async def remove_store(store_id: str = Query(..., description="ID of the store t
         # Find the store to remove
         store = await conn.fetchrow("""
             SELECT * FROM food_stores
-            WHERE store_id = $1 AND simulation_instance = $2 AND simulation_step = $3
+            WHERE store_id = $1 AND simulation_instance_id = $2 AND simulation_step = $3
         """, int(store_id), simulation_instance_id, simulation_step)
         if store is None:
             raise HTTPException(status_code=404, detail="Store not found")
@@ -373,7 +371,7 @@ async def remove_store(store_id: str = Query(..., description="ID of the store t
         # Delete the store
         await conn.execute("""
             DELETE FROM food_stores
-            WHERE store_id = $1 AND simulation_instance = $2 AND simulation_step = $3
+            WHERE store_id = $1 AND simulation_instance_id = $2 AND simulation_step = $3
         """, int(store_id), simulation_instance_id, simulation_step)
 
         # Get all stores after deletion
@@ -383,17 +381,17 @@ async def remove_store(store_id: str = Query(..., description="ID of the store t
 
 
 @router.get("/get-step-number")
-async def get_step_number(simulation_instance: str = Query(..., description="Simulation instance ID")) -> Dict[str, int]:
+async def get_step_number(simulation_instance_id: str = Query(..., description="Simulation instance ID")) -> Dict[str, int]:
     """
     Gets the current step number the model is at
 
     Parameters:
-        simulation_instance (str): The ID of the simulation instance to get the step number for
+        simulation_instance_id (str): The ID of the simulation instance to get the step number for
 
     Returns:
         dict: A dictionary with the current step number
     """
-    step_number = await query_current_simulation_step(simulation_instance)
+    step_number = await query_current_simulation_step(simulation_instance_id)
     return {"step_number": step_number}
 
 
@@ -445,7 +443,7 @@ async def get_num_stores(simulation_instance_id: str = Query(..., description="S
                 END AS store_group,
                 COUNT(*) AS store_count
             FROM food_stores
-            WHERE simulation_instance = $1 AND simulation_step = $2
+            WHERE simulation_instance_id = $1 AND simulation_step = $2
             GROUP BY store_group
             ORDER BY store_group
             """, simulation_instance_id, simulation_step)
@@ -713,7 +711,7 @@ async def return_step_results_to_database(households: List[Dict[str, Any]],
             simulation_step
         )
         await conn.execute(
-            "DELETE FROM food_stores WHERE simulation_instance = $1 AND simulation_step = $2",
+            "DELETE FROM food_stores WHERE simulation_instance_id = $1 AND simulation_step = $2",
             simulation_instance_id,
             simulation_step
         )
@@ -771,11 +769,11 @@ async def return_step_results_to_database(households: List[Dict[str, Any]],
         async with pool.acquire() as conn:
             insert_query = """
                 INSERT INTO food_stores (
-                    simulation_instance, simulation_step, name, shop, x, y, store_id
+                    simulation_instance_id, simulation_step, name, shop, longitude, latitude, store_id
                 )
-                SELECT $1, $2, name, shop, x, y, store_id
+                SELECT $1, $2, name, shop, longitude, latitude, store_id
                 FROM food_stores
-                WHERE simulation_instance = $1 AND simulation_step = $3;
+                WHERE simulation_instance_id = $1 AND simulation_step = $3;
             """
 
             await conn.execute(insert_query, simulation_instance_id, simulation_step, simulation_step - 1)
@@ -853,9 +851,9 @@ async def generate_stores_for_simulation(instance_id: str):
 
         insert_query = """
             INSERT INTO food_stores (
-                simulation_instance, simulation_step, name, shop, x, y, store_id
+                simulation_instance_id, simulation_step, name, shop, longitude, latitude, store_id
             )
-            SELECT $1, 0, name, shop, x, y, store_id
+            SELECT $1, 0, name, shop, longitude, latitude, store_id
             FROM food_stores
             WHERE simulation_instance = $2 AND simulation_step = 0;
         """
@@ -876,9 +874,9 @@ async def generate_stores_for_simulation_step(instance_id: str, simulation_step:
 
         insert_query = """
             INSERT INTO food_stores (
-                simulation_instance, simulation_step, name, shop, x, y, store_id
+                simulation_instance_id, simulation_step, name, shop, longitude, latitude, store_id
             )
-            SELECT $1, $2, name, shop, x, y, store_id
+            SELECT $1, $2, name, shop, longitude, latitude, store_id
             FROM food_stores
             WHERE simulation_instance = $1 AND simulation_step = $3;
         """
