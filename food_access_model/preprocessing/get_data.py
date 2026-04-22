@@ -49,6 +49,8 @@ from household_constants import (
 
 load_dotenv()
 
+ox.settings.timeout = 180  # 3 minute timeout to prevent indefinite hangs
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -817,7 +819,7 @@ def process_housing_areas(
     house_tuples: List[Tuple] = []
     total_count = 0
     
-    # Progress monitoring counters
+    # Debug counters
     attempted = 0
     failed_validation = 0
     failed_tract = 0
