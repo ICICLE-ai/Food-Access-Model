@@ -19,6 +19,7 @@ from food_access_model.abm.geo_model import GeoModel
 from food_access_model.abm.store import Store
 from food_access_model.repository.db_repository import DBRepository, get_db_repository
 from food_access_model.model_multi_processing.batch_running import batch_run
+from food_access_model.abm.stats import STAT_REGISTRY, compute_all_stats
 import time
 
 
@@ -516,6 +517,32 @@ async def health_check():
     except Exception as e:
         logging.error(f"Health check failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
+
+@router.get("/report/stat")
+async def get_single_report_stat(
+    stat: str = Query(...),
+    simulation_instance_id: str = Query(...),
+    simulation_step: int = Query(...),
+) -> ORJSONResponse:
+    """Single user specified stat endpoint"""
+    if stat not in STAT_REGISTRY:
+        raise HTTPException(status_code=400, detail=f"Unknown stat '{stat}'. Valid options: {', '.join(STAT_REGISTRY.keys())}")
+    rows = await query_households(simulation_instance_id=simulation_instance_id, simulation_step=simulation_step)
+    result = STAT_REGISTRY[stat](rows)
+    return ORJSONResponse(result)
+
+@router.get("/report/all")
+async def get_all_report_stats(
+    simulation_instance_id: str = Query(...),
+    simulation_step: int = Query(...),
+) -> ORJSONResponse:
+    """Endpoint to get all stats for a given simulation instance and step"""
+    rows = await query_households(simulation_instance_id=simulation_instance_id, simulation_step=simulation_step)
+    return ORJSONResponse({
+        "simulation_instance_id": simulation_instance_id,
+        "simulation_step": simulation_step,
+        "stats": compute_all_stats(rows),
+    })
 
 
 async def query_current_simulation_step(simulation_instance_id: str) -> int:
