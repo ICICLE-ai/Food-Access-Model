@@ -1,5 +1,8 @@
 from mesa_geo import GeoAgent
-import shapely
+from shapely.geometry import Point
+from pyproj import Transformer
+
+_TO_3857 = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
 
 class Store(GeoAgent):
     """
@@ -9,7 +12,8 @@ class Store(GeoAgent):
                  id: int,
                  name: str = None,
                  type: str = None,
-                 geometry: str = None) -> None:
+                 longitude: float = None,
+                 latitude: float = None) -> None:
         """
         Initialize the Store Agent.
 
@@ -17,15 +21,16 @@ class Store(GeoAgent):
             model (GeoModel): model from mesa that places stores on a GeoSpace
             id (int): store's unique id
             name (String): Name of grocery store
-            type (String): can be one of [CurbPickup, EthnicFoods, GroceRetail, HealthFoods,
-                                          ShoppingService, SpecialtyFoods, WholeSale]
-            lat (float): latitude of agent
-            lon (float): longitude of agent
-            crs (string): constant value (i.e.3857),used to map stores on a flat earth display
+            type (String): can be one of [convenience, supermarket, butcher, wholesale,
+                                          farm, greengrocer, health_food, grocery]
+            longitude (float): EPSG:4326 longitude coordinate
+            latitude (float): EPSG:4326 latitude coordinate
         """
-        polygon = shapely.wkt.loads(geometry)
-        # polygon = Polygon(((point.x, point.y+50),(point.x+50, point.y-50),(point.x-50, point.y-50)))
-        super().__init__(id, model, polygon, "epsg:3857")  # epsg:3857 is the mercator projection
+        # Convert 4326 to 3857 for in-memory spatial math
+        x_3857, y_3857 = _TO_3857.transform(longitude, latitude) 
+        point = Point(x_3857, y_3857)
+        super().__init__(id, model, point, "epsg:3857")
         self.type = type
         self.name = name
-        self.raw_geometry = geometry
+        self.longitude = longitude  # original 4326 for reference
+        self.latitude = latitude    # original 4326 for reference
