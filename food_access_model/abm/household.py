@@ -14,7 +14,7 @@ class Household(GeoAgent):
     Represents one Household. Extends the mesa_geo GeoAgent class. The step function
     defines the behavior of a single household on each step through the model.
     """
-    def __init__(self, model, geometry_4326: str, id: int, income: int, household_size: int, vehicles: int, number_of_workers: int, walking_time: int, biking_time: int, transit_time: int, driving_time: int, search_radius: int, crs: str, distance_to_closest_store: float = None, num_store_within_mile: int = None, mfai: int = None, color: str= None) -> None:
+    def __init__(self, model, geometry_4326: str, id: int, income: int, household_size: int, vehicles: int, number_of_workers: int, walking_time: int, biking_time: int, transit_time: int, driving_time: int, search_radius: int, distance_to_closest_store: float = None, num_store_within_mile: int = None, mfai: int = None, color: str= None) -> None:
         """
         Initialize the Household Agent.
 
@@ -28,6 +28,7 @@ class Household(GeoAgent):
             - number_of_workers (int): total working members (having job) in the household
             - stores_list : List containing all the stores with their attributes
             - search_radius (int): how far to search for stores (default 500)
+            - distance_to_closest_store (float): pre-computed distance to nearest store
         """
         # Keep original 4326 WKT for DB writes
         self.raw_geometry = geometry_4326

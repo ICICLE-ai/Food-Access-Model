@@ -247,7 +247,7 @@ async def delete_simulation_instance(instance_id: str) -> ORJSONResponse:
 
     store_query = """
         DELETE FROM food_stores
-        WHERE simulation_instance = $1;
+        WHERE simulation_instance_id = $1;
         """
 
     instance_query = """
@@ -324,7 +324,7 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
         row = await conn.fetchrow("""
             SELECT MAX(store_id) AS max_id
             FROM food_stores
-            WHERE simulation_instance = $1 AND simulation_step = $2
+            WHERE simulation_instance_id = $1 AND simulation_step = $2
         """, store.simulation_instance_id, store.simulation_step)
         max_id = row['max_id'] if row and row['max_id'] is not None else 0
         new_store_id = max_id + 1
@@ -628,7 +628,7 @@ async def reset_simulation(instance_id: str) -> None:
         )
         # Delete all food stores for the given simulation instance
         await conn.execute(
-            "DELETE FROM food_stores WHERE simulation_instance = $1 and simulation_step != 0", instance_id
+            "DELETE FROM food_stores WHERE simulation_instance_id = $1 and simulation_step != 0", instance_id
         )
 
 
@@ -855,7 +855,7 @@ async def generate_stores_for_simulation(instance_id: str):
             )
             SELECT $1, 0, name, shop, longitude, latitude, store_id
             FROM food_stores
-            WHERE simulation_instance = $2 AND simulation_step = 0;
+            WHERE simulation_instance_id = $2 AND simulation_step = 0;
         """
 
         await conn.execute(insert_query, instance_id, default_instance_id)
@@ -878,7 +878,7 @@ async def generate_stores_for_simulation_step(instance_id: str, simulation_step:
             )
             SELECT $1, $2, name, shop, longitude, latitude, store_id
             FROM food_stores
-            WHERE simulation_instance = $1 AND simulation_step = $3;
+            WHERE simulation_instance_id = $1 AND simulation_step = $3;
         """
 
         await conn.execute(insert_query, instance_id, simulation_step, simulation_step - 1)

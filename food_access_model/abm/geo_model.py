@@ -77,8 +77,8 @@ class GeoModel(Model):
         for house in self.households:
             agent = Household(
                 self,
+                house['Geometry'],  # geometry_4326
                 house['id'],  # id
-                house['Geometry'],  # polygon
                 house['Income'],  # income
                 house['Household Size'],  # household_size
                 house['Vehicles'],  # vehicles

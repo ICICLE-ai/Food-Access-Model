@@ -471,7 +471,8 @@ def process_food_stores(
             # Store x/y in 4326 directly
             lon = float(row['longitude'])
             lat = float(row['latitude'])
-            shop_type = str(row['Type'])[:15]
+            # Use cspm/spm column to classify stores; Type column is ignored
+            shop_type = 'supermarket' if str(row.get('cspm/spm', '')).strip() == 'spm' else 'cspm'
             store_name = str(row['Name'])[:50]
 
             # Convert to 3857 only for map_elements buffer (spatial math)
