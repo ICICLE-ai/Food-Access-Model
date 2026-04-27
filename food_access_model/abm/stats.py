@@ -52,12 +52,23 @@ def stddev_distance_to_nearest_supermarket(households) -> Optional[float]:
     mu = sum(distances) / len(distances)
     variance = sum((d - mu) ** 2 for d in distances) / len(distances)
     return math.sqrt(variance)
- 
 
 def mean_travel_time_to_nearest_supermarket(households):
     """Mean driving time (minutes) to the nearest food store across all households."""
     times = [h["Driving time"] for h in households if h.get("Driving time") is not None]
     return sum(times) / len(times) if times else None
+
+def stddev_travel_time_to_nearest_supermarket(households) -> Optional[float]:
+    """
+    Population standard deviation of driving time (minutes) to the nearest food store.
+    """
+    times = [h["Driving time"] for h in households if h.get("Driving time") is not None]
+    if len(times) < 2:
+        return None
+    mu = sum(times) / len(times)
+    variance = sum((t - mu) ** 2 for t in times) / len(times)
+    return math.sqrt(variance)
+
 
 def compute_all_stats(households) -> dict:
     """
@@ -143,4 +154,10 @@ STAT_REGISTRY: dict[str, Any] = {
         unit="minutes",
         fn=mean_travel_time_to_nearest_supermarket,
     ),
+    "stddev_travel_time_to_nearest_supermarket": _make_stat(
+        key="stddev_travel_time_to_nearest_supermarket",
+        label="Std Dev — Driving Time to Nearest Supermarket",
+        unit="minutes",
+        fn=stddev_travel_time_to_nearest_supermarket,
+    ),  
 }
