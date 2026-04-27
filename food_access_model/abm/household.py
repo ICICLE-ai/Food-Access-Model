@@ -1,7 +1,11 @@
 from mesa_geo import GeoAgent
-import math
+from pyproj import Transformer
+from shapely.geometry import Point
 import shapely
 import random
+import math
+
+_TO_3857 = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)     
 
 METERS_IN_MILE = 1609.34
 
@@ -10,28 +14,32 @@ class Household(GeoAgent):
     Represents one Household. Extends the mesa_geo GeoAgent class. The step function
     defines the behavior of a single household on each step through the model.
     """
-    def __init__(self, model, id: int, polygon: str, income: int, household_size: int, vehicles: int, number_of_workers: int, walking_time: int, biking_time: int, transit_time: int, driving_time: int, search_radius: int, crs: str, distance_to_closest_store: float = None, num_store_within_mile: int = None, mfai: int = None, color: str= None) -> None:
+    def __init__(self, model, geometry_4326: str, id: int, income: int, household_size: int, vehicles: int, number_of_workers: int, walking_time: int, biking_time: int, transit_time: int, driving_time: int, search_radius: int, distance_to_closest_store: float = None, num_store_within_mile: int = None, mfai: int = None, color: str= None) -> None:
         """
         Initialize the Household Agent.
 
         Args:
             - model (GeoModel): model from mesa that places Households on a GeoSpace
             - id: id number of agent
-            - polygon (Polygon): a shapely polygon that represents a houshold on the map
+            - geometry_4326 (str): WKT string of the household location in EPSG:4326
             - income (int): total income of the household
             - household_size (int): total members in the household
             - vehicles (int): total vechiles in the household
             - number_of_workers (int): total working members (having job) in the household
             - stores_list : List containing all the stores with their attributes
             - search_radius (int): how far to search for stores (default 500)
-            - crs (string): constant value (i.e.3857),used to map households on a flat earth display
+            - distance_to_closest_store (float): pre-computed distance to nearest store
         """
+        # Keep original 4326 WKT for DB writes
+        self.raw_geometry = geometry_4326
 
-        self.raw_geometry = polygon 
-
-        polygon = shapely.wkt.loads(polygon)
+        # Reproject from 4326 to 3857 for in-memory spatial math, but the original 4326 geometry is kept in self.raw_geometry was saved for database writes
+        point_4326 = shapely.wkt.loads(geometry_4326)
+        x_3857, y_3857 = _TO_3857.transform(point_4326.x, point_4326.y)
+        point_3857 = Point(x_3857, y_3857)
+        
         # Setting argument values to the passed parameteric values.
-        super().__init__(id,model,polygon,crs)
+        super().__init__(id, model, point_3857, "epsg:3857")
         self.income = income
         self.search_radius = search_radius
         self.household_size = household_size
@@ -120,11 +128,11 @@ class Household(GeoAgent):
             self.rating_num_store_within_mile = "C"    
         if total < 10 and total >= 5:
             self.rating_num_store_within_mile = "B"  
-        if self.distance_to_closest_store > 2.00: 
+        if self.distance_to_closest_store is not None and self.distance_to_closest_store > 2.00: 
             self.rating_distance_to_closest_store  = "D"  
-        if self.distance_to_closest_store > 1.00 and self.distance_to_closest_store <= 2.00: 
+        if self.distance_to_closest_store is not None and self.distance_to_closest_store > 1.00 and self.distance_to_closest_store <= 2.00: 
             self.rating_distance_to_closest_store  = "C"  
-        if self.distance_to_closest_store > 0.50 and self.distance_to_closest_store <= 1.00: 
+        if self.distance_to_closest_store is not None and self.distance_to_closest_store > 0.50 and self.distance_to_closest_store <= 1.00: 
             self.rating_distance_to_closest_store  = "B"   
         if self.vehicles == 0:  
             self.rating_based_on_num_vehicles = "C"   
@@ -213,7 +221,7 @@ class Household(GeoAgent):
         if cspm is None:
             return spm
 
-        spm_chance = self.chance_of_choosing_distant_spm(spm_dist, cspm_dist)
+        spm_chance = self.chance_of_choosing_spm(spm_dist, cspm_dist)
 
         #randomly choose based off chances
         return random.choices([cspm, spm], [(1 - spm_chance), spm_chance], k = 1)[0]
@@ -275,8 +283,13 @@ class Household(GeoAgent):
             self.calculate_distances()
         # find spm for get_color and rating_evaluation methods (cspm and spm not needed for mfai method anymore)
         spm, spm_dist = self.get_closest_spm()
-        if spm is not None:
+        cspm, cspm_dist = self.get_closest_cspm()
+        if spm is not None and cspm is not None:
+            self.distance_to_closest_store = min(spm_dist, cspm_dist)
+        elif spm is not None:
             self.distance_to_closest_store = spm_dist
+        elif cspm is not None:
+            self.distance_to_closest_store = cspm_dist
 
         self.num_store_within_mile = self.stores_with_1_miles()
         self.mfai = self.get_mfai()

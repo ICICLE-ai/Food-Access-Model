@@ -55,7 +55,18 @@ class DBRepository:
         with connection.cursor() as cursor:
             cursor.execute("SELECT * FROM food_stores;")
             stores = cursor.fetchall()
-            self.food_stores = stores
+            self.food_stores = [   
+                {
+                    'simulation_instance': row[0],
+                    'simulation_step': row[1],
+                    'shop': row[2],
+                    'longitude': row[3],
+                    'latitude': row[4],
+                    'name': row[5],
+                    'store_id': row[6]
+                }
+                for row in stores
+            ]
             logging.debug(f"Fetched {len(stores)} food stores")
 
             if hasattr(DBRepository, 'max_households'):
@@ -64,7 +75,21 @@ class DBRepository:
                 cursor.execute("SELECT id, centroid_wkt, income, household_size, vehicles, number_of_workers, walking_time, biking_time, transit_time, driving_time FROM households;")
 
             households = cursor.fetchall()
-            self.households = households
+            self.households = [
+                {
+                    'id': row[0],
+                    'Geometry': row[1],        # centroid_wkt in 4326
+                    'Income': row[2],
+                    'Household Size': row[3],
+                    'Vehicles': row[4],
+                    'Number of Workers': row[5],
+                    'Walking time': row[6],
+                    'Biking time': row[7],
+                    'Transit time': row[8],
+                    'Driving time': row[9],
+                }
+                for row in households
+            ]
             logging.debug(f"Fetched {len(households)} households")
 
 
