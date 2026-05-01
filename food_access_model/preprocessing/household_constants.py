@@ -1,8 +1,8 @@
 
 YEAR = 2022
 PLACE_NAME  = "Brown County, Wisconsin, USA"
-CENTER_POINT = (44.5, -88.0)   
-DIST = 15000  # 15km radius
+# Representative map center (lat, lon). Simulation extent is defined by census tract union for FIPSCODE.
+CENTER_POINT = (44.5, -88.0)
 FIPSCODE = "55009"
 
 #Dictionary to describe homedata Variables

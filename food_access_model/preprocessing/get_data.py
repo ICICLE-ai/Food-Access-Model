@@ -26,6 +26,7 @@ from psycopg2 import extras
 from rtree.index import Index as RTreeIndex
 from psycopg2.extensions import connection as Connection, cursor as Cursor
 from shapely.geometry import Point, Polygon, LineString
+from shapely.ops import unary_union
 from shapely.strtree import STRtree
 from pyproj import Transformer
 from dotenv import load_dotenv 
@@ -35,10 +36,8 @@ STORES_CSV = "BC_stores.csv"
 
 # Local Application Imports
 from household_constants import (
-    YEAR, 
-    CENTER_POINT, 
-    DIST, 
-    FIPSCODE, 
+    YEAR,
+    FIPSCODE,
     households_variables_dict,
     households_key_list,
     income_ranges,
@@ -233,6 +232,24 @@ def load_and_merge_geodata(
 
     return merged_data
 
+
+def county_boundary_union_from_tracts(
+    tract_data: geopandas.GeoDataFrame,
+) -> Tuple[geometry.base.BaseGeometry, geometry.base.BaseGeometry]:
+    """
+    Single county footprint: union of tract polygons in EPSG:3857 (for census alignment)
+    and the same boundary in EPSG:4326 (for OSMnx downloads).
+    """
+    if tract_data is None or tract_data.empty:
+        raise ValueError("tract_data must be a non-empty GeoDataFrame")
+
+    union_3857 = unary_union(tract_data.geometry.values)
+    union_4326_series = (
+        geopandas.GeoSeries([union_3857], crs="EPSG:3857").to_crs("EPSG:4326")
+    )
+    return union_3857, union_4326_series.iloc[0]
+
+
 def initialize_database_tables(
     host: str,
     database: str,
@@ -333,15 +350,13 @@ def initialize_database_tables(
 
 
 def process_road_network(
-    center_point: Tuple[float, float],
-    dist: float
+    county_polygon_4326: geometry.base.BaseGeometry,
 ) -> Tuple[List[geometry.base.BaseGeometry], List[geometry.base.BaseGeometry], List[Tuple]]:
     """
     Process road network from OpenStreetMap and prepare geometry buffers and SQL-ready tuples.
 
     Args:
-        center_point (Tuple[float, float]): Latitude and longitude of the center location.
-        dist (float): Distance in 1000 meters to define the radius of the map from the center point.
+        county_polygon_4326: County boundary as a Shapely geometry in EPSG:4326 (lat/lon degrees).
 
     Returns:
         Tuple[
@@ -356,7 +371,7 @@ def process_road_network(
     map_elements: List[geometry.base.BaseGeometry] = []
     housing_areas: List[geometry.base.BaseGeometry] = []
 
-    G = ox.graph_from_point(center_point, dist=dist, network_type='all', retain_all=True)
+    G = ox.graph_from_polygon(county_polygon_4326, network_type='all', retain_all=True)
     gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
     gdf_edges = gdf_edges.to_crs("epsg:3857")
 
@@ -366,9 +381,8 @@ def process_road_network(
     
     # Fetch water bodies to prevent house placement in rivers/lakes
     try:
-        water_features = ox.features.features_from_point(
-            center_point,
-            dist=dist,
+        water_features = ox.features.features_from_polygon(
+            county_polygon_4326,
             tags={
                 "natural": ["water", "bay", "wetland", "spring"],
                 "waterway": ["river", "stream", "canal", "riverbank", "dock", "dam"],
@@ -414,8 +428,7 @@ def process_road_network(
 # remove cursor, no need now you aren't inserting data
 # return the list of store tuples additionally
 def process_food_stores(
-    center_point: Tuple[float, float],
-    dist: float,
+    county_polygon_4326: geometry.base.BaseGeometry,
     map_elements: List[geometry.base.BaseGeometry],
 ) -> Tuple[STRtree, List[Tuple]]:
     """
@@ -423,8 +436,7 @@ def process_food_stores(
     and insert them into the database.
 
     Args:
-        center_point (Tuple[float, float]): Latitude and longitude for the area of interest.
-        dist (float): Distance in meters for the search radius (3x for food stores).
+        county_polygon_4326: County boundary in EPSG:4326; limits OSM queries and filters CSV stores.
         map_elements (List[BaseGeometry]): List to append buffered polygons representing stores.
 
     Returns:
@@ -436,13 +448,12 @@ def process_food_stores(
     store_id = 0
 
     if INCLUDE_OSM_STORES:
-        features = ox.features.features_from_point(
-            center_point,
-            dist=dist * 3,
+        features = ox.features.features_from_polygon(
+            county_polygon_4326,
             tags={"shop": [
                 "convenience", "supermarket", "butcher", "wholesale",
                 "farm", "greengrocer", "health_food", "grocery"
-            ]}
+            ]},
         )
         features = features.to_crs("epsg:3857")
         features = features[["shop", "geometry", "name"]]
@@ -471,6 +482,8 @@ def process_food_stores(
             # Store x/y in 4326 directly
             lon = float(row['longitude'])
             lat = float(row['latitude'])
+            if not county_polygon_4326.covers(Point(lon, lat)):
+                continue
             # Use cspm/spm column to classify stores; Type column is ignored
             shop_type = 'supermarket' if str(row.get('cspm/spm', '')).strip() == 'spm' else 'cspm'
             store_name = str(row['Name'])[:50]
@@ -974,10 +987,8 @@ def connect_to_db(
 
 #new function
 def initialize_simulation(
-    center_point: Tuple[float, float],
     fips_code: str,
     year: str,
-    dist: float,
     api_key: str
 ):
     
@@ -986,8 +997,12 @@ def initialize_simulation(
 
     county_data = fetch_county_data(households_key_list, str(year), state_code, county_code, api_key)
     tract_data = load_and_merge_geodata(str(year), state_code, county_code, county_data)
-    map_elements, housing_areas, road_tuples = process_road_network(center_point, dist) 
-    store_index, store_tuples = process_food_stores(center_point, dist, map_elements)
+    if tract_data is None or tract_data.empty:
+        raise ValueError("Could not load census tract geometries for county; check FIPS and Census API data.")
+
+    _, county_poly_4326 = county_boundary_union_from_tracts(tract_data)
+    map_elements, housing_areas, road_tuples = process_road_network(county_poly_4326)
+    store_index, store_tuples = process_food_stores(county_poly_4326, map_elements)
     house_tuples = process_housing_areas(housing_areas, store_index, map_elements, tract_data, store_tuples)
 
     return {
@@ -1005,7 +1020,7 @@ def main() -> None:
     import uuid
     
     # new entry point
-    simulation_data = initialize_simulation(CENTER_POINT, FIPSCODE, YEAR, DIST, APIKEY)
+    simulation_data = initialize_simulation(FIPSCODE, YEAR, APIKEY)
 
     logging.info("Initializing database and creating tables...")
 
