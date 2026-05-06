@@ -243,11 +243,17 @@ def county_boundary_union_from_tracts(
     if tract_data is None or tract_data.empty:
         raise ValueError("tract_data must be a non-empty GeoDataFrame")
 
-    union_3857 = unary_union(tract_data.geometry.values)
-    union_4326_series = (
-        geopandas.GeoSeries([union_3857], crs="EPSG:3857").to_crs("EPSG:4326")
-    )
-    return union_3857, union_4326_series.iloc[0]
+    tract_data = tract_data.copy()
+    tract_data.geometry = tract_data.geometry.make_valid()
+
+    try:
+        union_3857 = unary_union(tract_data.geometry.values)
+        union_4326_series = (
+            geopandas.GeoSeries([union_3857], crs="EPSG:3857").to_crs("EPSG:4326")
+        )
+        return union_3857, union_4326_series.iloc[0]
+    except Exception as e:
+        raise ValueError(f"Failed to compute county boundary union from tract geometries: {e}") from e
 
 
 def initialize_database_tables(
