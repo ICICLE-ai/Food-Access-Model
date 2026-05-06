@@ -159,12 +159,23 @@ class Household(GeoAgent):
         cspm = None
         cspm_distance = 10000000
         for store in self.model.stores_list:
-            if store.type != "supermarket":
+            if store.type != "supermarket" and store.type != "pantry":
                 distance = self.get_store_dist(store)
                 if distance <= cspm_distance:
                     cspm = store
                     cspm_distance = distance
         return (cspm, cspm_distance)
+
+    def get_closest_pantry(self) -> tuple:
+        pantry = None
+        pantry_distance = 10000000
+        for store in self.model.stores_list:
+            if store.type == "pantry":
+                distance = self.get_store_dist(store)
+                if distance <= pantry_distance:
+                    pantry = store
+                    pantry_distance = distance
+        return (pantry, pantry_distance)
     
     def get_closest_spm(self) -> tuple:
         spm = None
@@ -237,17 +248,30 @@ class Household(GeoAgent):
         Returns:
             int: the mfai value
         """
-        # closest cspm/spm
         closest_cspm, cspm_dist = self.get_closest_cspm()
         closest_spm, spm_dist = self.get_closest_spm()
+        closest_pantry, pantry_dist = self.get_closest_pantry()
+
+        # If a pantry is the overall closest store, use it as the cspm candidate
+        # only for households with income <= 25k; otherwise fall back to cspm/spm.
+        pantry_is_closest = (
+            closest_pantry is not None
+            and pantry_dist <= cspm_dist
+            and pantry_dist <= spm_dist
+        )
+        if pantry_is_closest and self.income <= 25000:
+            effective_cspm, effective_cspm_dist = closest_pantry, pantry_dist
+        else:
+            effective_cspm, effective_cspm_dist = closest_cspm, cspm_dist
 
         food_avail = list()
         for i in range(self.monthly_trips):
-            # randomly select the closest spm/cspm
-            store = self.choose_store(closest_spm, closest_cspm, spm_dist, cspm_dist)
+            store = self.choose_store(closest_spm, effective_cspm, spm_dist, effective_cspm_dist)
 
             if store is not None and store.type == "supermarket":
                 fsa = 95
+            elif store is not None and store.type == "pantry":
+                fsa = 25
             else:
                 fsa = 55
 

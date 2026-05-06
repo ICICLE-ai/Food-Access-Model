@@ -486,12 +486,18 @@ def process_food_stores(
 
         for _, row in df.iterrows():
             # Store x/y in 4326 directly
-            lon = float(row['longitude'])
-            lat = float(row['latitude'])
+            lon = float(row['long'])
+            lat = float(row['lat'])
             if not county_polygon_4326.covers(Point(lon, lat)):
                 continue
             # Use cspm/spm column to classify stores; Type column is ignored
-            shop_type = 'supermarket' if str(row.get('cspm/spm', '')).strip() == 'spm' else 'cspm'
+            cspm_spm_val = str(row.get('cspm/spm', '')).strip()
+            if cspm_spm_val == 'spm':
+                shop_type = 'supermarket'
+            elif cspm_spm_val == 'pantry':
+                shop_type = 'pantry'
+            else:
+                shop_type = 'cspm'
             store_name = str(row['Name'])[:50]
 
             # Convert to 3857 only for map_elements buffer (spatial math)

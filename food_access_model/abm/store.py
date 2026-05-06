@@ -22,7 +22,7 @@ class Store(GeoAgent):
             id (int): store's unique id
             name (String): Name of grocery store
             type (String): can be one of [convenience, supermarket, butcher, wholesale,
-                                          farm, greengrocer, health_food, grocery]
+                                          farm, greengrocer, health_food, grocery, pantry]
             longitude (float): EPSG:4326 longitude coordinate
             latitude (float): EPSG:4326 latitude coordinate
         """
