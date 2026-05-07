@@ -308,10 +308,10 @@ def initialize_database_tables(
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS roads (
         name TEXT,
-        highway VARCHAR(30),
+        highway TEXT,
         length NUMERIC,
         geometry TEXT,
-        service VARCHAR(30)
+        service TEXT
     );
     ''')
     cursor.execute('''
