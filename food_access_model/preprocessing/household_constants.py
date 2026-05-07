@@ -1,9 +1,10 @@
+import os
 
-YEAR = 2022
-PLACE_NAME  = "Brown County, Wisconsin, USA"
+YEAR = int(os.getenv("YEAR", 2022))
+PLACE_NAME = os.getenv("PLACE_NAME")
 # Representative map center (lat, lon). Simulation extent is defined by census tract union for FIPSCODE.
-CENTER_POINT = (44.5, -88.0)
-FIPSCODE = "55009"
+CENTER_POINT = (float(os.getenv("CENTER_LAT")), float(os.getenv("CENTER_LON")))
+FIPSCODE = os.getenv("FIPSCODE")
 
 #Dictionary to describe homedata Variables
 households_variables_dict = {
