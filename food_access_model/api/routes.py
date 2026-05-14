@@ -191,7 +191,6 @@ async def reset_simulation_instance(instance_id: str) -> ORJSONResponse:
 
 @router.post("/simulation-instances")
 async def create_simulation_instance(name: Optional[str] = Body(None, embed=True),
-                                     description: Optional[str] = Body(None, embed=True),
                                      household_limit: Optional[int] = Body(None, embed=True)) -> ORJSONResponse:
     """
     Create a new simulation instance.
@@ -207,6 +206,13 @@ async def create_simulation_instance(name: Optional[str] = Body(None, embed=True
     # Generate a name if not provided
     if name is None:
         name = generate_name()
+
+    description = json.dumps({
+        "place_name": os.getenv("PLACE_NAME", "Unknown"),
+        "center_lat": float(os.getenv("CENTER_LAT", 0.0)),
+        "center_lon": float(os.getenv("CENTER_LON", 0.0)),
+    })
+
     query = """
         INSERT INTO simulation_instances (name, description)
         VALUES ($1, $2)

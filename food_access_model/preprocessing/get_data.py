@@ -29,10 +29,14 @@ from shapely.geometry import Point, Polygon, LineString
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 from pyproj import Transformer
-from dotenv import load_dotenv 
+from dotenv import load_dotenv
 
-INCLUDE_OSM_STORES = False
-STORES_CSV = "BC_stores.csv"
+load_dotenv()
+
+INCLUDE_OSM_STORES = (
+    os.getenv("INCLUDE_OSM_STORES").lower() == "true"
+)
+STORES_CSV = os.getenv("STORES_CSV") or None
 
 # Local Application Imports
 from household_constants import (
@@ -44,9 +48,6 @@ from household_constants import (
     size_index_dict,
     workers_index_dict
 )
-
-
-load_dotenv()
 
 ox.settings.timeout = 180  # 3 minute timeout to prevent indefinite hangs
 
@@ -307,10 +308,10 @@ def initialize_database_tables(
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS roads (
         name TEXT,
-        highway VARCHAR(30),
+        highway TEXT,
         length NUMERIC,
         geometry TEXT,
-        service VARCHAR(30)
+        service TEXT
     );
     ''')
     cursor.execute('''
