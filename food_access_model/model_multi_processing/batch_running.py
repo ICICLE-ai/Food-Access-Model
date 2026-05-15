@@ -105,11 +105,14 @@ def batch_run(
                     for data in pool.imap_unordered(process_func, runs_list):
                         results.append(data)
                         pbar.update()
-                    # Ensure all processes are properly terminated
                     pool.close()
                     pool.join()
             except Exception as e:
-                return {"error": str(e), "input": data}
+                logging.warning(f"Multiprocessing failed ({e}), falling back to single process")
+                results = []
+                for run in runs_list:
+                    data = process_func(run)
+                    results.append(data)
 
     logging.info("tqdm FUNCTION END")
     return results
@@ -141,7 +144,8 @@ def create_store_records(stores: List[Agent]):
     for store in stores:
         entry = {}
         entry['type'] = store.type
-        entry['geometry'] = store.raw_geometry
+        entry['x'] = store.geometry.x
+        entry['y'] = store.geometry.y
         entry['name'] = store.name
         store_records.append(entry)
     return store_records

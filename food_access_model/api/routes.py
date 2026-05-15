@@ -53,7 +53,7 @@ HOUSEHOLD_QUERY = """
                      food_score AS "Food Access Score",
                      NULL AS "Color"
                      FROM households
-                     WHERE simulation_instance = $1
+                     WHERE simulation_instance_id = $1
                      AND simulation_step = $2;
                      """
 
@@ -61,10 +61,11 @@ FOOD_STORE_QUERY = """
                      SELECT
                      store_id,
                      shop,
-                     geometry,
+                     longitude,
+                     latitude,
                      name
                      FROM food_stores
-                     WHERE simulation_instance = $1
+                     WHERE simulation_instance_id = $1
                      AND simulation_step = $2;
                      """
 
@@ -156,7 +157,7 @@ async def get_simulation_instance(instance_id: str) -> ORJSONResponse:
 async def advance_simulation_instance(instance_id: str) -> ORJSONResponse:
     """
     Advance the simulation instance by one step.
-
+ 
     Parameters:
         instance_id (str): The ID of the simulation instance to advance
 
@@ -190,7 +191,6 @@ async def reset_simulation_instance(instance_id: str) -> ORJSONResponse:
 
 @router.post("/simulation-instances")
 async def create_simulation_instance(name: Optional[str] = Body(None, embed=True),
-                                     description: Optional[str] = Body(None, embed=True),
                                      household_limit: Optional[int] = Body(None, embed=True)) -> ORJSONResponse:
     """
     Create a new simulation instance.
@@ -206,6 +206,13 @@ async def create_simulation_instance(name: Optional[str] = Body(None, embed=True
     # Generate a name if not provided
     if name is None:
         name = generate_name()
+
+    description = json.dumps({
+        "place_name": os.getenv("PLACE_NAME", "Unknown"),
+        "center_lat": float(os.getenv("CENTER_LAT", 0.0)),
+        "center_lon": float(os.getenv("CENTER_LON", 0.0)),
+    })
+
     query = """
         INSERT INTO simulation_instances (name, description)
         VALUES ($1, $2)
@@ -220,6 +227,7 @@ async def create_simulation_instance(name: Optional[str] = Body(None, embed=True
 
     await generate_household_instances_for_simulation(instance['id'], household_limit)
     await generate_stores_for_simulation(instance['id'])
+    await _run_model_step(instance['id'])  # run a step right after creating a new instance 
 
     return ORJSONResponse({"simulation_instance": instance})
 
@@ -240,12 +248,12 @@ async def delete_simulation_instance(instance_id: str) -> ORJSONResponse:
 
     household_query = """
         DELETE FROM households
-        WHERE simulation_instance = $1;
+        WHERE simulation_instance_id = $1;
         """
 
     store_query = """
         DELETE FROM food_stores
-        WHERE simulation_instance = $1;
+        WHERE simulation_instance_id = $1;
         """
 
     instance_query = """
@@ -270,37 +278,37 @@ async def delete_simulation_instance(instance_id: str) -> ORJSONResponse:
 
 
 @router.get("/households")
-async def get_all_households(simulation_instance: str = Query(..., description="Simulation instance ID"),
+async def get_all_households(simulation_instance_id: str = Query(..., description="Simulation instance ID"),
                              simulation_step: Optional[int] = Query(0, description="Optional step filter")) -> Dict[str, list]:
     """
     Gets all households in the model
 
     Parameters:
-        simulation_instance (str): The ID of the simulation instance to get households for
+        simulation_instance_id (str): The ID of the simulation instance to get households for
         simulation_step (int): The step number to get households for
 
     Returns:
         dict: A dictionary of households in the model with 'households_json' as the key which has a list of
               household objects
     """
-    household_data = await query_households(simulation_instance_id=simulation_instance, simulation_step=simulation_step)
+    household_data = await query_households(simulation_instance_id, simulation_step=simulation_step)
     return ORJSONResponse({"households_json": household_data})
 
 
 @router.get("/stores")
-async def get_stores(simulation_instance: str = Query(..., description="Simulation instance ID"),
+async def get_stores(simulation_instance_id: str = Query(..., description="Simulation instance ID"),
                      simulation_step: Optional[int] = Query(0, description="Optional step filter")) -> Dict[str, list]:
     """
     Gets all stores in the model
 
     Parameters:
-        simulation_instance (str): The ID of the simulation instance to get stores for
+        simulation_instance_id (str): The ID of the simulation instance to get stores for
         simulation_step (int): The step number to get stores for
 
     Returns:
         dict: A dictionary of stores in the model with 'store_json' as the key which has a list of store objects
     """
-    food_stores = await query_food_stores(simulation_instance_id=simulation_instance, simulation_step=simulation_step)
+    food_stores = await query_food_stores(simulation_instance_id, simulation_step=simulation_step)
     return {"store_json": food_stores}
 
 
@@ -317,19 +325,12 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
         dict: A dictionary of stores in the simulation with the new added store
 
     """
-    # convert latitude and longitude to a polygon
-    geo = str(
-        convert_centroid_to_polygon(
-            store.latitude, store.longitude, store.category
-        )
-    )
-
     # get the highest store_id for the simulation instance and step
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
             SELECT MAX(store_id) AS max_id
             FROM food_stores
-            WHERE simulation_instance = $1 AND simulation_step = $2
+            WHERE simulation_instance_id = $1 AND simulation_step = $2
         """, store.simulation_instance_id, store.simulation_step)
         max_id = row['max_id'] if row and row['max_id'] is not None else 0
         new_store_id = max_id + 1
@@ -337,9 +338,10 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
     async with pool.acquire() as conn:
         # Insert the new store
         await conn.fetchrow("""
-            INSERT INTO food_stores (name, shop, geometry, simulation_instance, simulation_step, store_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
-        """, store.name, store.category, geo, store.simulation_instance_id, store.simulation_step, new_store_id)
+            INSERT INTO food_stores (simulation_instance_id, simulation_step, name, shop, longitude, latitude, store_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """, store.simulation_instance_id, store.simulation_step, store.name, store.category, 
+            float(store.longitude), float(store.latitude), new_store_id)
 
         # get all of the stores for the simulation instance and timestep
         stores = await query_food_stores(simulation_instance_id=store.simulation_instance_id,
@@ -367,7 +369,7 @@ async def remove_store(store_id: str = Query(..., description="ID of the store t
         # Find the store to remove
         store = await conn.fetchrow("""
             SELECT * FROM food_stores
-            WHERE store_id = $1 AND simulation_instance = $2 AND simulation_step = $3
+            WHERE store_id = $1 AND simulation_instance_id = $2 AND simulation_step = $3
         """, int(store_id), simulation_instance_id, simulation_step)
         if store is None:
             raise HTTPException(status_code=404, detail="Store not found")
@@ -375,7 +377,7 @@ async def remove_store(store_id: str = Query(..., description="ID of the store t
         # Delete the store
         await conn.execute("""
             DELETE FROM food_stores
-            WHERE store_id = $1 AND simulation_instance = $2 AND simulation_step = $3
+            WHERE store_id = $1 AND simulation_instance_id = $2 AND simulation_step = $3
         """, int(store_id), simulation_instance_id, simulation_step)
 
         # Get all stores after deletion
@@ -385,17 +387,17 @@ async def remove_store(store_id: str = Query(..., description="ID of the store t
 
 
 @router.get("/get-step-number")
-async def get_step_number(simulation_instance: str = Query(..., description="Simulation instance ID")) -> Dict[str, int]:
+async def get_step_number(simulation_instance_id: str = Query(..., description="Simulation instance ID")) -> Dict[str, int]:
     """
     Gets the current step number the model is at
 
     Parameters:
-        simulation_instance (str): The ID of the simulation instance to get the step number for
+        simulation_instance_id (str): The ID of the simulation instance to get the step number for
 
     Returns:
         dict: A dictionary with the current step number
     """
-    step_number = await query_current_simulation_step(simulation_instance)
+    step_number = await query_current_simulation_step(simulation_instance_id)
     return {"step_number": step_number}
 
 
@@ -416,7 +418,7 @@ async def get_num_households(simulation_instance_id: str = Query(..., descriptio
         # Find the store to remove
         row = await conn.fetchrow("""
             SELECT count(*) FROM households
-            WHERE simulation_instance = $1 AND simulation_step = $2
+            WHERE simulation_instance_id = $1 AND simulation_step = $2
             """, simulation_instance_id, simulation_step)
 
     household_count = row['count'] if row else 0
@@ -442,12 +444,12 @@ async def get_num_stores(simulation_instance_id: str = Query(..., description="S
         rows = await conn.fetch("""
             SELECT
                 CASE
-                    WHEN shop IN ('supermarket', 'greengrocer', 'grocery') THEN 'numSPM'
+                    WHEN shop = 'supermarket' THEN 'numSPM'
                     ELSE 'numNonSPM'
                 END AS store_group,
                 COUNT(*) AS store_count
             FROM food_stores
-            WHERE simulation_instance = $1 AND simulation_step = $2
+            WHERE simulation_instance_id = $1 AND simulation_step = $2
             GROUP BY store_group
             ORDER BY store_group
             """, simulation_instance_id, simulation_step)
@@ -481,7 +483,7 @@ async def get_household_stats(simulation_instance_id: str = Query(..., descripti
             AVG(closest_store_miles) AS avg_closest_store_miles,
             AVG(stores_within_1_mile) AS avg_stores_within_1_mile
             FROM households
-            WHERE simulation_instance = $1 AND simulation_step = $2
+            WHERE simulation_instance_id = $1 AND simulation_step = $2
             """
         row = await conn.fetchrow(query, simulation_instance_id, simulation_step)
     if row is None:
@@ -529,7 +531,7 @@ async def query_current_simulation_step(simulation_instance_id: str) -> int:
     """
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT MAX(simulation_step) AS current_step FROM households WHERE simulation_instance = $1",
+            "SELECT MAX(simulation_step) AS current_step FROM households WHERE simulation_instance_id = $1",
             simulation_instance_id
         )
     if row is None or row["current_step"] is None:
@@ -548,11 +550,20 @@ async def query_households(simulation_instance_id: str, simulation_step: int = 0
     Returns:
         List[Any]: A list of household data.
     """
+    from decimal import Decimal
+    
     async with pool.acquire() as conn:
         rows = await conn.fetch(HOUSEHOLD_QUERY, simulation_instance_id, simulation_step)
 
-    # Convert rows to a list of dictionaries
-    households_data = [dict(row) for row in rows]
+    # Convert rows to a list of dictionaries and convert Decimal to float for JSON serialization
+    households_data = []
+    for row in rows:
+        row_dict = dict(row)
+        # Convert Decimal values to float
+        for key, value in row_dict.items():
+            if isinstance(value, Decimal):
+                row_dict[key] = float(value)
+        households_data.append(row_dict)
     return households_data
 
 
@@ -619,11 +630,11 @@ async def reset_simulation(instance_id: str) -> None:
     async with pool.acquire() as conn:
         # Delete all households for the given simulation instance
         await conn.execute(
-            "DELETE FROM households WHERE simulation_instance = $1 and simulation_step != 0", instance_id
+            "DELETE FROM households WHERE simulation_instance_id = $1 and simulation_step != 0", instance_id
         )
         # Delete all food stores for the given simulation instance
         await conn.execute(
-            "DELETE FROM food_stores WHERE simulation_instance = $1 and simulation_step != 0", instance_id
+            "DELETE FROM food_stores WHERE simulation_instance_id = $1 and simulation_step != 0", instance_id
         )
 
 
@@ -643,7 +654,8 @@ async def batch_run_model(households: List[Dict[str, Any]], food_stores: List[Di
         max_steps=1,
         data_collection_period=1,
         display_progress=True,
-        number_processes=25,
+        # sets default value to 2 if no inputted val in .env file
+        number_processes=int(os.getenv('NUMBER_PROCESSES', '2')), 
     )
     # at this point, stores do not have an id
     all_households = []
@@ -700,12 +712,12 @@ async def return_step_results_to_database(households: List[Dict[str, Any]],
     async with pool.acquire() as conn:
         # Delete existing records for the current step
         await conn.execute(
-            "DELETE FROM households WHERE simulation_instance = $1 AND simulation_step = $2",
+            "DELETE FROM households WHERE simulation_instance_id = $1 AND simulation_step = $2",
             simulation_instance_id,
             simulation_step
         )
         await conn.execute(
-            "DELETE FROM food_stores WHERE simulation_instance = $1 AND simulation_step = $2",
+            "DELETE FROM food_stores WHERE simulation_instance_id = $1 AND simulation_step = $2",
             simulation_instance_id,
             simulation_step
         )
@@ -738,7 +750,7 @@ async def return_step_results_to_database(households: List[Dict[str, Any]],
                     ),
                     columns=[
                         "id",
-                        "simulation_instance",
+                        "simulation_instance_id",
                         "simulation_step",
                         "centroid_wkt",
                         "income",
@@ -763,11 +775,11 @@ async def return_step_results_to_database(households: List[Dict[str, Any]],
         async with pool.acquire() as conn:
             insert_query = """
                 INSERT INTO food_stores (
-                    simulation_instance, simulation_step, name, shop, geometry, store_id
+                    simulation_instance_id, simulation_step, name, shop, longitude, latitude, store_id
                 )
-                SELECT $1, $2, name, shop, geometry, store_id
+                SELECT $1, $2, name, shop, longitude, latitude, store_id
                 FROM food_stores
-                WHERE simulation_instance = $1 AND simulation_step = $3;
+                WHERE simulation_instance_id = $1 AND simulation_step = $3;
             """
 
             await conn.execute(insert_query, simulation_instance_id, simulation_step, simulation_step - 1)
@@ -785,25 +797,25 @@ async def generate_household_instances_for_simulation(instance_id: str, househol
     if household_limit is not None:
         query = """
             INSERT INTO households (
-                simulation_instance, simulation_step, id, centroid_wkt, income, household_size,
+                simulation_instance_id, simulation_step, id, centroid_wkt, income, household_size,
                 vehicles, number_of_workers, transit_time, walking_time, biking_time, driving_time
             )
             SELECT $1, 0, id, centroid_wkt, income, household_size, vehicles, number_of_workers,
                 transit_time, walking_time, biking_time, driving_time
             FROM households
-            WHERE simulation_instance = $2 AND simulation_step = 0
+            WHERE simulation_instance_id = $2 AND simulation_step = 0
             LIMIT $3;
         """
     else:
         query = """
             INSERT INTO households (
-                simulation_instance, simulation_step, id, centroid_wkt, income, household_size,
+                simulation_instance_id, simulation_step, id, centroid_wkt, income, household_size,
                 vehicles, number_of_workers, transit_time, walking_time, biking_time, driving_time
             )
             SELECT $1, 0, id, centroid_wkt, income, household_size, vehicles, number_of_workers,
                 transit_time, walking_time, biking_time, driving_time
             FROM households
-            WHERE simulation_instance = $2 AND simulation_step = 0;
+            WHERE simulation_instance_id = $2 AND simulation_step = 0;
         """
 
     # Assuming you already have an asyncpg connection object
@@ -845,11 +857,11 @@ async def generate_stores_for_simulation(instance_id: str):
 
         insert_query = """
             INSERT INTO food_stores (
-                simulation_instance, simulation_step, name, shop, geometry, store_id
+                simulation_instance_id, simulation_step, name, shop, longitude, latitude, store_id
             )
-            SELECT $1, 0, name, shop, geometry, store_id
+            SELECT $1, 0, name, shop, longitude, latitude, store_id
             FROM food_stores
-            WHERE simulation_instance = $2 AND simulation_step = 0;
+            WHERE simulation_instance_id = $2 AND simulation_step = 0;
         """
 
         await conn.execute(insert_query, instance_id, default_instance_id)
@@ -868,11 +880,11 @@ async def generate_stores_for_simulation_step(instance_id: str, simulation_step:
 
         insert_query = """
             INSERT INTO food_stores (
-                simulation_instance, simulation_step, name, shop, geometry, store_id
+                simulation_instance_id, simulation_step, name, shop, longitude, latitude, store_id
             )
-            SELECT $1, $2, name, shop, geometry, store_id
+            SELECT $1, $2, name, shop, longitude, latitude, store_id
             FROM food_stores
-            WHERE simulation_instance = $1 AND simulation_step = $3;
+            WHERE simulation_instance_id = $1 AND simulation_step = $3;
         """
 
         await conn.execute(insert_query, instance_id, simulation_step, simulation_step - 1)

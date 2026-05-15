@@ -1,9 +1,10 @@
+import os
 
-YEAR = 2022
-PLACE_NAME  = "Franklin County, Ohio, USA"
-CENTER_POINT = (39.938806, -82.972361)   
-DIST = 1000
-FIPSCODE = "39049"
+YEAR = int(os.getenv("YEAR", 2022))
+PLACE_NAME = os.getenv("PLACE_NAME")
+# Representative map center (lat, lon). Simulation extent is defined by census tract union for FIPSCODE.
+CENTER_POINT = (float(os.getenv("CENTER_LAT")), float(os.getenv("CENTER_LON")))
+FIPSCODE = os.getenv("FIPSCODE")
 
 #Dictionary to describe homedata Variables
 households_variables_dict = {
