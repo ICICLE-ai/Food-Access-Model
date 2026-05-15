@@ -1,8 +1,12 @@
 from mesa_geo import GeoAgent
+from pyproj import Transformer
+from shapely.geometry import Point
 import shapely
 import random
+import math
 
-# Constants
+_TO_3857 = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)     
+
 METERS_IN_MILE = 1609.34
 
 class Household(GeoAgent):
@@ -10,28 +14,32 @@ class Household(GeoAgent):
     Represents one Household. Extends the mesa_geo GeoAgent class. The step function
     defines the behavior of a single household on each step through the model.
     """
-    def __init__(self, model, id: int, polygon: str, income: int, household_size: int, vehicles: int, number_of_workers: int, walking_time: int, biking_time: int, transit_time: int, driving_time: int, search_radius: int, crs: str, distance_to_closest_store: float = None, num_store_within_mile: int = None, mfai: int = None, color: str= None) -> None:
+    def __init__(self, model, geometry_4326: str, id: int, income: int, household_size: int, vehicles: int, number_of_workers: int, walking_time: int, biking_time: int, transit_time: int, driving_time: int, search_radius: int, distance_to_closest_store: float = None, num_store_within_mile: int = None, mfai: int = None, color: str= None) -> None:
         """
         Initialize the Household Agent.
 
         Args:
             - model (GeoModel): model from mesa that places Households on a GeoSpace
             - id: id number of agent
-            - polygon (Polygon): a shapely polygon that represents a houshold on the map
+            - geometry_4326 (str): WKT string of the household location in EPSG:4326
             - income (int): total income of the household
             - household_size (int): total members in the household
             - vehicles (int): total vechiles in the household
             - number_of_workers (int): total working members (having job) in the household
             - stores_list : List containing all the stores with their attributes
             - search_radius (int): how far to search for stores (default 500)
-            - crs (string): constant value (i.e.3857),used to map households on a flat earth display
+            - distance_to_closest_store (float): pre-computed distance to nearest store
         """
+        # Keep original 4326 WKT for DB writes
+        self.raw_geometry = geometry_4326
 
-        self.raw_geometry = polygon 
-
-        polygon = shapely.wkt.loads(polygon)
+        # Reproject from 4326 to 3857 for in-memory spatial math, but the original 4326 geometry is kept in self.raw_geometry was saved for database writes
+        point_4326 = shapely.wkt.loads(geometry_4326)
+        x_3857, y_3857 = _TO_3857.transform(point_4326.x, point_4326.y)
+        point_3857 = Point(x_3857, y_3857)
+        
         # Setting argument values to the passed parameteric values.
-        super().__init__(id,model,polygon,crs)
+        super().__init__(id, model, point_3857, "epsg:3857")
         self.income = income
         self.search_radius = search_radius
         self.household_size = household_size
@@ -53,6 +61,9 @@ class Household(GeoAgent):
         self.num_store_within_mile = num_store_within_mile
         self.mfai = mfai #MFAI (monthly food access index)
         self.color = color
+        self.has_vehicles = self.vehicles > 0
+        self.resources = self.has_resources()
+        self.monthly_trips = self.get_monthly_trip_count()
 
     def get_color(self) -> str:
         """
@@ -117,11 +128,11 @@ class Household(GeoAgent):
             self.rating_num_store_within_mile = "C"    
         if total < 10 and total >= 5:
             self.rating_num_store_within_mile = "B"  
-        if self.distance_to_closest_store > 2.00: 
+        if self.distance_to_closest_store is not None and self.distance_to_closest_store > 2.00: 
             self.rating_distance_to_closest_store  = "D"  
-        if self.distance_to_closest_store > 1.00 and self.distance_to_closest_store <= 2.00: 
+        if self.distance_to_closest_store is not None and self.distance_to_closest_store > 1.00 and self.distance_to_closest_store <= 2.00: 
             self.rating_distance_to_closest_store  = "C"  
-        if self.distance_to_closest_store > 0.50 and self.distance_to_closest_store <= 1.00: 
+        if self.distance_to_closest_store is not None and self.distance_to_closest_store > 0.50 and self.distance_to_closest_store <= 1.00: 
             self.rating_distance_to_closest_store  = "B"   
         if self.vehicles == 0:  
             self.rating_based_on_num_vehicles = "C"   
@@ -135,45 +146,87 @@ class Household(GeoAgent):
         Returns:
             int: total number of stores within a mile
         """
-
         total = 0 
-        for store in self.model.stores_list:
-            distance = self.distances_map[store.unique_id]
-            if distance <= 1:
-                total += 1
+        for store in self.model.stores_list: 
+         # distance is already in miles (converted in calculate_distances)
+         distance = self.distances_map[store.unique_id]
+         if distance <= 1.0:
+          total += 1 
         self.rating_evaluation(total)
-        return total 
-
-    def closest_cspm_and_spm(self) -> tuple:
-        """
-        Finds the closest supermarket and the closest market of the other types (convenience, wholesale, etc).
-        Helper method for get_mfai and step functions
-
-        Returns:
-            cspm (object): closest store with the market type of convenience, wholesale, other
-            spm (object): closest store with type supermarket
-            spm_distance (int): distance of the closest supermarket to the household
-            cspm_distance (int): distance of the closest other market to the household
-        """
+        return total
+    
+    def get_closest_cspm(self) -> tuple:
         cspm = None
         cspm_distance = 10000000
-        spm = None
-        spm_distance = 10000000
-        for store in self.model.stores_list: 
-            #distance = self.model.space.distance(self,store)
-            #distance = round(distance/1609.34,2)
-            distance = self.distances_map[store.unique_id]
-            if store.type == "supermarket":
-                if distance <= spm_distance:
-                    spm = store
-                    spm_distance = distance
-            else:
+        for store in self.model.stores_list:
+            if store.type != "supermarket":
+                distance = self.get_store_dist(store)
                 if distance <= cspm_distance:
                     cspm = store
                     cspm_distance = distance
-        return cspm, spm, spm_distance, cspm_distance
+        return (cspm, cspm_distance)
+    
+    def get_closest_spm(self) -> tuple:
+        spm = None
+        spm_distance = 10000000
+        for store in self.model.stores_list:
+            if store.type == "supermarket":
+                distance = self.get_store_dist(store)
+                if distance <= spm_distance:
+                    spm = store
+                    spm_distance = distance
+        return (spm, spm_distance)
 
-    def get_mfai(self,cspm: object, spm: object) -> int:
+    def has_resources(self) -> bool:
+        if self.income < 10000:
+            return False
+        if self.household_size >= 2 and self.income < 15000:
+            return False
+        if self.household_size >= 3 and self.income < 25000:
+            return False
+        return True
+    
+    def get_monthly_trip_count(self) -> int:
+        if self.resources:
+            if self.has_vehicles:
+                return 7
+            else:
+                return 8
+        else:
+            return 6
+
+    # chance of choosing a close spm is just hard code val 0.8
+    def chance_of_choosing_spm(self, spm_dist, cspm_dist) -> float:
+        if spm_dist < cspm_dist:
+            return 0.8
+        
+        if self.resources:
+            if self.has_vehicles:
+                return 0.76
+            else:
+                return 0.72
+        else:
+            if self.has_vehicles:
+                return 0.64
+            else:
+                return 0.6
+            
+    def get_store_dist(self, store) -> float:
+        return self.distances_map[store.unique_id]
+    
+    # returns store object
+    def choose_store(self, spm, cspm, spm_dist, cspm_dist) -> object:
+        if spm is None:
+            return cspm
+        if cspm is None:
+            return spm
+
+        spm_chance = self.chance_of_choosing_spm(spm_dist, cspm_dist)
+
+        #randomly choose based off chances
+        return random.choices([cspm, spm], [(1 - spm_chance), spm_chance], k = 1)[0]
+
+    def get_mfai(self) -> int:
         """
         Calculates the MFAI (monthly food access index)
 
@@ -184,31 +237,22 @@ class Household(GeoAgent):
         Returns:
             int: the mfai value
         """
-        #constants
-        MAX_FSA, MIN_FSA = 100, 55
-        MONTHLY_TRIP_COUNT = 7
-        VEHICLE_ACCESS_WEIGHT = 10
-        INCOME_WEIGHT = 80
-        NO_VEHICLE_REDUCTION_FACTOR = 0.8
-        MAX_TOTAL_FSA = MONTHLY_TRIP_COUNT * MAX_FSA
+        # closest cspm/spm
+        closest_cspm, cspm_dist = self.get_closest_cspm()
+        closest_spm, spm_dist = self.get_closest_spm()
 
-        #calculate mfai
-        #cspm, spm,f,f = self.closest_cspm_and_spm()
         food_avail = list()
-        for i in range(MONTHLY_TRIP_COUNT):
-            chance_of_choosing_spm = int(((self.vehicles*VEHICLE_ACCESS_WEIGHT)+(self.income/200000)*INCOME_WEIGHT))
-            store = random.choices([cspm,spm], [(chance_of_choosing_spm-100)*-1,chance_of_choosing_spm], k=1)[0]
-            fsa = 0
-            if store is not None and store.type == "supermarket":
-                fsa = MAX_FSA
-            else:
-                fsa = MIN_FSA
-            if self.vehicles == 0:
-                fsa = fsa*NO_VEHICLE_REDUCTION_FACTOR
-            fsa = fsa*0.85+fsa*0.25*abs(1-self.distance_to_closest_store)
-            food_avail.append(fsa)
+        for i in range(self.monthly_trips):
+            # randomly select the closest spm/cspm
+            store = self.choose_store(closest_spm, closest_cspm, spm_dist, cspm_dist)
 
-        return int(sum(food_avail)/MAX_TOTAL_FSA*100)
+            if store is not None and store.type == "supermarket":
+                fsa = 95
+            else:
+                fsa = 55
+
+            food_avail.append(fsa)
+        return sum(food_avail) / len(food_avail)
 
     def calculate_distances(self) -> None:
         """
@@ -216,20 +260,20 @@ class Household(GeoAgent):
         
         Uses EPSG:3857 projection (units in meters). Distance values are stored in the distances_map
         dictionary with store unique_id as key and distance in miles as value.
-        
-        Raises:
-            ValueError: If the model's CRS is not EPSG:3857
         """
-        # Validate CRS - distance units depend on this
-        if str(self.crs) not in ["3857", "EPSG:3857"]:
-            raise ValueError(f"Expected CRS EPSG:3857, but got {self.crs}. Distance calculations require meter-based projection.")
-            
-        self.distances_map = dict()
-        for store in self.model.stores_list:
-            agent_unique_id = store.unique_id
-            distance = self.model.space.distance(self, store)
-            distance = round(distance / METERS_IN_MILE, 2)
-            self.distances_map[agent_unique_id] = distance
+        # TODO (#74): Replace this brute-force loop with an STRtree.query to only
+        # calculate distances for stores within a 10-mile radius.
+        if not hasattr(self.model, '_store_centroids'):
+            self.model._store_centroids = [
+                (s.unique_id, *s.geometry.centroid.coords[0])
+                for s in self.model.stores_list
+            ]
+
+        self.distances_map = {}
+        hx, hy = self.geometry.centroid.coords[0]
+        for sid, sx, sy in self.model._store_centroids:
+            distance_m = math.hypot(hx - sx, hy - sy)
+            self.distances_map[sid] = round(distance_m / METERS_IN_MILE, 2)
 
     def step(self) -> None:
         """
@@ -237,9 +281,18 @@ class Household(GeoAgent):
         """
         if self.distances_map is None:
             self.calculate_distances()
-        cspm, spm, self.distance_to_closest_store, f = self.closest_cspm_and_spm()
+        # find spm for get_color and rating_evaluation methods (cspm and spm not needed for mfai method anymore)
+        spm, spm_dist = self.get_closest_spm()
+        cspm, cspm_dist = self.get_closest_cspm()
+        if spm is not None and cspm is not None:
+            self.distance_to_closest_store = min(spm_dist, cspm_dist)
+        elif spm is not None:
+            self.distance_to_closest_store = spm_dist
+        elif cspm is not None:
+            self.distance_to_closest_store = cspm_dist
+
         self.num_store_within_mile = self.stores_with_1_miles()
-        self.mfai = self.get_mfai(cspm, spm)
+        self.mfai = self.get_mfai()
         self.color = self.get_color()
 
         return None

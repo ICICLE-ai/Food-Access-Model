@@ -1,4 +1,5 @@
 # Standard Library Imports
+import argparse
 import logging
 import math
 import os
@@ -8,6 +9,7 @@ from datetime import datetime
 from io import BytesIO
 from typing import List, Tuple, Optional, Callable, Any
 from zipfile import ZipFile
+import sys
 
 #  Third-Party Library Imports (External packages you install with pip):
 import numpy as np
@@ -24,17 +26,22 @@ from psycopg2 import extras
 from rtree.index import Index as RTreeIndex
 from psycopg2.extensions import connection as Connection, cursor as Cursor
 from shapely.geometry import Point, Polygon, LineString
+from shapely.ops import unary_union
 from shapely.strtree import STRtree
 from pyproj import Transformer
-from dotenv import load_dotenv 
+from dotenv import load_dotenv
 
+load_dotenv()
+
+INCLUDE_OSM_STORES = (
+    os.getenv("INCLUDE_OSM_STORES").lower() == "true"
+)
+STORES_CSV = os.getenv("STORES_CSV") or None
 
 # Local Application Imports
 from household_constants import (
-    YEAR, 
-    CENTER_POINT, 
-    DIST, 
-    FIPSCODE, 
+    YEAR,
+    FIPSCODE,
     households_variables_dict,
     households_key_list,
     income_ranges,
@@ -42,11 +49,17 @@ from household_constants import (
     workers_index_dict
 )
 
+ox.settings.timeout = 180  # 3 minute timeout to prevent indefinite hangs
 
-load_dotenv()
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 COUNTY_CODE = FIPSCODE[2:]                  
-STATE_CODE = FIPSCODE[:2]   
+STATE_CODE = FIPSCODE[:2]
 
 PASS = os.getenv("DB_PASS")
 if not PASS:
@@ -151,10 +164,6 @@ def fetch_county_data(
             county_data = pd.DataFrame(data[1:], columns= data[0])
     return county_data
 
-# Initialize county data using the function
-COUNTY_DATA = fetch_county_data(households_key_list, YEAR, STATE_CODE, COUNTY_CODE, APIKEY)
-
-
 def load_and_merge_geodata(
     year: str,
     state_code: str,
@@ -224,11 +233,28 @@ def load_and_merge_geodata(
 
     return merged_data
 
-# Run and create merged geospatial data
-data = load_and_merge_geodata(YEAR, STATE_CODE, COUNTY_CODE, COUNTY_DATA)
 
-# Create spatial index from geometry
-tract_index = STRtree(data["geometry"])
+def county_boundary_union_from_tracts(
+    tract_data: geopandas.GeoDataFrame,
+) -> Tuple[geometry.base.BaseGeometry, geometry.base.BaseGeometry]:
+    """
+    Single county footprint: union of tract polygons in EPSG:3857 (for census alignment)
+    and the same boundary in EPSG:4326 (for OSMnx downloads).
+    """
+    if tract_data is None or tract_data.empty:
+        raise ValueError("tract_data must be a non-empty GeoDataFrame")
+
+    tract_data = tract_data.copy()
+    tract_data.geometry = tract_data.geometry.make_valid()
+
+    try:
+        union_3857 = unary_union(tract_data.geometry.values)
+        union_4326_series = (
+            geopandas.GeoSeries([union_3857], crs="EPSG:3857").to_crs("EPSG:4326")
+        )
+        return union_3857, union_4326_series.iloc[0]
+    except Exception as e:
+        raise ValueError(f"Failed to compute county boundary union from tract geometries: {e}") from e
 
 
 def initialize_database_tables(
@@ -236,7 +262,8 @@ def initialize_database_tables(
     database: str,
     user: str,
     password: str,
-    port: str
+    port: str,
+    destroy_tables: bool = False
 ) -> Tuple[psycopg2.extensions.connection, psycopg2.extensions.cursor]:
     """
     Connect to the PostgreSQL database and initialize required tables.
@@ -247,7 +274,7 @@ def initialize_database_tables(
         user (str): Database username.
         password (str): User's database password.
         port (str): Port number for the database connection.
-
+        destroy_tables (bool): Developer can set this to true in line 1036 of main to destroy
     Returns:
         Tuple[psycopg2.extensions.connection, psycopg2.extensions.cursor]: 
             A tuple containing the active connection and cursor objects.
@@ -264,48 +291,79 @@ def initialize_database_tables(
     except psycopg2.Error as e:
         logging.error(f"Failed to connect to the database: {e}")
         return None, None
-    
 
-    # Drop tables if they already exist
-    try:
-        cursor.execute('DROP TABLE IF EXISTS roads;')
-        cursor.execute('DROP TABLE IF EXISTS food_stores;')
-    except psycopg2.Error as e:
-        logging.error(f"Database table operation failed: {e}")
-        connection.rollback()
-        return None, None
+    if destroy_tables:
+        # Drop tables if needed
+        try:
+            cursor.execute('DROP TABLE IF EXISTS households;')
+            cursor.execute('DROP TABLE IF EXISTS food_stores;')
+            cursor.execute('DROP TABLE IF EXISTS roads;')
+            cursor.execute('DROP TABLE IF EXISTS simulation_instances;')
+        except psycopg2.Error as e:
+            logging.error(f"Database table operation failed: {e}")
+            connection.rollback()
+            return None, None
 
-    # Create tables
-    create_roads_query = '''
-    CREATE TABLE roads (
+    # Create tables if they don't exist
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS roads (
         name TEXT,
-        highway VARCHAR(30),
+        highway TEXT,
         length NUMERIC,
         geometry TEXT,
-        service VARCHAR(30)
+        service TEXT
     );
-    '''
-    create_food_stores_query = '''
-    CREATE TABLE food_stores (
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS food_stores (
+        simulation_instance_id UUID,
+        simulation_step INTEGER,
         shop VARCHAR(15),
-        geometry TEXT,
-        name VARCHAR(50)
+        longitude NUMERIC,
+        latitude NUMERIC,
+        name VARCHAR(50),
+        store_id INTEGER
     );
-    '''
-    cursor.execute(create_roads_query)
-    cursor.execute(create_food_stores_query)
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS simulation_instances (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT UNIQUE NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS households (
+        id NUMERIC,
+        simulation_instance_id UUID,
+        simulation_step INTEGER,
+        centroid_wkt TEXT,
+        income NUMERIC,
+        household_size NUMERIC,
+        vehicles NUMERIC,
+        number_of_workers NUMERIC,
+        walking_time NUMERIC,
+        biking_time NUMERIC,
+        transit_time NUMERIC,
+        driving_time NUMERIC,
+        food_score NUMERIC,
+        stores_within_1_mile NUMERIC,
+        closest_store_miles NUMERIC
+    );
+    ''')
+    
+    return connection, cursor
 
 
 def process_road_network(
-    center_point: Tuple[float, float],
-    dist: float
+    county_polygon_4326: geometry.base.BaseGeometry,
 ) -> Tuple[List[geometry.base.BaseGeometry], List[geometry.base.BaseGeometry], List[Tuple]]:
     """
     Process road network from OpenStreetMap and prepare geometry buffers and SQL-ready tuples.
 
     Args:
-        center_point (Tuple[float, float]): Latitude and longitude of the center location.
-        dist (float): Distance in 1000 meters to define the radius of the map from the center point.
+        county_polygon_4326: County boundary as a Shapely geometry in EPSG:4326 (lat/lon degrees).
 
     Returns:
         Tuple[
@@ -320,32 +378,52 @@ def process_road_network(
     map_elements: List[geometry.base.BaseGeometry] = []
     housing_areas: List[geometry.base.BaseGeometry] = []
 
-    G = ox.graph_from_point(center_point, dist=dist, network_type='all', retain_all=True)
+    G = ox.graph_from_polygon(county_polygon_4326, network_type='all', retain_all=True)
     gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
     gdf_edges = gdf_edges.to_crs("epsg:3857")
 
     if "service" not in gdf_edges.columns:
         gdf_edges["service"] = None
     gdf_edges = gdf_edges[["name", "highway", "length", "geometry", "service"]]
+    
+    # Fetch water bodies to prevent house placement in rivers/lakes
+    try:
+        water_features = ox.features.features_from_polygon(
+            county_polygon_4326,
+            tags={
+                "natural": ["water", "bay", "wetland", "spring"],
+                "waterway": ["river", "stream", "canal", "riverbank", "dock", "dam"],
+                "landuse": ["reservoir", "basin"]
+            }
+        )
+        if not water_features.empty:
+            water_features = water_features.to_crs("epsg:3857")
+            for row in water_features.itertuples():
+                if hasattr(row, 'geometry') and row.geometry is not None:
+                    # Buffer water bodies slightly to create exclusion zones
+                    map_elements.append(row.geometry.buffer(10))
+            logging.info(f"Added {len(water_features)} water bodies to exclusion zones")
+    except Exception as e:
+        logging.warning(f"Could not fetch water features: {e}. Continuing without water filtering.")
 
 
-    for _, row in gdf_edges.itertuples():
-        if row["highway"] in ["residential", "living_street"]:
-            housing_areas.append(row["geometry"].buffer(30))
-            map_elements.append(row["geometry"].buffer(3))
-        elif row["service"] == "alley":
-            housing_areas.append(row["geometry"].buffer(30))
-            map_elements.append(row["geometry"].buffer(3))
-        elif row["highway"] == "motorway":
-            map_elements.append(row["geometry"].buffer(100))
-        elif row["highway"] == "trunk":
-            map_elements.append(row["geometry"].buffer(30))
-        elif row["highway"] == "primary":
-            map_elements.append(row["geometry"].buffer(10))
-        elif row["highway"] == "secondary":
-            map_elements.append(row["geometry"].buffer(10))
-        elif isinstance(row["geometry"], LineString):
-            map_elements.append(row["geometry"])
+    for row in gdf_edges.itertuples():
+        if row.highway in ["residential", "living_street"]:
+            housing_areas.append(row.geometry.buffer(30))
+            map_elements.append(row.geometry.buffer(3))
+        elif row.service == "alley":
+            housing_areas.append(row.geometry.buffer(30))
+            map_elements.append(row.geometry.buffer(3))
+        elif row.highway == "motorway":
+            map_elements.append(row.geometry.buffer(100))
+        elif row.highway == "trunk":
+            map_elements.append(row.geometry.buffer(30))
+        elif row.highway == "primary":
+            map_elements.append(row.geometry.buffer(10))
+        elif row.highway == "secondary":
+            map_elements.append(row.geometry.buffer(10))
+        elif isinstance(row.geometry, LineString):
+            map_elements.append(row.geometry)
 
     gdf_edges["length"] = gdf_edges["length"].astype(int)
     gdf_edges["geometry"] = gdf_edges["geometry"].astype(str)
@@ -354,114 +432,99 @@ def process_road_network(
 
     return map_elements, housing_areas, data_tuples
 
-
-# Run the road network processor
-map_elements, housing_areas, data_tuples = process_road_network(CENTER_POINT, DIST)
-
-# Prepare the SQL insertion query
-roads_query = "INSERT INTO roads (name, highway, length, geometry, service) VALUES %s"
-
-
+# remove cursor, no need now you aren't inserting data
+# return the list of store tuples additionally
 def process_food_stores(
-    center_point: Tuple[float, float],
-    dist: float,
+    county_polygon_4326: geometry.base.BaseGeometry,
     map_elements: List[geometry.base.BaseGeometry],
-    cursor: psycopg2.extensions.cursor
-) -> Tuple[STRtree, List] : 
+) -> Tuple[STRtree, List[Tuple]]:
     """
     Retrieve and process food store locations from OpenStreetMap, convert them into geometric shapes,
     and insert them into the database.
 
     Args:
-        center_point (Tuple[float, float]): Latitude and longitude for the area of interest.
-        dist (float): Distance in meters for the search radius (3x for food stores).
+        county_polygon_4326: County boundary in EPSG:4326; limits OSM queries and filters CSV stores.
         map_elements (List[BaseGeometry]): List to append buffered polygons representing stores.
-        cursor (psycopg2.extensions.cursor): Cursor for executing database insert queries.
 
     Returns:
-        STRtree: Spatial index of all geometric elements including food stores.
+        Tuple containing:
+            - STRtree: Spatial index of all geometric elements (roads, stores, water).
+            - List[Tuple]: Store tuples with string geometries for SQL insertion.
     """
-    features = ox.features.features_from_point(
-        center_point,
-        dist=dist * 3,
-        tags={"shop": [
-            "convenience", "supermarket", "butcher", "wholesale",
-            "farm", "greengrocer", "health_food", "grocery"
-        ]}
-    )
+    store_tuples: List[Tuple] = []
+    store_id = 0
 
-    features = features.to_crs("epsg:3857")
-    features = features[["shop", "geometry", "name"]]
+    if INCLUDE_OSM_STORES:
+        features = ox.features.features_from_polygon(
+            county_polygon_4326,
+            tags={"shop": [
+                "convenience", "supermarket", "butcher", "wholesale",
+                "farm", "greengrocer", "health_food", "grocery"
+            ]},
+        )
+        features = features.to_crs("epsg:3857")
+        features = features[["shop", "geometry", "name"]]
 
-    store_tuples_strPoly: List[Tuple[str, str, str]] = []
-    store_tuples_Poly: List[Tuple[str, str, str]] = []
+        transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
+        for row in features.itertuples():
+            point = row.geometry.centroid if not isinstance(row.geometry, Point) else row.geometry
+            # Buffer compensates for point vs original polygon exclusion zone
+            # supermarkets used 50m radius hexagon + 20m buffer = 70m total
+            # others used ~25m triangle + 20m buffer = 45m total
+            if str(row.shop) in ["supermarket", "grocery", "greengrocer"]:
+                map_elements.append(point.buffer(70))
+            else:
+                map_elements.append(point.buffer(45))
 
-    food_stores_query = "INSERT INTO food_stores (shop, geometry, name) VALUES %s"
+            lon, lat = transformer.transform(point.x, point.y)
+            store_tuples.append((None, 0, str(row.shop), lon, lat, str(row.name), store_id))
+            store_id += 1
+    else:
+        logging.info("INCLUDE_OSM_STORES=False — loading curated stores from %s", STORES_CSV)
+        transformer_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)
+        csv_path = os.path.join(os.path.dirname(__file__), STORES_CSV)
+        df = pd.read_csv(csv_path)
 
-    for _, row in features.itertuples():
-        point = row["geometry"].centroid if not isinstance(row["geometry"], Point) else row["geometry"]
+        for _, row in df.iterrows():
+            # Store x/y in 4326 directly
+            lon = float(row['longitude'])
+            lat = float(row['latitude'])
+            if not county_polygon_4326.covers(Point(lon, lat)):
+                continue
+            # Use cspm/spm column to classify stores; Type column is ignored
+            shop_type = 'supermarket' if str(row.get('cspm/spm', '')).strip() == 'spm' else 'cspm'
+            store_name = str(row['Name'])[:50]
 
-        if row["shop"] in ["supermarket", "grocery", "greengrocer"]:
-            polygon = Polygon([
-                (point.x + 50 * math.cos(math.radians(angle)), point.y + 50 * math.sin(math.radians(angle)))
-                for angle in range(0, 360, 60)
-            ])
-        else:
-            polygon = Polygon([
-                (point.x, point.y + 20),
-                (point.x + 25, point.y - 30),
-                (point.x - 25, point.y - 30)
-            ])
+            # Convert to 3857 only for map_elements buffer (spatial math)
+            x_3857, y_3857 = transformer_to_3857.transform(lon, lat)
+            # Buffer compensates for point vs original polygon exclusion zone
+            # supermarkets used 50m radius hexagon + 20m buffer = 70m total
+            # others used ~25m triangle + 20m buffer = 45m total
+            if shop_type in ["supermarket", "grocery", "greengrocer"]:
+                map_elements.append(Point(x_3857, y_3857).buffer(70))
+            else:
+                map_elements.append(Point(x_3857, y_3857).buffer(45))
 
-        map_elements.append(polygon.buffer(20))
-        store_tuples_strPoly.append((str(row["shop"]), str(polygon), str(row["name"])))
-        store_tuples_Poly.append((str(row["shop"]), polygon, str(row["name"])))
-    try:
-        extras.execute_values(cursor, food_stores_query, store_tuples_strPoly)
-    except psycopg2.Error as e:
-        logging.error(f"Databse insertion failed: {e}")
-        connection.rollback()
-        raise
-    
-    return (STRtree(map_elements),store_tuples_Poly) , 
+            store_tuples.append((None, 0, shop_type, lon, lat, store_name, store_id))
+            store_id += 1
 
+        logging.info("Loaded %d curated stores from CSV", store_id)
 
-# Call the function and get the spatial index of mapped elements
-map_elements_index = process_food_stores(CENTER_POINT, DIST, map_elements, cursor)
+    return (STRtree(map_elements), store_tuples)  
 
-
-def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
+def get_household_insert_query() -> str:
     """
-    Create the 'households' table in the database after dropping it if it already exists.
-
-    Args:
-        cursor (psycopg2.extensions.cursor): Active database cursor.
+    Returns the prepared SQL insert query string for inserting household data.
 
     Returns:
-        str: Prepared SQL insert query string for inserting household data.
+        str: SQL INSERT query template for households.
     """
-    create_households_query = '''
-    CREATE TABLE households (
-        id NUMERIC,
-        polygon TEXT,
-        income NUMERIC,
-        household_size NUMERIC,
-        vehicles NUMERIC,
-        number_of_workers NUMERIC,
-        walking_time TEXT,
-        biking_time TEXT,
-        transit_time TEXT,
-        driving_time TEXT
-    );
-    '''
-
-    cursor.execute('DROP TABLE IF EXISTS households;')
-    cursor.execute(create_households_query)
-
-    household_query = """
+    return """
     INSERT INTO households 
     (id,
-     polygon,
+     simulation_instance_id,
+     simulation_step,
+     centroid_wkt,
      income,
      household_size,
      vehicles,
@@ -469,13 +532,15 @@ def create_households_table(cursor: psycopg2.extensions.cursor) -> str:
      walking_time,
      biking_time,
      transit_time,
-     driving_time) 
+     driving_time,
+     food_score,
+     stores_within_1_mile,
+     closest_store_miles) 
     VALUES %s
     """
-    return household_query
 
 
-def close_db_connection(connection: psycopg2.extensions.connection, cursor: psycopg2.extensions.cursor) -> None:
+def close_db_connection(connection: psycopg2.extensions.connection, cursor: psycopg2.extensions.cursor):
     """
     Commit any pending transactions and close the database connection and cursor.
 
@@ -558,26 +623,19 @@ def is_valid_house(
 ) -> bool:
     """
     Check whether a house polygon is valid by verifying it does not intersect
-    with roads or existing houses.
+    with roads, water bodies, or existing houses.
 
     Args:
         house (Polygon): The house polygon to check.
-        map_elements_index (STRtree): Spatial index for roads and store areas.
+        map_elements_index (STRtree): Spatial index for roads, stores, and water bodies.
         houses_index (rtree.index.Index): R-tree index of all placed houses.
-        map_elements (List[Polygon]): The list of buffered roads and stores.
+        map_elements (List[Polygon]): The list of buffered roads, stores, and water bodies.
 
     Returns:
         bool: True if house is valid; False if it intersects with other features.
     """
-    # Check collision with road/store polygons
-    search_area = Polygon([
-        (house.centroid.x + 10, house.centroid.y + 20),
-        (house.centroid.x - 10, house.centroid.y + 20),
-        (house.centroid.x - 10, house.centroid.y - 5),
-        (house.centroid.x + 10, house.centroid.y - 5)
-    ])
-
-    for index in map_elements_index.query(search_area):
+    # Check collision with road/store/water polygons using the actual house polygon
+    for index in map_elements_index.query(house):
         if map_elements[index].intersects(house):
             return False
 
@@ -624,7 +682,7 @@ def assign_household_attributes(
             "1 Person(s) 0 Worker(s)", "1 Person(s) 1 Worker(s)",
             "2 Person(s) 0 Worker(s)", "2 Person(s) 1 Worker(s)", "2 Person(s) 2 Worker(s)",
             "3 Person(s) 0 Worker(s)", "3 Person(s) 1 Worker(s)", "3 Person(s) 2 Worker(s)", "3 Person(s) 3 Worker(s)",
-            "4+ Person(s) 0 Worker(s)", "4+ Person(s) 1 Worker(s)", "4+ Person(s) 2 Worker(s)", "4+ Person(s) 3+ Worker(s)"
+            "4+ Person(s) 0 Worker(s)", "4+ Person(s) 1 Worker(s)", "4+ Person(s) 2 Worker(s)", "4+ Person(s) 3 Worker(s)"
         ]
     ]
 
@@ -737,52 +795,6 @@ def generate_houses_from_housing_areas(
 
     return house_tuples
 
-
-def get_nearest_store(
-        house: Polygon, 
-        store_tuples : List[Tuple[str, str, str]], 
-        shapely_loader: Callable[[str], Polygon]
-        )-> Optional[Polygon]:
-    """
-    Find the nearest store polygon to house. 
-
-    Args:
-        house (Polygon): The house polygon to check
-        store_tuples: (List[Tuple[str, str, str]]): List of tuples (shop type, WKT polygon, name) for stores.
-        shapely_loader (Any): Function to convert WKT string to Shapely geometry.
-    
-    Returns:
-        Optional[Polygon]: The nearest store polygon, or None if no stores found.
-    """
-    nearest_store = None
-    store_distance = float('inf')
-
-    for store in store_tuples:
-        store_poly = shapely_loader(store[1])
-        dist = store_poly.distance(house)
-
-        if dist <= store_distance:
-            nearest_store = store_poly
-            store_distance = DIST
-
-    return nearest_store
-
-
-def transform_polygon_coords(polygon: Polygon, source_crs : str, target_crs : str) -> Polygon:
-    """Transform a polygon's coordinates from one CRS to another.
-
-    Args:
-        polygon (Polygon): The polygon to transform.
-        source_crs (str): The source coordinate reference system (e.g., "EPSG:3857").
-        target_crs (str): The target coordinate reference system (e.g., "EPSG:4326").
-
-    Returns:
-        Polygon: A new Polygon with its coordinates in the target CRS.
-    """
-    transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
-    coords = [transformer.transform(x, y) for x, y in polygon.exterior.coords]
-    return Polygon(coords)
-
 def get_tract_for_house(
     house: Polygon,
     tract_index: STRtree,
@@ -818,7 +830,7 @@ def process_housing_areas(
     Args:
         housing_areas (List[Polygon]): Polygons representing areas around residential roads.
         map_elements_index (STRtree): STRtree index for nearby road/store geometries.
-        map_elements (List[Polygon]): Buffered geometries (roads, stores) for intersection checking.
+        map_elements (List[Polygon]): Buffered geometries (roads, stores) for intersection checks.
         data (pd.DataFrame): Census tract data with attributes.
         store_tuples (List[Tuple[str, str, str]]): Store (shop type, WKT, name).
 
@@ -827,17 +839,24 @@ def process_housing_areas(
     """
     house_tuples: List[Tuple] = []
     total_count = 0
+    
+    # Debug counters
+    attempted = 0
+    failed_validation = 0
+    failed_tract = 0
+    failed_attributes = 0
+    # failed_store = 0
+    success = 0
 
     # R-tree index to check house overlap
     houses_index = RTreeIndex()
     # STRtree index of tract geometries.
     tract_index = STRtree(data["geometry"])
-
-    vehicle_weights = List[int]
-    worker_weights = List[int]
     
+    transformer = Transformer.from_crs("epsg:3857", "epsg:4326", always_xy=True)
+
     for i, housing_area in enumerate(housing_areas):
-        logging.info(f"{round((i + 1) / len(housing_areas) * 100)}%")
+        logging.info(f"Processing housing areas: {round((i + 1) / len(housing_areas) * 100)}% ({i + 1}/{len(housing_areas)})")
 
         exterior_coords = list(housing_area.exterior.coords)
         edges = [LineString([exterior_coords[i], exterior_coords[i + 1]])
@@ -855,50 +874,72 @@ def process_housing_areas(
                 )
 
                 house = create_house_polygon(location)
+                attempted += 1
 
                 if not is_valid_house(house, map_elements_index, houses_index, map_elements):
+                    failed_validation += 1
                     continue
 
                 houses_index.add(total_count, house.bounds)
 
                 tract = get_tract_for_house(house, tract_index, data)
                 if tract is None:
+                    failed_tract += 1
                     continue
 
                 try:
                     income, size, workers, vehicles = assign_household_attributes(
-                        tract, income_ranges, size_index_dict, workers_index_dict,
-                        vehicle_weights, worker_weights
+                        tract, income_ranges, size_index_dict, workers_index_dict
                     )
-                except Exception:
+                except Exception as e:
+                    failed_attributes += 1
+                    if failed_attributes == 1:  # Log first error
+                        logging.warning(f"First attribute assignment error: {e}")
                     continue
-
-                nearest_store = get_nearest_store(house, store_tuples, shapely.wkt.loads)
-                if nearest_store is None:
-                    continue
-
-                house_4326 = transform_polygon_coords(house, "EPSG:3857", "EPSG:4326")
-                store_4326 = transform_polygon_coords(nearest_store, "EPSG:3857", "EPSG:4326")
-                ##origin = (float(house_4326.centroid.y), float(house_4326.centroid.x))
-                ##destination = (float(store_4326.centroid.y), float(store_4326.centroid.x))
+           
+                success += 1
 
                 # Placeholder travel times (to be replaced with real data if available)
                 walking_time = biking_time = transit_time = driving_time = 0
+                
+                # Placeholder values for simulation-calculated fields
+                food_score = None
+                stores_within_1_mile = None
+                closest_store_miles = None
+
+                lon, lat = transformer.transform(house.centroid.x, house.centroid.y)
 
                 house_tuples.append((
                     total_count,
-                    str(house),
+                    None,  # simulation_instance_id (will be set during insertion)
+                    0,  # simulation_step (initial step)
+                    # str(house.centroid),  # centroid_wkt instead of full polygon
+                    f"POINT ({lon} {lat})",
                     income,
                     size,
                     vehicles,
                     workers,
-                    walking_time,
-                    biking_time,
-                    transit_time,
-                    driving_time
+                    str(walking_time),
+                    str(biking_time),
+                    str(transit_time),
+                    str(driving_time),
+                    food_score,
+                    stores_within_1_mile,
+                    closest_store_miles
                 ))
 
                 total_count += 1
+    
+    # Log summary statistics
+    logging.info("=" * 50)
+    logging.info("HOUSEHOLD GENERATION SUMMARY")
+    logging.info(f"Total houses attempted: {attempted}")
+    logging.info(f"Failed validation (intersects road/store/house): {failed_validation}")
+    logging.info(f"Failed tract check (outside census tract): {failed_tract}")
+    logging.info(f"Failed attributes (bad census data): {failed_attributes}")
+    # logging.info(f"Failed store check (no nearby store): {failed_store}")
+    logging.info(f"Successfully created: {success}")
+    logging.info("=" * 50)
 
     return house_tuples
 
@@ -913,7 +954,7 @@ def insert_households(cursor, house_tuples: List[Tuple], household_query: str) -
         household_query (str): The SQL query template for inserting households
 
     Raises:
-        Exception: If insertion fails, the exception is re-raised after logging.infoing the error.
+        Exception: If insertion fails, the exception is re-raised after logging the error.
     """
     try:
         extras.execute_values(cursor, household_query, house_tuples)
@@ -951,41 +992,99 @@ def connect_to_db(
     )
     return conn, conn.cursor()
 
+#new function
+def initialize_simulation(
+    fips_code: str,
+    year: str,
+    api_key: str
+):
+    
+    state_code = fips_code[:2]
+    county_code = fips_code[2:]
+
+    county_data = fetch_county_data(households_key_list, str(year), state_code, county_code, api_key)
+    tract_data = load_and_merge_geodata(str(year), state_code, county_code, county_data)
+    if tract_data is None or tract_data.empty:
+        raise ValueError("Could not load census tract geometries for county; check FIPS and Census API data.")
+
+    _, county_poly_4326 = county_boundary_union_from_tracts(tract_data)
+    map_elements, housing_areas, road_tuples = process_road_network(county_poly_4326)
+    store_index, store_tuples = process_food_stores(county_poly_4326, map_elements)
+    house_tuples = process_housing_areas(housing_areas, store_index, map_elements, tract_data, store_tuples)
+
+    return {
+        'households' : house_tuples,
+        'stores' : store_tuples,
+        'roads' : road_tuples,
+        'tract_data' : tract_data,
+        'store_index' : store_index
+    }
+
 def main() -> None:
     """
     Main function to execute the full data processing and insertion pipeline.
     """
-    logging.info("Fetching household census data...")
-    county_data = fetch_county_data(households_key_list, YEAR, STATE_CODE, COUNTY_CODE, APIKEY)
-
-    logging.info("Loading and merging tract shapefile with census data...")
-    tract_data = load_and_merge_geodata(YEAR, STATE_CODE, COUNTY_CODE, county_data)
+    import uuid
+    
+    # new entry point
+    simulation_data = initialize_simulation(FIPSCODE, YEAR, APIKEY)
 
     logging.info("Initializing database and creating tables...")
-    connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT)
-    household_query = create_households_table(cursor)
 
-    logging.info("Processing road network...")
-    map_elements, housing_areas, road_tuples = process_road_network(CENTER_POINT, DIST)
+    # Add CL argument for resetting the database tables
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--reset-db", action="store_true")
+    args = parser.parse_args()
 
-    logging.info("Processing food stores...")
-    store_index = process_food_stores(CENTER_POINT, DIST, map_elements, cursor)
+    connection, cursor = initialize_database_tables(HOST, NAME, USER, PASS, PORT, destroy_tables=args.reset_db) 
+    household_query = get_household_insert_query()
 
-    logging.info("Generating household records...")
+    # Insert or get default simulation instance
+    cursor.execute("""
+        INSERT INTO simulation_instances (name, description)
+        VALUES ('default_simulation', 'Brown County, Wisconsin')
+        ON CONFLICT (name) DO NOTHING
+        RETURNING id;
+    """)
+    result = cursor.fetchone()
+    if result:
+        simulation_instance_id = result[0]
+    else:
+        # If already exists, fetch it
+        cursor.execute("SELECT id FROM simulation_instances WHERE name = 'default_simulation';")
+        simulation_instance_id = cursor.fetchone()[0]
+    
+    logging.info(f"Using simulation_instance_id: {simulation_instance_id}")
 
-    # yeslai return wala banam, through process_food_stores()
-    store_tuples =  store_index[1] 
+    logging.info("Inserting road data...")
+    roads_query = "INSERT INTO roads (name, highway, length, geometry, service) VALUES %s"
+    try:
+        extras.execute_values(cursor, roads_query, simulation_data['roads'])
+    except psycopg2.Error as e:
+        logging.error(f"Roads insertion failed: {e}")
+        connection.rollback()
+        raise
 
-    house_tuples = process_housing_areas(
-        housing_areas,
-        store_index,
-        map_elements,
-        tract_data,
-        store_tuples,
-    )
+    logging.info("Inserting food stores...")
+    food_stores_query = "INSERT INTO food_stores (simulation_instance_id, simulation_step, shop, longitude, latitude, name, store_id) VALUES %s"
+    # Update store tuples with simulation_instance_id
+    store_tuples_with_id = [(simulation_instance_id, step, shop, longitude, latitude, name, sid) 
+                            for (_, step, shop, longitude, latitude, name, sid) in simulation_data['stores']]
+    try:
+        extras.execute_values(cursor, food_stores_query, store_tuples_with_id)
+    except psycopg2.Error as e:
+        logging.error(f"Food stores insertion failed: {e}")
+        connection.rollback()
+        raise
 
     logging.info("Inserting households into the database...")
-    insert_households(cursor, house_tuples, household_query)
+    # Update household tuples with simulation_instance_id
+    household_tuples_with_id = [(hid, simulation_instance_id, step, centroid, income, size, vehicles, workers,
+                                 walking, biking, transit, driving, food_score, stores_1mi, closest_store)
+                                for (hid, _, step, centroid, income, size, vehicles, workers, 
+                                     walking, biking, transit, driving, food_score, stores_1mi, closest_store)
+                                in simulation_data['households']]
+    insert_households(cursor, household_tuples_with_id, household_query)    
 
     logging.info("Finalizing and closing connection...")
     connection.commit()
