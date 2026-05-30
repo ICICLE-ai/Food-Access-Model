@@ -1,0 +1,34 @@
+name: flake8 Lint
+
+on: [push, pull_request]
+
+jobs:
+  flake8-lint:
+    runs-on: ubuntu-latest
+    name: Lint
+    on:
+      push:
+        branches:
+          - dev
+          - main
+          - staging
+      pull_request:
+        branches:
+          - dev
+          - main
+          - staging
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@v3
+      - name: Set up Python environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install UV
+        uses: astral-sh/setup-uv@v3
+      - name: Install dependencies
+        run: uv sync
+      - name: flake8 Lint
+        uses: py-actions/flake8@v2
+        with:
+          path: ./food_access_model
