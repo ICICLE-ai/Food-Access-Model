@@ -209,6 +209,37 @@ If you are running the application locally, then switch to the "reduced_househol
    DB_HOST=[DATABASE HOST]
    DB_PORT=[DATABASE PORT FOR DATABASE]
    ```
+
+### Optional per-request user scoping (#102)
+
+Every API endpoint accepts an optional `Authorization: Bearer <token>` header.
+With no header, the request sees the shared public pool (`simulation_instances`
+rows where `owner_id IS NULL`) and all pre-scoping behavior is preserved.
+With a header, the token is verified via JWKS (`food_access_model/api/token_verification.py`)
+and the request sees ONLY instances owned by that user — public instances are
+not mixed in. "Exists but not yours" and "doesn't exist" both return 404 so
+ownership doesn't leak.
+
+Verification is JWKS-backed via `pyjwt[crypto]` and config-driven via env vars
+(`JWT_JWKS_URL`, `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_USER_CLAIM`, `JWT_ALGORITHMS`).
+When `JWT_JWKS_URL` is unset the verifier is a no-op that returns `None` for
+every token — a local dev operator who doesn't want to stand up an OIDC
+provider gets public-pool-only behavior, not trust-as-is. For the ICICLE/Tapis
+deployment, point `JWT_JWKS_URL` at the Tapis JWKS and set `JWT_USER_CLAIM=username`.
+See `.env.example` for the full config surface.
+
+**Required manual DB migration for live databases.** This change adds a
+nullable `owner_id TEXT` column to `simulation_instances`. New databases get
+it via the updated `CREATE TABLE` in `preprocessing/get_data.py`. For databases
+that have already been seeded and are not going to re-run preprocessing, run:
+
+```sql
+ALTER TABLE simulation_instances ADD COLUMN IF NOT EXISTS owner_id TEXT;
+```
+
+Existing rows stay `NULL` (public) which preserves the pre-scoping shared-pool
+behavior for anything that already existed.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- USAGE EXAMPLES -->

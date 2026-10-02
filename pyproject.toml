@@ -16,4 +16,16 @@ dependencies = [
     "asyncpg>=0.30.0",
     "names-generator>=0.2.0",
     "python-dotenv>=1.1.1",
+    "pyjwt[crypto]>=2.8.0", # #102: verify bearer tokens via JWKS instead of trusting them as-is
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "cryptography>=42.0", # for test_token_verification RSA keypair generation
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -330,8 +330,17 @@ def initialize_database_tables(
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name TEXT UNIQUE NOT NULL,
         description TEXT,
+        owner_id TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+    ''')
+    # Optional bearer-token user scoping (#102). CREATE TABLE IF NOT EXISTS
+    # leaves an existing simulation_instances table untouched, so add the
+    # column explicitly for already-seeded databases. NULL = public pool,
+    # matching the pre-#102 behavior for existing rows.
+    cursor.execute('''
+    ALTER TABLE simulation_instances
+        ADD COLUMN IF NOT EXISTS owner_id TEXT;
     ''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS households (
