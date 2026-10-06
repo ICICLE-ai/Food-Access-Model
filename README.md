@@ -63,6 +63,16 @@ We welcome feedback and issue reports to help improve FEAST. Please use the foll
 
 ---
 
+## Behavioral Calibration (FoodAPS)
+
+Household shopping behavior is calibrated to USDA's National Household Food Acquisition and Purchase Survey (FoodAPS-1, 2012-13; 4,826 households). Parameters and their provenance live in `food_access_model/abm/foodaps_calibration.py`; the estimation script is `scripts/foodaps/estimate_abm_params.py` (run it on the public-use CSV files from ERS).
+
+* **Store choice per trip:** logit in distance to the nearest supermarket/superstore, distance to the nearest other food store, vehicle access, income-to-poverty ratio, and household size (replaces fixed probabilities of 0.60-0.80).
+* **Trips per month:** 12-13 food-store trips, slightly more with a vehicle (replaces 6-8).
+* **Resources:** income below 130% of the HHS poverty guideline for the household's size and the simulation year (replaces fixed dollar cutoffs).
+* **New outputs:** poverty ratio, supermarket trip probability, imputed probability of low liquid assets, and probability of food insecurity. Food insecurity depends on household resources only; FoodAPS shows no association with supermarket distance after income and assets are controlled, so store changes do not move it.
+* **Validation:** `food_access_model/abm/foodaps_validation.compare_to_foodaps(model)` reports simulated values next to national FoodAPS benchmarks. Unit tests: `pytest tests/test_foodaps_calibration.py`.
+
 # Tutorials
 ## Example Use Case
 

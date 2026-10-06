@@ -5,6 +5,8 @@ import shapely
 import random
 import math
 
+from food_access_model.abm import foodaps_calibration as fc
+
 _TO_3857 = Transformer.from_crs("epsg:4326", "epsg:3857", always_xy=True)     
 
 METERS_IN_MILE = 1609.34
@@ -62,8 +64,15 @@ class Household(GeoAgent):
         self.mfai = mfai #MFAI (monthly food access index)
         self.color = color
         self.has_vehicles = self.vehicles > 0
+        # FoodAPS-calibrated household quantities (see foodaps_calibration.py)
+        self.poverty_ratio = fc.poverty_ratio(self.income, self.household_size)
         self.resources = self.has_resources()
         self.monthly_trips = self.get_monthly_trip_count()
+        self.prob_low_assets = fc.prob_low_assets(
+            self.poverty_ratio, self.household_size, self.has_vehicles, self.number_of_workers or 0)
+        self.food_insecurity_prob = fc.prob_food_insecure(
+            self.poverty_ratio, self.household_size, self.has_vehicles, self.number_of_workers or 0)
+        self.spm_trip_prob = None  # set in step() once distances are known
 
     def get_color(self) -> str:
         """
@@ -178,38 +187,29 @@ class Household(GeoAgent):
         return (spm, spm_distance)
 
     def has_resources(self) -> bool:
-        if self.income < 10000:
-            return False
-        if self.household_size >= 2 and self.income < 15000:
-            return False
-        if self.household_size >= 3 and self.income < 25000:
-            return False
-        return True
-    
-    def get_monthly_trip_count(self) -> int:
-        if self.resources:
-            if self.has_vehicles:
-                return 7
-            else:
-                return 8
-        else:
-            return 6
+        """
+        True if household income is at or above 130% of the HHS poverty guideline for its
+        size (the SNAP gross-income limit). Replaces fixed dollar thresholds so the cutoff
+        scales with household size and simulation year.
+        """
+        return not fc.is_low_income(self.poverty_ratio)
 
-    # chance of choosing a close spm is just hard code val 0.8
+    def get_monthly_trip_count(self) -> int:
+        """
+        Food-store trips per month, from FoodAPS (about 12-13 per month; households with a
+        vehicle make slightly more trips, not fewer).
+        """
+        return fc.monthly_trips(self.has_vehicles, self.poverty_ratio)
+
     def chance_of_choosing_spm(self, spm_dist, cspm_dist) -> float:
-        if spm_dist < cspm_dist:
-            return 0.8
-        
-        if self.resources:
-            if self.has_vehicles:
-                return 0.76
-            else:
-                return 0.72
-        else:
-            if self.has_vehicles:
-                return 0.64
-            else:
-                return 0.6
+        """
+        Probability that a trip goes to the nearest supermarket rather than the nearest
+        other food store. Trip-level logit estimated on FoodAPS: decreasing in distance to
+        the supermarket, increasing in distance to the alternative, and higher for
+        households with a vehicle.
+        """
+        return fc.prob_spm_trip(spm_dist, cspm_dist, self.has_vehicles,
+                                self.poverty_ratio, self.household_size)
             
     def get_store_dist(self, store) -> float:
         return self.distances_map[store.unique_id]
@@ -292,6 +292,10 @@ class Household(GeoAgent):
             self.distance_to_closest_store = cspm_dist
 
         self.num_store_within_mile = self.stores_with_1_miles()
+        if spm is not None and cspm is not None:
+            self.spm_trip_prob = self.chance_of_choosing_spm(spm_dist, cspm_dist)
+        else:
+            self.spm_trip_prob = 1.0 if spm is not None else 0.0
         self.mfai = self.get_mfai()
         self.color = self.get_color()
 

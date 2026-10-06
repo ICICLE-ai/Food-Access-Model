@@ -116,6 +116,12 @@ class GeoModel(Model):
                 "Driving time": "driving_time",
                 "Food Access Score": "mfai",
                 "Color": "color",
+                # FoodAPS-calibrated outputs (not yet persisted to the database)
+                "Poverty Ratio": "poverty_ratio",
+                "Monthly Trips": "monthly_trips",
+                "Supermarket Trip Probability": "spm_trip_prob",
+                "Low Liquid Assets Probability": "prob_low_assets",
+                "Food Insecurity Probability": "food_insecurity_prob",
             }
         )
         self.datacollector.collect(self)
