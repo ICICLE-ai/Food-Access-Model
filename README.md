@@ -176,16 +176,25 @@ deployment, point `JWT_JWKS_URL` at the Tapis JWKS and set `JWT_USER_CLAIM=usern
 See `.env.example` for the full config surface.
 
 **Required manual DB migration for live databases.** This change adds a
-nullable `owner_id TEXT` column to `simulation_instances`. New databases get
-it via the updated `CREATE TABLE` in `preprocessing/get_data.py`. For databases
-that have already been seeded and are not going to re-run preprocessing, run:
+nullable `owner_id TEXT` column to `simulation_instances` and scopes the
+instance-name uniqueness per owner. New databases get both via the updated
+`CREATE TABLE` in `preprocessing/get_data.py`. For databases that have
+already been seeded and are not going to re-run preprocessing, run (requires
+PostgreSQL 15+):
 
 ```sql
 ALTER TABLE simulation_instances ADD COLUMN IF NOT EXISTS owner_id TEXT;
+ALTER TABLE simulation_instances DROP CONSTRAINT IF EXISTS simulation_instances_name_key;
+ALTER TABLE simulation_instances
+    ADD CONSTRAINT simulation_instances_owner_name_key
+    UNIQUE (owner_id, name) NULLS NOT DISTINCT;
 ```
 
-Existing rows stay `NULL` (public) which preserves the pre-scoping shared-pool
-behavior for anything that already existed.
+Existing rows stay `NULL` on `owner_id` (public) which preserves the
+pre-scoping shared-pool behavior for anything that already existed. The
+constraint swap is why PG15+ is required: `NULLS NOT DISTINCT` keeps the
+public pool uniquely-named without needing a separate catch for anonymous
+collisions.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

@@ -18,6 +18,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from food_access_model.api import token_verification
+from food_access_model.api.token_verification import TokenVerificationError
 
 
 @lru_cache(maxsize=2)
@@ -103,49 +104,87 @@ def test_valid_token_uses_configured_user_claim(configure_verifier, signing_keyp
     assert token_verification.verify_token(token) == "jdoe"
 
 
-# --- verification failures all return None ---------------------------------
+# --- verification failures all raise TokenVerificationError ----------------
+#
+# None would collide with "verifier disabled" (JWT_JWKS_URL unset); raising
+# an exception lets ``_extract_user_id_from_token`` map a present-but-invalid
+# token to HTTP 401 instead of silently downgrading the request to anonymous.
+# See the module docstring and PR review on this change (#104).
 
 
-def test_expired_token_returns_none(configure_verifier, signing_keypair):
+def test_expired_token_raises(configure_verifier, signing_keypair):
     token = _issue_token(signing_keypair, exp_offset=-1)
-    assert token_verification.verify_token(token) is None
+    with pytest.raises(TokenVerificationError):
+        token_verification.verify_token(token)
 
 
-def test_bad_signature_returns_none(configure_verifier, wrong_keypair):
+def test_bad_signature_raises(configure_verifier, wrong_keypair):
     """Token signed by a key that is NOT in the JWKS -- same shape as a forged
     token. Must not be accepted even though the token is well-formed."""
     token = _issue_token(wrong_keypair)
-    assert token_verification.verify_token(token) is None
+    with pytest.raises(TokenVerificationError):
+        token_verification.verify_token(token)
 
 
-def test_unknown_issuer_returns_none(configure_verifier, signing_keypair):
+def test_unknown_issuer_raises(configure_verifier, signing_keypair):
     token = _issue_token(signing_keypair, iss="https://attacker.example/")
-    assert token_verification.verify_token(token) is None
+    with pytest.raises(TokenVerificationError):
+        token_verification.verify_token(token)
 
 
-def test_wrong_audience_returns_none(configure_verifier, signing_keypair):
+def test_wrong_audience_raises(configure_verifier, signing_keypair):
     token = _issue_token(signing_keypair, aud="some-other-service")
-    assert token_verification.verify_token(token) is None
+    with pytest.raises(TokenVerificationError):
+        token_verification.verify_token(token)
 
 
-def test_missing_exp_claim_returns_none(configure_verifier, signing_keypair):
+def test_missing_exp_claim_raises(configure_verifier, signing_keypair):
     """``options={"require": ["exp"]}`` is a defence-in-depth check: a provider
     that emits non-expiring tokens is a security smell, so refuse rather than
     accept the first `sub` we see."""
     payload = {"iss": "https://example.test/", "aud": "feast-backend", "sub": "user-123"}
     token = jwt.encode(payload, signing_keypair, algorithm="RS256")
-    assert token_verification.verify_token(token) is None
+    with pytest.raises(TokenVerificationError):
+        token_verification.verify_token(token)
 
 
-def test_malformed_token_returns_none(configure_verifier):
-    assert token_verification.verify_token("not-a-jwt") is None
+def test_malformed_token_raises(configure_verifier):
+    with pytest.raises(TokenVerificationError):
+        token_verification.verify_token("not-a-jwt")
 
 
-def test_token_without_user_claim_returns_none(configure_verifier, signing_keypair, monkeypatch):
+def test_token_without_user_claim_raises(configure_verifier, signing_keypair, monkeypatch):
+    """Signature + iss + aud all check out but the configured claim is absent --
+    the token is cryptographically valid but useless for scoping, so 401 is
+    the right call rather than letting the request fall through to anonymous."""
     monkeypatch.setenv("JWT_USER_CLAIM", "username")
-    # Token has a sub but no username; verification succeeds, extraction fails.
     token = _issue_token(signing_keypair)
-    assert token_verification.verify_token(token) is None
+    with pytest.raises(TokenVerificationError):
+        token_verification.verify_token(token)
+
+
+def test_jwks_client_error_raises_and_logs_warning(configure_verifier, signing_keypair, monkeypatch, caplog):
+    """JWKS fetch failure is an ops signal (misconfigured Tapis URL, Tapis
+    down, timeout) and must not be a silent debug log in prod -- otherwise
+    every logged-in user would 401 and nobody would see why."""
+    import logging as _logging
+    from jwt.exceptions import PyJWKClientError
+
+    class _FailingClient:
+        def get_signing_key_from_jwt(self, token):
+            raise PyJWKClientError("simulated JWKS fetch failure")
+
+    monkeypatch.setattr(token_verification, "_jwks_client", lambda url: _FailingClient())
+    token = _issue_token(signing_keypair)
+
+    with caplog.at_level(_logging.WARNING, logger="food_access_model.api.token_verification"):
+        with pytest.raises(TokenVerificationError):
+            token_verification.verify_token(token)
+
+    assert any(
+        rec.levelno == _logging.WARNING and "JWKS client error" in rec.getMessage()
+        for rec in caplog.records
+    ), "PyJWKClientError should log at WARNING so prod misconfigs are visible"
 
 
 # --- unconfigured verifier short-circuits ----------------------------------

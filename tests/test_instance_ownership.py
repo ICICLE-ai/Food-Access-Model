@@ -12,6 +12,7 @@ import pytest
 from fastapi import HTTPException
 
 import food_access_model.api.routes as routes
+from food_access_model.api.token_verification import TokenVerificationError
 
 
 VALID_ID = str(uuid.UUID("11111111-1111-4111-8111-111111111111"))
@@ -63,6 +64,37 @@ def test_non_bearer_scheme_returns_none():
 
 def test_bearer_with_empty_token_returns_none():
     assert routes.get_current_user_id(authorization="Bearer   ") is None
+
+
+# --- bad-token -> 401 (not silent anonymous) --------------------------------
+#
+# Steve's PR review on this change flagged that a present but invalid token
+# used to downgrade silently to the public pool, which let a logged-in user
+# with an expired Tapis token accidentally create or mutate shared scenarios.
+# The 401 path is the fix.
+
+
+def test_bad_bearer_token_raises_401(monkeypatch):
+    """verify_token raises TokenVerificationError on any present-but-bad
+    token (expired, bad signature, missing claim, JWKS failure). The
+    dependency must translate that into HTTP 401 rather than returning
+    None, which would re-introduce the silent downgrade."""
+    def _raise(_token):
+        raise TokenVerificationError("simulated verification failure")
+
+    monkeypatch.setattr(routes, "verify_token", _raise)
+
+    with pytest.raises(HTTPException) as exc:
+        routes.get_current_user_id(authorization="Bearer bad-token")
+    assert exc.value.status_code == 401
+
+
+def test_verifier_disabled_returns_none(monkeypatch):
+    """verify_token returning None means the verifier is disabled
+    (JWT_JWKS_URL unset). The dependency must preserve that as anonymous
+    rather than treating it as a verification failure."""
+    monkeypatch.setattr(routes, "verify_token", lambda _token: None)
+    assert routes.get_current_user_id(authorization="Bearer any-token") is None
 
 
 def test_extract_user_id_from_token_delegates_to_verify_token(monkeypatch):

@@ -15,7 +15,7 @@ from fastapi import APIRouter, Body, HTTPException, Depends, Header, Query
 from fastapi.responses import StreamingResponse, ORJSONResponse
 
 from food_access_model.api.helpers import StoreInput, convert_centroid_to_polygon
-from food_access_model.api.token_verification import verify_token
+from food_access_model.api.token_verification import TokenVerificationError, verify_token
 from food_access_model.abm.geo_model import GeoModel
 from food_access_model.abm.store import Store
 from food_access_model.repository.db_repository import DBRepository, get_db_repository
@@ -89,21 +89,28 @@ def _extract_user_id_from_token(token: str):
     """Return the user id carried by a verified bearer token.
 
     Delegates to ``verify_token`` (``food_access_model.api.token_verification``),
-    which checks the token's signature, expiry, and (if configured) issuer and
-    audience against a JWKS endpoint. Any verification failure, or an unset
-    ``JWT_JWKS_URL``, returns None -- the request then falls through to the
-    public-pool behavior ``authorize_instance_access`` already handles for
-    no-token callers. On the ICICLE deployment this is Tapis-backed.
+    which checks the token's signature, expiry, and (if configured) issuer
+    and audience against a JWKS endpoint. Returns None when the verifier is
+    disabled (``JWT_JWKS_URL`` unset) so the request falls through to the
+    public-pool behavior; raises HTTP 401 when a token is present but fails
+    verification so a logged-in user with an expired Tapis token does not
+    silently downgrade to anonymous and start touching shared scenarios.
+    See PR review on this change (#104).
     """
-    return verify_token(token)
+    try:
+        return verify_token(token)
+    except TokenVerificationError:
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
 
 
 def get_current_user_id(authorization: Optional[str] = Header(None)):
     """Parse the optional ``Authorization: Bearer <token>`` header into a user id.
 
-    Returns None when the header is absent, malformed, or when verification
-    fails -- all three collapse to "no-token / shared public pool" so pre-login
-    frontends keep working unchanged and a forged token can't be trusted.
+    Returns None when the header is absent, uses a non-Bearer scheme, or is a
+    Bearer with an empty token -- all of which are the "no-token / shared
+    public pool" signal so pre-login frontends keep working unchanged. A
+    Bearer header with a non-empty token that fails verification raises
+    HTTP 401 (see ``_extract_user_id_from_token``).
     """
     if not authorization:
         return None

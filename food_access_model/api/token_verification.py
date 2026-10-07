@@ -2,9 +2,8 @@
 
 Ports FEAST-backend #219's JWKS-backed JWT verifier onto this ICICLE
 deployment. Any client-supplied token has to pass signature + expiry checks
-(plus optional issuer/audience pinning) before its ``sub`` claim is accepted
-as the user id; verification failures return None so the request falls
-through to public-pool behavior rather than 500ing on client-supplied input.
+(plus optional issuer/audience pinning) before its claim is accepted as the
+user id.
 
 The implementation is deliberately generic: it will work for any provider
 that exposes a JWKS URL. The ICICLE deployment sets ``JWT_JWKS_URL`` to a
@@ -12,11 +11,19 @@ Tapis JWKS; other deployments can point it at their own OIDC provider.
 Deployment-specific pieces (JWKS URL, expected issuer / audience, which claim
 carries the user id) live in env vars, not code.
 
-When ``JWT_JWKS_URL`` is unset the verifier returns None for every token.
-This matches the "no header -> public pool" branch so a local dev
-environment that doesn't want to stand up an OIDC provider can just leave
-the var unset and operate against the shared public pool only. A
-trust-as-is dev fallback was considered and rejected: dev and prod should
+Two distinct "no user id" outcomes are intentional:
+
+* ``JWT_JWKS_URL`` unset -> ``verify_token`` returns None. The verifier is
+  disabled; every request falls through to the shared public pool. Lets a
+  local dev operator skip standing up an OIDC provider.
+* Verifier enabled but the token itself fails -> ``verify_token`` raises
+  ``TokenVerificationError``. The caller (``get_current_user_id`` /
+  ``_extract_user_id_from_token``) maps this to HTTP 401 rather than
+  silently downgrading the request to anonymous, which would let a
+  logged-in user with an expired Tapis token accidentally create or mutate
+  public-pool rows. See PR review on this change (#104).
+
+A trust-as-is dev fallback was considered and rejected: dev and prod should
 be on the same verification code path to avoid regressions slipping through
 dev review.
 """
@@ -29,6 +36,16 @@ from jwt import PyJWKClient
 from jwt.exceptions import InvalidTokenError, PyJWKClientError
 
 logger = logging.getLogger(__name__)
+
+
+class TokenVerificationError(Exception):
+    """Raised when a bearer token is present but cannot be verified.
+
+    Separate from ``verify_token`` returning None (which signals "verifier
+    disabled"): callers translate this exception into HTTP 401 so a
+    present-but-invalid token does not silently fall through to anonymous.
+    """
+
 
 # RS256 by default: every OIDC-conformant JWKS uses asymmetric keys
 # (RSA / EC). HS256-style shared-secret algorithms are not fetched via JWKS,
@@ -65,14 +82,18 @@ def _jwks_client(url):
 
 
 def verify_token(token):
-    """Verify a bearer token and return its user id, or None.
+    """Verify a bearer token and return its user id.
 
-    Reads config at call time (not import time) so a server that boots before
-    its ``.env`` is populated still picks up the config on the first real
-    request. Any verification failure -- bad signature, expired, wrong
-    issuer/audience, unknown key id, missing ``exp``, malformed token, JWKS
-    fetch timeout -- returns None so the request falls through to public-pool
-    behavior, not a 500 on client-supplied input.
+    Returns None when ``JWT_JWKS_URL`` is unset (verifier disabled; caller
+    falls through to the public pool). Raises ``TokenVerificationError`` when
+    the verifier is enabled but the token is bad -- bad signature, expired,
+    wrong issuer/audience, unknown key id, missing ``exp``, malformed token,
+    JWKS fetch failure, or verified-but-missing user claim. Callers map that
+    exception to HTTP 401 rather than silently downgrading to anonymous.
+
+    Config is read at call time (not import time) so a server that boots
+    before its ``.env`` is populated still picks up the config on the first
+    real request.
     """
     jwks_url = _env("JWT_JWKS_URL")
     if not jwks_url:
@@ -102,12 +123,23 @@ def verify_token(token):
     try:
         signing_key = _jwks_client(jwks_url).get_signing_key_from_jwt(token)
         payload = jwt.decode(token, signing_key.key, **decode_kwargs)
-    except (InvalidTokenError, PyJWKClientError) as exc:
-        logger.debug("Token verification failed (%s): %s", type(exc).__name__, exc)
-        return None
+    except PyJWKClientError as exc:
+        # JWKS fetch / parse failure is an ops signal: a misconfigured
+        # JWT_JWKS_URL in prod (wrong Tapis URL, Tapis down, etc.) would
+        # otherwise silently 401 every logged-in user and the only evidence
+        # would be a debug log nobody is tailing.
+        logger.warning("JWKS client error (%s): %s", type(exc).__name__, exc)
+        raise TokenVerificationError("JWKS client error") from exc
+    except InvalidTokenError as exc:
+        logger.debug("Invalid token (%s): %s", type(exc).__name__, exc)
+        raise TokenVerificationError("Invalid token") from exc
 
     user_id = payload.get(user_claim)
     if not user_id:
-        logger.debug("Verified token has no %s claim", user_claim)
-        return None
+        # Signature + expiry + iss/aud all passed, but the claim the
+        # deployment is configured to scope on isn't in the token. From the
+        # user's perspective the token is effectively invalid for this
+        # service, so 401 rather than downgrade to anonymous.
+        logger.debug("Verified token missing %s claim", user_claim)
+        raise TokenVerificationError("Token missing " + user_claim + " claim")
     return str(user_id)
