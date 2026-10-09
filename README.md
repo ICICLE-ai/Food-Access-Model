@@ -156,6 +156,49 @@ If you are running the application locally, then switch to the "reduced_househol
    DB_HOST=[DATABASE HOST]
    DB_PORT=[DATABASE PORT FOR DATABASE]
    ```
+
+### Optional per-request user scoping (#102)
+
+Every API endpoint accepts an optional `Authorization: Bearer <token>` header.
+With no header, the request sees the shared public pool (`simulation_instances`
+rows where `owner_id IS NULL`) and all pre-scoping behavior is preserved.
+With a header, the token is verified via JWKS (`food_access_model/api/token_verification.py`)
+and the request sees ONLY instances owned by that user — public instances are
+not mixed in. "Exists but not yours" and "doesn't exist" both return 404 so
+ownership doesn't leak.
+
+Verification is JWKS-backed via `pyjwt[crypto]` and config-driven via env vars
+(`JWT_JWKS_URL`, `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_USER_CLAIM`, `JWT_ALGORITHMS`).
+When `JWT_JWKS_URL` is unset the verifier is a no-op that returns `None` for
+every token — a local dev operator who doesn't want to stand up an OIDC
+provider gets public-pool-only behavior, not trust-as-is. For the ICICLE/Tapis
+deployment, point `JWT_JWKS_URL` at the Tapis JWKS (e.g.
+`https://icicle.tapis.io/v3/tokens/.well-known/jwks.json`) and set
+`JWT_ISSUER` to the matching token service URL. Tapis tokens have no `aud`
+claim and `sub` is `username@tenant`, so leave `JWT_AUDIENCE` and
+`JWT_USER_CLAIM` unset. See `.env.example` for the full config surface.
+
+**Required manual DB migration for live databases.** This change adds a
+nullable `owner_id TEXT` column to `simulation_instances` and scopes the
+instance-name uniqueness per owner. New databases get both via the updated
+`CREATE TABLE` in `preprocessing/get_data.py`. For databases that have
+already been seeded and are not going to re-run preprocessing, run (requires
+PostgreSQL 15+):
+
+```sql
+ALTER TABLE simulation_instances ADD COLUMN IF NOT EXISTS owner_id TEXT;
+ALTER TABLE simulation_instances DROP CONSTRAINT IF EXISTS simulation_instances_name_key;
+ALTER TABLE simulation_instances
+    ADD CONSTRAINT simulation_instances_owner_name_key
+    UNIQUE (owner_id, name) NULLS NOT DISTINCT;
+```
+
+Existing rows stay `NULL` on `owner_id` (public) which preserves the
+pre-scoping shared-pool behavior for anything that already existed. The
+constraint swap is why PG15+ is required: `NULLS NOT DISTINCT` keeps the
+public pool uniquely-named without needing a separate catch for anonymous
+collisions.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- USAGE EXAMPLES -->
