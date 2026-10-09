@@ -97,8 +97,9 @@ def test_valid_token_returns_sub(configure_verifier, signing_keypair):
 
 
 def test_valid_token_uses_configured_user_claim(configure_verifier, signing_keypair, monkeypatch):
-    """JWT_USER_CLAIM lets a deployment pick a non-``sub`` claim (Tapis uses
-    ``username``) without having to patch the verifier."""
+    """JWT_USER_CLAIM lets a deployment pick a non-``sub`` claim without
+    having to patch the verifier -- for providers whose user identifier
+    lives on a custom claim rather than in ``sub``."""
     monkeypatch.setenv("JWT_USER_CLAIM", "username")
     token = _issue_token(signing_keypair, extra={"username": "jdoe"})
     assert token_verification.verify_token(token) == "jdoe"
@@ -164,7 +165,7 @@ def test_token_without_user_claim_raises(configure_verifier, signing_keypair, mo
 
 
 def test_jwks_client_error_raises_and_logs_warning(configure_verifier, signing_keypair, monkeypatch, caplog):
-    """JWKS fetch failure is an ops signal (misconfigured Tapis URL, Tapis
+    """JWKS fetch failure is an ops signal (misconfigured JWKS URL, provider
     down, timeout) and must not be a silent debug log in prod -- otherwise
     every logged-in user would 401 and nobody would see why."""
     import logging as _logging

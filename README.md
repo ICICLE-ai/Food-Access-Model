@@ -172,8 +172,11 @@ Verification is JWKS-backed via `pyjwt[crypto]` and config-driven via env vars
 When `JWT_JWKS_URL` is unset the verifier is a no-op that returns `None` for
 every token — a local dev operator who doesn't want to stand up an OIDC
 provider gets public-pool-only behavior, not trust-as-is. For the ICICLE/Tapis
-deployment, point `JWT_JWKS_URL` at the Tapis JWKS and set `JWT_USER_CLAIM=username`.
-See `.env.example` for the full config surface.
+deployment, point `JWT_JWKS_URL` at the Tapis JWKS (e.g.
+`https://icicle.tapis.io/v3/tokens/.well-known/jwks.json`) and set
+`JWT_ISSUER` to the matching token service URL. Tapis tokens have no `aud`
+claim and `sub` is `username@tenant`, so leave `JWT_AUDIENCE` and
+`JWT_USER_CLAIM` unset. See `.env.example` for the full config surface.
 
 **Required manual DB migration for live databases.** This change adds a
 nullable `owner_id TEXT` column to `simulation_instances` and scopes the
