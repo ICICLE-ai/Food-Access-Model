@@ -10,18 +10,38 @@ The Food Access and Strategy Simulation tool is a powerful resource for analyzin
 * React.js
 
 ### License
-<!-- TODO: link to relavant licenses  -->
+
+[![License: BSD 3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](https://github.com/ICICLE-ai/Food-Access-Model/blob/main/LICENSE)
+
+Distributed under the BSD 3-Clause License. See [`LICENSE`](LICENSE) for details. Copyright © 2025, Intelligent Cyberinfrastructure with Computational Learning in the Environment — ICICLE.
 
 ## References
-<!-- TODO: e.g., libraries, tools) or external documentation.
-- Definitions of key terms and concepts used in the project.  -->
+
+- **ICICLE Institute** — [icicle.osu.edu](https://icicle.osu.edu/)
+- **FASS-Frontend (companion React UI)** — [github.com/ICICLE-ai/FASS-Frontend](https://github.com/ICICLE-ai/FASS-Frontend)
+- **Mesa / mesa-geo** — [projectmesa/mesa](https://github.com/projectmesa/mesa) — agent-based modeling framework.
+- **OSMnx** — [gboeing/osmnx](https://github.com/gboeing/osmnx) — OpenStreetMap data retrieval.
+- **US Census Bureau API** — [api.census.gov](https://api.census.gov/) — household demographics data source.
+- **OpenStreetMap** — [openstreetmap.org](https://www.openstreetmap.org/) — store locations data source.
+
+### Key terms
+
+- **MFAI** — Modified Food Access Index; the per-household access score (0–100) the simulation outputs.
+- **Simulation step** — one calendar month advancement of the model.
+- **Convenience store (CSPM)** / **supermarket (SPM)** — the two store categories tracked, weighted differently in access scoring.
 
 ## Acknowledgements
 - Please include other funding sources to the section below.
    
 *National Science Foundation (NSF) funded AI institute for Intelligent Cyberinfrastructure with Computational Learning in the Environment (ICICLE) (OAC 2112606)*
 
-# Tutorial
+## Issue reporting
+
+Please report bugs, feature requests, and other issues via [GitHub Issues](https://github.com/ICICLE-ai/Food-Access-Model/issues).
+
+---
+
+# Tutorials
 
 ## Example Use Case
 
@@ -31,6 +51,8 @@ The Food Access and Strategy Simulation tool is a powerful resource for analyzin
     access, particularly for households without vehicles.
 3. Remove a Store: Remove "Charlie’s Market" and/or surrounding stores and examine
     how food access challenges re-emerge in the affected area.
+
+---
 
 # Explanation
 
@@ -75,7 +97,9 @@ at the census tract level.
     - Average household income
     - Average number of household vehicles
 
-# How To Guide
+---
+
+# How-To Guides
 
 ## How To Use The Tool
 Step 1: Adding a Store
