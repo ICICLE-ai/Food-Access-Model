@@ -11,10 +11,11 @@ from names_generator import generate_name
 import databases
 import orjson
 
-from fastapi import APIRouter, Body, HTTPException, Depends, Query
+from fastapi import APIRouter, Body, HTTPException, Depends, Header, Query
 from fastapi.responses import StreamingResponse, ORJSONResponse
 
 from food_access_model.api.helpers import StoreInput, convert_centroid_to_polygon
+from food_access_model.api.token_verification import TokenVerificationError, verify_token
 from food_access_model.abm.geo_model import GeoModel
 from food_access_model.abm.store import Store
 from food_access_model.repository.db_repository import DBRepository, get_db_repository
@@ -76,6 +77,95 @@ router = APIRouter(prefix="/api", tags=["ABM"])
 pool: asyncpg.Pool = None  # will be set on startup
 
 
+# --- Optional bearer-token user scoping (issue #102, ports FEAST-backend #216 + #219) --------
+# Shared pool when no token (user_id is None) + owner_id IS NULL; otherwise
+# owner_id must match the caller's user id exactly. IS NOT DISTINCT FROM treats
+# NULL = NULL as TRUE so a single comparison handles both the public-public
+# and owned-owned cases without a two-branch WHERE.
+_OWNERSHIP_PREDICATE_SQL = "owner_id IS NOT DISTINCT FROM $2::text"
+
+
+def _extract_user_id_from_token(token: str):
+    """Return the user id carried by a verified bearer token.
+
+    Delegates to ``verify_token`` (``food_access_model.api.token_verification``),
+    which checks the token's signature, expiry, and (if configured) issuer
+    and audience against a JWKS endpoint. Returns None when the verifier is
+    disabled (``JWT_JWKS_URL`` unset) so the request falls through to the
+    public-pool behavior; raises HTTP 401 when a token is present but fails
+    verification so a logged-in user with an expired Tapis token does not
+    silently downgrade to anonymous and start touching shared scenarios.
+    See PR review on this change (#104).
+    """
+    try:
+        return verify_token(token)
+    except TokenVerificationError:
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
+
+
+def get_current_user_id(authorization: Optional[str] = Header(None)):
+    """Parse the optional ``Authorization: Bearer <token>`` header into a user id.
+
+    Returns None when the header is absent, uses a non-Bearer scheme, or is a
+    Bearer with an empty token -- all of which are the "no-token / shared
+    public pool" signal so pre-login frontends keep working unchanged. A
+    Bearer header with a non-empty token that fails verification raises
+    HTTP 401 (see ``_extract_user_id_from_token``).
+    """
+    if not authorization:
+        return None
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer":
+        return None
+    token = token.strip()
+    if not token:
+        return None
+    return _extract_user_id_from_token(token)
+
+
+async def authorize_instance_access(instance_id: str, user_id):
+    """Raise 404 if the caller cannot access ``instance_id``.
+
+    404 (not 403) for the "exists but not yours" case: the response is
+    deliberately indistinguishable from a nonexistent instance so ownership
+    doesn't leak. Also 404s for genuinely-missing ids.
+    """
+    async with pool.acquire() as conn:
+        row = await conn.fetchval(
+            f"SELECT 1 FROM simulation_instances WHERE id = $1 AND {_OWNERSHIP_PREDICATE_SQL}",
+            instance_id,
+            user_id,
+        )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Simulation instance not found")
+
+
+async def authorized_instance_id_path(
+    instance_id: str,
+    user_id: Optional[str] = Depends(get_current_user_id),
+) -> str:
+    """Path-param dependency: parse (400), then enforce existence + ownership (404)."""
+    try:
+        uuid.UUID(instance_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid instance ID format")
+    await authorize_instance_access(instance_id, user_id)
+    return instance_id
+
+
+async def authorized_instance_id_query(
+    simulation_instance_id: str = Query(..., description="Simulation instance ID"),
+    user_id: Optional[str] = Depends(get_current_user_id),
+) -> str:
+    """Query-param dependency: parse (400), then enforce existence + ownership (404)."""
+    try:
+        uuid.UUID(simulation_instance_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid instance ID format")
+    await authorize_instance_access(simulation_instance_id, user_id)
+    return simulation_instance_id
+
+
 @router.on_event("startup")
 async def startup():
     global pool
@@ -97,9 +187,15 @@ async def shutdown():
 
 
 @router.get("/simulation-instances")
-async def get_simulation_instances() -> ORJSONResponse:
+async def get_simulation_instances(
+    user_id: Optional[str] = Depends(get_current_user_id),
+) -> ORJSONResponse:
     """
-    Get all simulation instances.
+    Get the simulation instances visible to the caller.
+
+    No ``Authorization: Bearer`` header returns the shared public pool
+    (``owner_id IS NULL``). A valid token returns ONLY instances owned by
+    that caller -- public instances are NOT included.
 
     Returns:
         dict: A dictionary containing a list of simulation instances.
@@ -107,18 +203,19 @@ async def get_simulation_instances() -> ORJSONResponse:
     query = """
         SELECT id::text AS id, name, description, created_at
         FROM simulation_instances
+        WHERE owner_id IS NOT DISTINCT FROM $1::text
         ORDER BY created_at DESC;
         """
 
     async with pool.acquire() as conn:
-        rows = await conn.fetch(query)
+        rows = await conn.fetch(query, user_id)
 
     simulation_instances = [dict(row) for row in rows]
     return ORJSONResponse({"simulation_instances": simulation_instances})
 
 
 @router.get("/simulation-instances/{instance_id}")
-async def get_simulation_instance(instance_id: str) -> ORJSONResponse:
+async def get_simulation_instance(instance_id: str = Depends(authorized_instance_id_path)) -> ORJSONResponse:
     """
     Get a specific simulation instance by ID.
 
@@ -128,13 +225,6 @@ async def get_simulation_instance(instance_id: str) -> ORJSONResponse:
     Returns:
         dict: A dictionary containing the details of the simulation instance.
     """
-
-    # check if instance_id is a valid uuid
-    try:
-        uuid.UUID(instance_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid instance ID format")
-
     query = """
         SELECT id::text AS id, name, description, created_at
         FROM simulation_instances
@@ -148,33 +238,30 @@ async def get_simulation_instance(instance_id: str) -> ORJSONResponse:
         raise HTTPException(status_code=500, detail="Internal server error")
 
     if row is None:
+        # Defense in depth: the authorized dependency already verified existence,
+        # but the row could in theory vanish between the two queries.
         raise HTTPException(status_code=404, detail="Simulation instance not found")
     instance = dict(row)
     return ORJSONResponse({"simulation_instance": instance})
 
 
 @router.post("/simulation-instances/{instance_id}/advance")
-async def advance_simulation_instance(instance_id: str) -> ORJSONResponse:
+async def advance_simulation_instance(instance_id: str = Depends(authorized_instance_id_path)) -> ORJSONResponse:
     """
     Advance the simulation instance by one step.
- 
+
     Parameters:
         instance_id (str): The ID of the simulation instance to advance
 
     Returns:
         dict: A dictionary indicating success
     """
-    try:
-        uuid.UUID(instance_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid instance ID format")
-
     await _run_model_step(instance_id)
     return ORJSONResponse({"status": "success"})
 
 
 @router.post("/simulation-instances/{instance_id}/reset")
-async def reset_simulation_instance(instance_id: str) -> ORJSONResponse:
+async def reset_simulation_instance(instance_id: str = Depends(authorized_instance_id_path)) -> ORJSONResponse:
     """
     Reset the simulation instance to its initial state and deletes data from other steps.
 
@@ -191,9 +278,14 @@ async def reset_simulation_instance(instance_id: str) -> ORJSONResponse:
 
 @router.post("/simulation-instances")
 async def create_simulation_instance(name: Optional[str] = Body(None, embed=True),
-                                     household_limit: Optional[int] = Body(None, embed=True)) -> ORJSONResponse:
+                                     household_limit: Optional[int] = Body(None, embed=True),
+                                     user_id: Optional[str] = Depends(get_current_user_id)) -> ORJSONResponse:
     """
     Create a new simulation instance.
+
+    The caller's user id (from ``Authorization: Bearer <token>``) is stamped
+    into ``owner_id``; a no-token caller creates a public instance
+    (``owner_id`` NULL), matching the pre-#102 shared-pool behavior.
 
     Parameters:
         name (str, optional): The name of the simulation instance.
@@ -214,26 +306,26 @@ async def create_simulation_instance(name: Optional[str] = Body(None, embed=True
     })
 
     query = """
-        INSERT INTO simulation_instances (name, description)
-        VALUES ($1, $2)
+        INSERT INTO simulation_instances (name, description, owner_id)
+        VALUES ($1, $2, $3)
         RETURNING id, name, description, created_at;
         """
 
     async with pool.acquire() as conn:
-        row = await conn.fetchrow(query, name, description)
+        row = await conn.fetchrow(query, name, description, user_id)
     instance = dict(row)
 
     instance['id'] = str(instance['id'])  # Convert UUID to string for JSON serialization
 
     await generate_household_instances_for_simulation(instance['id'], household_limit)
     await generate_stores_for_simulation(instance['id'])
-    await _run_model_step(instance['id'])  # run a step right after creating a new instance 
+    await _run_model_step(instance['id'])  # run a step right after creating a new instance
 
     return ORJSONResponse({"simulation_instance": instance})
 
 
 @router.delete("/simulation-instances/{instance_id}")
-async def delete_simulation_instance(instance_id: str) -> ORJSONResponse:
+async def delete_simulation_instance(instance_id: str = Depends(authorized_instance_id_path)) -> ORJSONResponse:
     """
     Delete a simulation instance by ID.
 
@@ -278,7 +370,7 @@ async def delete_simulation_instance(instance_id: str) -> ORJSONResponse:
 
 
 @router.get("/households")
-async def get_all_households(simulation_instance_id: str = Query(..., description="Simulation instance ID"),
+async def get_all_households(simulation_instance_id: str = Depends(authorized_instance_id_query),
                              simulation_step: Optional[int] = Query(0, description="Optional step filter")) -> Dict[str, list]:
     """
     Gets all households in the model
@@ -296,7 +388,7 @@ async def get_all_households(simulation_instance_id: str = Query(..., descriptio
 
 
 @router.get("/stores")
-async def get_stores(simulation_instance_id: str = Query(..., description="Simulation instance ID"),
+async def get_stores(simulation_instance_id: str = Depends(authorized_instance_id_query),
                      simulation_step: Optional[int] = Query(0, description="Optional step filter")) -> Dict[str, list]:
     """
     Gets all stores in the model
@@ -313,7 +405,8 @@ async def get_stores(simulation_instance_id: str = Query(..., description="Simul
 
 
 @router.post("/stores")
-async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
+async def add_store(store: StoreInput,
+                    user_id: Optional[str] = Depends(get_current_user_id)) -> Dict[str, List[Dict[str, Any]]]:
     """
     Adds a store to the model
 
@@ -325,6 +418,14 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
         dict: A dictionary of stores in the simulation with the new added store
 
     """
+    # Ownership can't be enforced via a dependency here: the instance id lives
+    # in the request body (StoreInput), not a path/query param.
+    try:
+        uuid.UUID(store.simulation_instance_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid instance ID format")
+    await authorize_instance_access(store.simulation_instance_id, user_id)
+
     # get the highest store_id for the simulation instance and step
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
@@ -352,7 +453,7 @@ async def add_store(store: StoreInput) -> Dict[str, List[Dict[str, Any]]]:
 
 @router.delete("/stores")
 async def remove_store(store_id: str = Query(..., description="ID of the store to delete"),
-                       simulation_instance_id: str = Query(..., description="Simulation instance ID"),
+                       simulation_instance_id: str = Depends(authorized_instance_id_query),
                        simulation_step: int = Query(..., description="Simulation step")) -> Dict[str, List[Dict[str, Any]]]:
     """
     Removes a store from a model given a store_id, simulation_instance_id, and simulation_step
@@ -387,7 +488,7 @@ async def remove_store(store_id: str = Query(..., description="ID of the store t
 
 
 @router.get("/get-step-number")
-async def get_step_number(simulation_instance_id: str = Query(..., description="Simulation instance ID")) -> Dict[str, int]:
+async def get_step_number(simulation_instance_id: str = Depends(authorized_instance_id_query)) -> Dict[str, int]:
     """
     Gets the current step number the model is at
 
@@ -402,7 +503,7 @@ async def get_step_number(simulation_instance_id: str = Query(..., description="
 
 
 @router.get("/get-num-households")
-async def get_num_households(simulation_instance_id: str = Query(..., description="Simulation instance ID"),
+async def get_num_households(simulation_instance_id: str = Depends(authorized_instance_id_query),
                              simulation_step: int = Query(..., description="Simulation step")) -> Dict[str, int]:
     """
     Gets the number of households in the model
@@ -427,7 +528,7 @@ async def get_num_households(simulation_instance_id: str = Query(..., descriptio
 
 
 @router.get("/get-num-stores")
-async def get_num_stores(simulation_instance_id: str = Query(..., description="Simulation instance ID"),
+async def get_num_stores(simulation_instance_id: str = Depends(authorized_instance_id_query),
                          simulation_step: int = Query(..., description="Simulation step")) -> Dict[str, int]:
     """
     Gets the number of stores in the model
@@ -462,7 +563,7 @@ async def get_num_stores(simulation_instance_id: str = Query(..., description="S
 
 
 @router.get("/get-household-stats")
-async def get_household_stats(simulation_instance_id: str = Query(..., description="Simulation instance ID"),
+async def get_household_stats(simulation_instance_id: str = Depends(authorized_instance_id_query),
                               simulation_step: int = Query(..., description="Simulation step")) -> Dict[str, float]:
     """
     Gets household stats
