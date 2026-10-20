@@ -333,7 +333,7 @@ def initialize_database_tables(
         owner_id TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT simulation_instances_owner_name_key
-            UNIQUE (owner_id, name) NULLS NOT DISTINCT
+            UNIQUE NULLS NOT DISTINCT (owner_id, name)
     );
     ''')
     # Optional bearer-token user scoping (#102). CREATE TABLE IF NOT EXISTS
@@ -363,7 +363,7 @@ def initialize_database_tables(
         ) THEN
             ALTER TABLE simulation_instances
                 ADD CONSTRAINT simulation_instances_owner_name_key
-                UNIQUE (owner_id, name) NULLS NOT DISTINCT;
+                UNIQUE NULLS NOT DISTINCT (owner_id, name);
         END IF;
     END $$;
     ''')
@@ -1077,7 +1077,7 @@ def main() -> None:
     cursor.execute("""
         INSERT INTO simulation_instances (name, description)
         VALUES ('default_simulation', 'Brown County, Wisconsin')
-        ON CONFLICT (name) DO NOTHING
+        ON CONFLICT (owner_id, name) DO NOTHING
         RETURNING id;
     """)
     result = cursor.fetchone()
@@ -1085,7 +1085,7 @@ def main() -> None:
         simulation_instance_id = result[0]
     else:
         # If already exists, fetch it
-        cursor.execute("SELECT id FROM simulation_instances WHERE name = 'default_simulation';")
+        cursor.execute("SELECT id FROM simulation_instances WHERE name = 'default_simulation' AND owner_id IS NULL;")
         simulation_instance_id = cursor.fetchone()[0]
     
     logging.info(f"Using simulation_instance_id: {simulation_instance_id}")
