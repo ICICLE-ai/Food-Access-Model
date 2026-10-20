@@ -84,6 +84,11 @@ pool: asyncpg.Pool = None  # will be set on startup
 # and owned-owned cases without a two-branch WHERE.
 _OWNERSHIP_PREDICATE_SQL = "owner_id IS NOT DISTINCT FROM $2::text"
 
+# The seed template every new instance copies from. Names are only unique per
+# owner, so a logged-in user can create their own "default_simulation"; pin
+# the lookup to the public row so that copy is never used as the template.
+_DEFAULT_INSTANCE_ID_QUERY = "SELECT id FROM simulation_instances WHERE name = 'default_simulation' AND owner_id IS NULL;"
+
 
 def _extract_user_id_from_token(token: str):
     """Return the user id carried by a verified bearer token.
@@ -336,7 +341,7 @@ async def delete_simulation_instance(instance_id: str = Depends(authorized_insta
         dict: A dictionary indicating success.
     """
 
-    get_default_instance_id_query = """SELECT id FROM simulation_instances WHERE name = 'default_simulation';"""
+    get_default_instance_id_query = _DEFAULT_INSTANCE_ID_QUERY
 
     household_query = """
         DELETE FROM households
@@ -920,7 +925,7 @@ async def generate_household_instances_for_simulation(instance_id: str, househol
         """
 
     # Assuming you already have an asyncpg connection object
-    get_default_instance_id_query = """SELECT id FROM simulation_instances WHERE name = 'default_simulation';"""
+    get_default_instance_id_query = _DEFAULT_INSTANCE_ID_QUERY
 
     async with pool.acquire() as conn:
         default_instance_row = await conn.fetchrow(get_default_instance_id_query)
@@ -947,7 +952,7 @@ async def generate_stores_for_simulation(instance_id: str):
     # This function should create store instances in the database for the given simulation instance
 
     # Get the simulation_instance id for the default simulation
-    get_default_instance_id_query = """SELECT id FROM simulation_instances WHERE name = 'default_simulation';"""
+    get_default_instance_id_query = _DEFAULT_INSTANCE_ID_QUERY
 
     async with pool.acquire() as conn:
         default_instance_row = await conn.fetchrow(get_default_instance_id_query)

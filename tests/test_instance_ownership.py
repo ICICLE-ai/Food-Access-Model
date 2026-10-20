@@ -277,3 +277,73 @@ async def test_add_store_404s_when_instance_not_accessible(seed_pool):
     with pytest.raises(HTTPException) as exc:
         await routes.add_store(store, user_id="other")
     assert exc.value.status_code == 404
+
+
+# --- default_simulation lookup ignores owned look-alikes --------------------
+#
+# Names are only unique per owner, so a logged-in user can create their own
+# "default_simulation". Missed in the #104 review because the old global
+# UNIQUE(name) made a second row impossible and nothing exercised the seed
+# lookup. These guard that the template lookup only ever sees the public row.
+
+
+PUBLIC_DEFAULT_ID = str(uuid.UUID("22222222-2222-4222-8222-222222222222"))
+OWNED_LOOKALIKE_ID = str(uuid.UUID("33333333-3333-4333-8333-333333333333"))
+
+
+class _DefaultLookupConn:
+    """Answers the default_simulation fetchrow from in-memory rows and records
+    every execute. Applies ``owner_id IS NULL`` only when the query asks for
+    it, so an unscoped lookup gets the owned look-alike (listed first)."""
+
+    def __init__(self, rows, executed):
+        self._rows = rows
+        self._executed = executed
+
+    async def fetchrow(self, query, *args):
+        assert "default_simulation" in query, f"unexpected fetchrow: {query}"
+        for row_id, row_owner in self._rows:
+            if "owner_id IS NULL" in query and row_owner is not None:
+                continue
+            return {"id": row_id}
+        return None
+
+    async def execute(self, query, *args):
+        self._executed.append(args)
+
+
+@pytest.fixture
+def default_lookup_pool(monkeypatch):
+    executed = []
+    rows = [(OWNED_LOOKALIKE_ID, "owner-1"), (PUBLIC_DEFAULT_ID, None)]
+
+    class _Acquire:
+        async def __aenter__(self):
+            return _DefaultLookupConn(rows, executed)
+
+        async def __aexit__(self, *exc):
+            return False
+
+    class _Pool:
+        def acquire(self):
+            return _Acquire()
+
+    monkeypatch.setattr(routes, "pool", _Pool())
+    return executed
+
+
+async def test_generate_stores_copies_from_public_default(default_lookup_pool):
+    await routes.generate_stores_for_simulation(VALID_ID)
+    assert default_lookup_pool == [(VALID_ID, PUBLIC_DEFAULT_ID)]
+
+
+async def test_generate_households_copies_from_public_default(default_lookup_pool):
+    await routes.generate_household_instances_for_simulation(VALID_ID, household_limit=5)
+    assert default_lookup_pool == [(VALID_ID, PUBLIC_DEFAULT_ID, 5)]
+
+
+async def test_delete_refuses_public_default_despite_owned_lookalike(default_lookup_pool):
+    with pytest.raises(HTTPException) as exc:
+        await routes.delete_simulation_instance(instance_id=PUBLIC_DEFAULT_ID)
+    assert exc.value.status_code == 400
+    assert default_lookup_pool == []
