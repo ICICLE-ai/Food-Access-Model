@@ -1,0 +1,15 @@
+- id: "Food-Access-Model:0.1.0"
+  owner: James DeSilver
+  primaryThrust: useInspired/SF
+  name: Food-Access-Model
+  status: ProductionRelease
+  description: The Food Access and Strategy Simulation tool is a powerful resource for analyzing and simulating the effects of adding or removing stores on household food access.
+  componentVersion: 0.1.0
+  targetIcicleRelease: "2026-12"
+  licenseUrl: https://github.com/ICICLE-ai/Food-Access-Model?tab=BSD-3-Clause-1-ov-file
+  publicAccess: true
+  sourceCodeUrl: https://github.com/ICICLE-ai/Food-Access-Model
+  codeReviewConducted: true
+  testsWritten: true
+  developerDocumentationAvailable: false
+  trainingTutorialsAvailable: false

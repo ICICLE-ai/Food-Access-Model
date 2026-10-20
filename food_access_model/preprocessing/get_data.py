@@ -328,10 +328,44 @@ def initialize_database_tables(
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS simulation_instances (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
         description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        owner_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT simulation_instances_owner_name_key
+            UNIQUE NULLS NOT DISTINCT (owner_id, name)
     );
+    ''')
+    # Optional bearer-token user scoping (#102). CREATE TABLE IF NOT EXISTS
+    # leaves an existing simulation_instances table untouched, so add the
+    # column explicitly for already-seeded databases. NULL = public pool,
+    # matching the pre-#102 behavior for existing rows.
+    cursor.execute('''
+    ALTER TABLE simulation_instances
+        ADD COLUMN IF NOT EXISTS owner_id TEXT;
+    ''')
+    # Scoped-unique instance names (PR review on #104). The pre-scoping schema
+    # had `name TEXT UNIQUE NOT NULL`, which 500s on cross-user name
+    # collisions and leaks that someone else owns an instance by that name.
+    # Already-seeded databases need the old global UNIQUE on name dropped and
+    # the new per-owner UNIQUE added. NULLS NOT DISTINCT keeps the public
+    # pool (owner_id NULL) uniquely-named too; requires PostgreSQL 15+.
+    cursor.execute('''
+    ALTER TABLE simulation_instances
+        DROP CONSTRAINT IF EXISTS simulation_instances_name_key;
+    ''')
+    cursor.execute('''
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'simulation_instances_owner_name_key'
+        ) THEN
+            ALTER TABLE simulation_instances
+                ADD CONSTRAINT simulation_instances_owner_name_key
+                UNIQUE NULLS NOT DISTINCT (owner_id, name);
+        END IF;
+    END $$;
     ''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS households (
@@ -1043,7 +1077,7 @@ def main() -> None:
     cursor.execute("""
         INSERT INTO simulation_instances (name, description)
         VALUES ('default_simulation', 'Brown County, Wisconsin')
-        ON CONFLICT (name) DO NOTHING
+        ON CONFLICT (owner_id, name) DO NOTHING
         RETURNING id;
     """)
     result = cursor.fetchone()
@@ -1051,7 +1085,7 @@ def main() -> None:
         simulation_instance_id = result[0]
     else:
         # If already exists, fetch it
-        cursor.execute("SELECT id FROM simulation_instances WHERE name = 'default_simulation';")
+        cursor.execute("SELECT id FROM simulation_instances WHERE name = 'default_simulation' AND owner_id IS NULL;")
         simulation_instance_id = cursor.fetchone()[0]
     
     logging.info(f"Using simulation_instance_id: {simulation_instance_id}")
