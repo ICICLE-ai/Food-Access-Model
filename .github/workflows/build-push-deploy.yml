@@ -3,18 +3,15 @@
 ### Release-* methodology originally authored by Nathan Freeman (TACC) here:
 ### https://github.com/tapis-project/tapis-workflows/blob/prod/.github/workflows/ci.yml#L59
 # Description. This Github action runs when there are new commits to dev, stage, main, or release-*.
-# The action logs into GHCR with the Github action environment secrets `GHCR_USERNAME`
-# and `GHCR_TOKEN`.
+# The action logs into GHCR with the workflow's `github.actor` and `GITHUB_TOKEN`.
 # The action pulls the repo and builds the icicle-ai/store-closure-abm image and uses branch name as the
 # docker tag. In instance of `release-1.2.0`, sed will delete `release-`, leaving `1.2.0`.
 # If branch = main, tag becomes `latest` so latest is built.
 #
 ### Variables
-#   vars.GHCR_USERNAME: Docker username
-#   secrets.GHCR_TOKEN: Docker token
-#   secrets.TAPIS_ICICLE_PROD_TOKEN: token for Tapis user
-#   vars.POD_ID: storeclosureabm
-#   vars.DEV_POD_ID: storeclosureabmdev
+#   secrets.TAPIS_TOKEN: ICICLE org-level Tapis token (see cicd-templates wiki Quick-start)
+#   vars.POD_ID: fassback
+#   vars.STAGE_POD_ID: fassbackstage
 
 name: Build & Push & Deploy
 on:
@@ -94,7 +91,7 @@ jobs:
       with:
         url: 'https://icicleai.tapis.io/v3/pods/${{ vars.STAGE_POD_ID }}/restart'
         method: 'GET'
-        customHeaders: '{"Content-Type": "application/json", "X-Tapis-Token": "${{ secrets.TAPIS_ICICLE_PROD_TOKEN }}"}'
+        customHeaders: '{"Content-Type": "application/json", "X-Tapis-Token": "${{ secrets.TAPIS_TOKEN }}"}'
 
   deploy-images:
     runs-on: ubuntu-latest
@@ -107,4 +104,4 @@ jobs:
       with:
         url: 'https://icicleai.tapis.io/v3/pods/${{ vars.POD_ID }}/restart'
         method: 'GET'
-        customHeaders: '{"Content-Type": "application/json", "X-Tapis-Token": "${{ secrets.TAPIS_ICICLE_PROD_TOKEN }}"}'
+        customHeaders: '{"Content-Type": "application/json", "X-Tapis-Token": "${{ secrets.TAPIS_TOKEN }}"}'
