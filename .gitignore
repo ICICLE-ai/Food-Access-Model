@@ -3,6 +3,7 @@ config.py
 
 #useless json
 *.json
+!openapi.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

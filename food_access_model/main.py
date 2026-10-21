@@ -32,7 +32,15 @@ setup_logger()
 logger = logging.getLogger(__name__)
 logger.info("Starting the application...")
 
-app = FastAPI()
+app = FastAPI(
+    title="Food-Access-Model API",
+    description=(
+        "Backend API for the Food Equity Access Simulation Technology (FEAST) "
+        "agent-based model. Simulates how changes in the food retail landscape "
+        "affect household food access. Endpoints are grouped under /api."
+    ),
+    version="0.1.0",
+)
 
 app.add_middleware(
     CORSMiddleware,
