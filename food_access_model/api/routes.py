@@ -71,10 +71,42 @@ FOOD_STORE_QUERY = """
                      """
 
 
-router = APIRouter(prefix="/api", tags=["ABM"])
-# FRONT_URL = os.environ.get("FRONT_URL", "http://localhost:5173")
+pool: asyncpg.Pool = None  # set on startup, or lazily by ensure_pool if startup could not connect
+_pool_lock = asyncio.Lock()
 
-pool: asyncpg.Pool = None  # will be set on startup
+
+async def _create_pool() -> asyncpg.Pool:
+    logging.info(f"Initializing database connection to database {os.getenv('DB_NAME')} at {os.getenv('DB_HOST')}")
+    new_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5, timeout=10)
+    logging.info("Database pool created")
+    return new_pool
+
+
+async def ensure_pool() -> None:
+    """Router-wide dependency: create the pool if startup (or an earlier retry) couldn't.
+
+    The pool used to be created only at startup, so if the database was down
+    when the backend booted, every request failed with ``'NoneType' object has
+    no attribute 'acquire'`` until someone restarted the pod -- even after the
+    database came back (the Oct 2026 fassdb node outage). Retrying here lets
+    the backend recover on its own. While the database is still unreachable,
+    requests get a 503 instead of an AttributeError 500.
+    """
+    global pool
+    if pool is not None:
+        return
+    async with _pool_lock:
+        if pool is not None:  # another request created it while we waited
+            return
+        try:
+            pool = await _create_pool()
+        except Exception as e:
+            logging.error(f"Could not create database connection pool: {e}")
+            raise HTTPException(status_code=503, detail="Database unavailable")
+
+
+router = APIRouter(prefix="/api", tags=["ABM"], dependencies=[Depends(ensure_pool)])
+# FRONT_URL = os.environ.get("FRONT_URL", "http://localhost:5173")
 
 
 # --- Optional bearer-token user scoping (issue #102, ports FEAST-backend #216 + #219) --------
@@ -175,20 +207,19 @@ async def authorized_instance_id_query(
 async def startup():
     global pool
     try:
-        logging.info(f"Initializing database connection to database {os.getenv('DB_NAME')} at {os.getenv('DB_HOST')}")
-        pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5, timeout=10)
-        logging.info("Database pool created")
+        pool = await _create_pool()
     except Exception as e:
-        # CRITICAL: If connection fails, log the error but DO NOT crash.
-        # The web server will stay alive, allowing the health check to pass.
-        logging.error(f"FATAL: Could not create database connection pool on startup: {e}")
-        pool = None  # Ensure pool is None if connection fails
+        # Don't crash: the web server stays up and ensure_pool retries on the
+        # next request, so the backend recovers once the database is reachable.
+        logging.error(f"Could not create database connection pool on startup, will retry on first request: {e}")
+        pool = None
 
 
 @router.on_event("shutdown")
 async def shutdown():
-    await pool.close()
-    logging.info("Database pool closed")
+    if pool is not None:
+        await pool.close()
+        logging.info("Database pool closed")
 
 
 @router.get("/simulation-instances")
