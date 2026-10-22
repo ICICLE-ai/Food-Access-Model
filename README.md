@@ -165,6 +165,42 @@ hold down the shift or command key as you select. To deselect stores, click on t
 3. Confirm the removal. The store(s) will disappear from the map.
 4. Use the Step Function to evaluate the effects of this change on household food access.
 
+## How to Call the API Programmatically
+
+The backend is a FastAPI service and ships with a machine-readable OpenAPI
+specification so you can generate clients, import endpoints into tools like
+Postman or Insomnia, or wire FEAST into other ICICLE components.
+
+- **Static spec file:** [`openapi.json`](openapi.json) in the repo root. Re-generate
+  it from the live app with:
+  ```sh
+  uv run python -c "from food_access_model.main import app; import json; print(json.dumps(app.openapi(), indent=2))" > openapi.json
+  ```
+- **Live interactive docs:** when the server is running, Swagger UI is served at
+  `/docs` and ReDoc at `/redoc`. For the ICICLE deployment this is
+  `https://fassback.pods.icicleai.tapis.io/docs`.
+
+All endpoints are grouped under `/api` (for example `GET /api/simulation-instances`).
+Every endpoint accepts an optional `Authorization: Bearer <Tapis token>` header:
+
+- With no header, the caller sees the shared public pool of simulation instances
+  (any row with `owner_id IS NULL`). This is the same behavior as pre-#102.
+- With a valid Tapis token, the caller sees ONLY the instances they own; writes
+  are stamped with `owner_id = <token sub>`.
+
+Minimal curl example (replace `$TOKEN` with your Tapis token from
+`https://icicleai.tapis.io`):
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" \
+     https://fassback.pods.icicleai.tapis.io/api/simulation-instances
+```
+
+Health check (no auth):
+```sh
+curl https://fassback.pods.icicleai.tapis.io/api/health
+```
+
 ## Tips for Effective Use
 
 - Analyze Community Needs: Before making changes, review community-level data to

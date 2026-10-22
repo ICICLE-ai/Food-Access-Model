@@ -1,0 +1,1092 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Food-Access-Model API",
+    "description": "Backend API for the Food Equity Access Simulation Technology (FEAST) agent-based model. Simulates how changes in the food retail landscape affect household food access. Endpoints are grouped under /api.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/simulation-instances": {
+      "get": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Get Simulation Instances",
+        "description": "Get the simulation instances visible to the caller.\n\nNo ``Authorization: Bearer`` header returns the shared public pool\n(``owner_id IS NULL``). A valid token returns ONLY instances owned by\nthat caller -- public instances are NOT included.\n\nReturns:\n    dict: A dictionary containing a list of simulation instances.",
+        "operationId": "get_simulation_instances_api_simulation_instances_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Create Simulation Instance",
+        "description": "Create a new simulation instance.\n\nThe caller's user id (from ``Authorization: Bearer <token>``) is stamped\ninto ``owner_id``; a no-token caller creates a public instance\n(``owner_id`` NULL), matching the pre-#102 shared-pool behavior.\n\nParameters:\n    name (str, optional): The name of the simulation instance.\n    description (str, optional): A description of the simulation instance.\n    household_limit (int, optional): The maximum number of households to generate for the simulation instance.\n\nReturns:\n    dict: A dictionary containing the details of the created simulation instance.",
+        "operationId": "create_simulation_instance_api_simulation_instances_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_simulation_instance_api_simulation_instances_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulation-instances/{instance_id}": {
+      "get": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Get Simulation Instance",
+        "description": "Get a specific simulation instance by ID.\n\nParameters:\n    instance_id (str): The ID of the simulation instance to retrieve.\n\nReturns:\n    dict: A dictionary containing the details of the simulation instance.",
+        "operationId": "get_simulation_instance_api_simulation_instances__instance_id__get",
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Instance Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Delete Simulation Instance",
+        "description": "Delete a simulation instance by ID.\n\nParameters:\n    instance_id (str): The ID of the simulation instance to delete.\n\nReturns:\n    dict: A dictionary indicating success.",
+        "operationId": "delete_simulation_instance_api_simulation_instances__instance_id__delete",
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Instance Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulation-instances/{instance_id}/advance": {
+      "post": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Advance Simulation Instance",
+        "description": "Advance the simulation instance by one step.\n\nParameters:\n    instance_id (str): The ID of the simulation instance to advance\n\nReturns:\n    dict: A dictionary indicating success",
+        "operationId": "advance_simulation_instance_api_simulation_instances__instance_id__advance_post",
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Instance Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulation-instances/{instance_id}/reset": {
+      "post": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Reset Simulation Instance",
+        "description": "Reset the simulation instance to its initial state and deletes data from other steps.\n\nParameters:\n    instance_id (str): The ID of the simulation instance to reset\n\nReturns:\n    dict: A dictionary indicating success",
+        "operationId": "reset_simulation_instance_api_simulation_instances__instance_id__reset_post",
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Instance Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/households": {
+      "get": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Get All Households",
+        "description": "Gets all households in the model\n\nParameters:\n    simulation_instance_id (str): The ID of the simulation instance to get households for\n    simulation_step (int): The step number to get households for\n\nReturns:\n    dict: A dictionary of households in the model with 'households_json' as the key which has a list of\n          household objects",
+        "operationId": "get_all_households_api_households_get",
+        "parameters": [
+          {
+            "name": "simulation_step",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional step filter",
+              "default": 0,
+              "title": "Simulation Step"
+            },
+            "description": "Optional step filter"
+          },
+          {
+            "name": "simulation_instance_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Simulation instance ID",
+              "title": "Simulation Instance Id"
+            },
+            "description": "Simulation instance ID"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {}
+                  },
+                  "title": "Response Get All Households Api Households Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stores": {
+      "get": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Get Stores",
+        "description": "Gets all stores in the model\n\nParameters:\n    simulation_instance_id (str): The ID of the simulation instance to get stores for\n    simulation_step (int): The step number to get stores for\n\nReturns:\n    dict: A dictionary of stores in the model with 'store_json' as the key which has a list of store objects",
+        "operationId": "get_stores_api_stores_get",
+        "parameters": [
+          {
+            "name": "simulation_step",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional step filter",
+              "default": 0,
+              "title": "Simulation Step"
+            },
+            "description": "Optional step filter"
+          },
+          {
+            "name": "simulation_instance_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Simulation instance ID",
+              "title": "Simulation Instance Id"
+            },
+            "description": "Simulation instance ID"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {}
+                  },
+                  "title": "Response Get Stores Api Stores Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Add Store",
+        "description": "Adds a store to the model\n\nParameters:\n    store (StoreInput): The details of the store to be added.\n                        Dict should contain 'name', 'category', 'latitude', 'longitude', 'simulation_instance_id', and 'simulation_step'.\n\nReturns:\n    dict: A dictionary of stores in the simulation with the new added store",
+        "operationId": "add_store_api_stores_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "title": "Response Add Store Api Stores Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Remove Store",
+        "description": "Removes a store from a model given a store_id, simulation_instance_id, and simulation_step\n\nParameters:\n    store_id (str): The ID of the store to be removed\n    simulation_instance_id (str): The ID of the simulation instance to remove the store from\n    simulation_step (int): The step number to remove the store from\n\nReturns:\n    dict: A dictionary of the updated stores in the model as well as the removed store",
+        "operationId": "remove_store_api_stores_delete",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "ID of the store to delete",
+              "title": "Store Id"
+            },
+            "description": "ID of the store to delete"
+          },
+          {
+            "name": "simulation_step",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Simulation step",
+              "title": "Simulation Step"
+            },
+            "description": "Simulation step"
+          },
+          {
+            "name": "simulation_instance_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Simulation instance ID",
+              "title": "Simulation Instance Id"
+            },
+            "description": "Simulation instance ID"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "title": "Response Remove Store Api Stores Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/get-step-number": {
+      "get": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Get Step Number",
+        "description": "Gets the current step number the model is at\n\nParameters:\n    simulation_instance_id (str): The ID of the simulation instance to get the step number for\n\nReturns:\n    dict: A dictionary with the current step number",
+        "operationId": "get_step_number_api_get_step_number_get",
+        "parameters": [
+          {
+            "name": "simulation_instance_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Simulation instance ID",
+              "title": "Simulation Instance Id"
+            },
+            "description": "Simulation instance ID"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Get Step Number Api Get Step Number Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/get-num-households": {
+      "get": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Get Num Households",
+        "description": "Gets the number of households in the model\n\nParameters:\n    simulation_instance_id (str): The ID of the simulation instance to get the number of households for\n    simulation_step (int): The step number to get the number of households for\n\nReturns:\n    dict: Dictionary with the number of households in the model",
+        "operationId": "get_num_households_api_get_num_households_get",
+        "parameters": [
+          {
+            "name": "simulation_step",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Simulation step",
+              "title": "Simulation Step"
+            },
+            "description": "Simulation step"
+          },
+          {
+            "name": "simulation_instance_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Simulation instance ID",
+              "title": "Simulation Instance Id"
+            },
+            "description": "Simulation instance ID"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Get Num Households Api Get Num Households Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/get-num-stores": {
+      "get": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Get Num Stores",
+        "description": "Gets the number of stores in the model\n\nParameters:\n    simulation_instance_id (str): The ID of the simulation instance to get the number of stores for\n    simulation_step (int): The step number to get the number of stores for\n\nReturns:\n    dict: Dictionaries with the number of stores, number of supermarket stores, and number of non-supermarket stores",
+        "operationId": "get_num_stores_api_get_num_stores_get",
+        "parameters": [
+          {
+            "name": "simulation_step",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Simulation step",
+              "title": "Simulation Step"
+            },
+            "description": "Simulation step"
+          },
+          {
+            "name": "simulation_instance_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Simulation instance ID",
+              "title": "Simulation Instance Id"
+            },
+            "description": "Simulation instance ID"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Get Num Stores Api Get Num Stores Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/get-household-stats": {
+      "get": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Get Household Stats",
+        "description": "Gets household stats\n\nParameters:\n    simulation_instance_id (str): The ID of the simulation instance to get the household stats for\n    simulation_step (int): The step number to get the household stats for\n\nReturns:\n    dict: Dictionaries with average income of the households and average vehicles per household",
+        "operationId": "get_household_stats_api_get_household_stats_get",
+        "parameters": [
+          {
+            "name": "simulation_step",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Simulation step",
+              "title": "Simulation Step"
+            },
+            "description": "Simulation step"
+          },
+          {
+            "name": "simulation_instance_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Simulation instance ID",
+              "title": "Simulation Instance Id"
+            },
+            "description": "Simulation instance ID"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "number"
+                  },
+                  "title": "Response Get Household Stats Api Get Household Stats Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "ABM"
+        ],
+        "summary": "Health Check",
+        "description": "Health check endpoint to verify the API is running properly",
+        "operationId": "health_check_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_create_simulation_instance_api_simulation_instances_post": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "household_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Household Limit"
+          }
+        },
+        "type": "object",
+        "title": "Body_create_simulation_instance_api_simulation_instances_post"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "StoreInput": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "longitude": {
+            "type": "string",
+            "title": "Longitude"
+          },
+          "latitude": {
+            "type": "string",
+            "title": "Latitude"
+          },
+          "simulation_instance_id": {
+            "type": "string",
+            "title": "Simulation Instance Id"
+          },
+          "simulation_step": {
+            "type": "integer",
+            "title": "Simulation Step"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "category",
+          "longitude",
+          "latitude",
+          "simulation_instance_id",
+          "simulation_step"
+        ],
+        "title": "StoreInput",
+        "description": "Data model for adding a store.\n\nAttributes:\n    name (str): The name of the store.\n    category (str): The category/type of the store (e.g., supermarket, grocery).\n    longitude (str): The longitude coordinate of the store location.\n    latitude (str): The latitude coordinate of the store location.\n    simulation_instance_id (str): The ID of the simulation instance to which the store belongs.\n    simulation_step (int): The step of the simulation at which the store is added."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
