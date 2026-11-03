@@ -1,15 +1,18 @@
-- id: "FEAST:0.5"
+- id: "FEAST:0.5.0"
   owner: James DeSilver
   primaryThrust: useInspired/SF
-  name: Food-Access-Model
+  name: FEAST
   status: ProductionRelease
   description: The Food Access and Strategy Simulation tool is a powerful resource for analyzing and simulating the effects of adding or removing stores on household food access.
-  componentVersion: 0.5
+  componentVersion: 0.5.0
   targetIcicleRelease: "2026-10"
+  hasDependentComponents:
+    - related_to: "FASS:0.2"
+      relationship_type: DependsOn
   licenseUrl: https://github.com/ICICLE-ai/Food-Access-Model?tab=BSD-3-Clause-1-ov-file
   publicAccess: true
   sourceCodeUrl: https://github.com/ICICLE-ai/Food-Access-Model
   codeReviewConducted: true
   testsWritten: true
-  developerDocumentationAvailable: false
-  trainingTutorialsAvailable: false
+  developerDocumentationAvailable: true
+  trainingTutorialsAvailable: true
