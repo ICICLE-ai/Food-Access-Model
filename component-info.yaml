@@ -7,7 +7,7 @@
   componentVersion: 0.5.0
   targetIcicleRelease: "2026-10"
   hasDependentComponents:
-    - related_to: "FASS:0.2"
+    - related_to: "FEAST:0.4"
       relationship_type: DependsOn
   licenseUrl: https://github.com/ICICLE-ai/Food-Access-Model?tab=BSD-3-Clause-1-ov-file
   publicAccess: true
